@@ -11,14 +11,10 @@ estimates; nobody has been timed.
 
 ## Start
 
-1. Do steps 1 to 4 of "Setup" in the [root README](../README.md#setup):
-   get the code, install Lean, build, and set up VS Code. Step 5, the C++
-   compiler, is optional; see "Without the C++ compiler" below.
-2. In VS Code, with the repository folder open, open
-   `course/Work/Scratch.lean`. After a few seconds the panel on the right
-   (the _infoview_) shows Lean's messages, and nothing in the file is
-   underlined in red. If `import Tau` is underlined in red, the folder you
-   opened is not the repository folder.
+1. Do "Setup" in the [root README](../README.md#setup). The compiler part
+   is optional.
+2. In VS Code, open `course/Work/Scratch.lean`. Nothing should be underlined
+   in red.
 3. Read the book, starting with "Start here" and "Working in Lean".
 
 ## The book

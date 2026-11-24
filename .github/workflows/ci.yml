@@ -20,7 +20,7 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
-      - name: Install tools (README steps 1, 2 and 5)
+      - name: Install tools
         run: |
           apt-get update
           apt-get install -y git curl ca-certificates python3
@@ -30,17 +30,17 @@ jobs:
           curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
-      - name: Lean library, proofs and tests (README step 3)
+      - name: Lean library, proofs and tests
         run: lake build Tau TauTest tau-sim tau-check
       - name: Exercises are up to date and compile
         run: |
           python3 scripts/make-exercises.py --check
           lake build Exercises Work
-      - name: Compiler (README step 5)
+      - name: Compiler
         run: |
           cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
           cmake --build compiler/build
-      - name: Examples (README step 6)
+      - name: Examples
         run: scripts/check-examples.sh
 
   container:

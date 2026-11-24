@@ -32,62 +32,27 @@ What is not proved:
 
 ## Setup
 
-All commands are typed in a terminal, from the repository folder. CI runs
-these exact steps on Debian 12 and Ubuntu 24.04
-(`.github/workflows/ci.yml`). On Windows, install
-[WSL 2](https://learn.microsoft.com/windows/wsl/install) with Ubuntu and do
-everything inside it. On macOS, steps 1 to 4 should work as written but have
-not been tried; for step 5 see the note there.
-
-**1. Get the code.** On Debian or Ubuntu, first
-`sudo apt install git curl`.
+On Linux (on Windows, inside WSL):
 
 ```bash
-git clone https://github.com/pku-lemonade/tau-tpu.git
-cd tau-tpu
-```
+git clone https://github.com/pku-lemonade/tau-tpu.git && cd tau-tpu
 
-**2. Install Lean.** You do not install Lean itself. You install
-[elan](https://github.com/leanprover/elan), which manages Lean versions the
-way `rustup` manages Rust's. Lean comes with Lake, its build tool, which
-plays the part of `make` or `cargo`. The file `lean-toolchain` names the
-Lean version this project uses, and elan downloads that version the first
-time you run `lake` in this folder.
-
-```bash
+# Lean. elan installs the Lean version named in lean-toolchain;
+# lake, which comes with it, is the build tool.
 curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
-source ~/.elan/env        # or open a new terminal
-lake --version            # downloads Lean the first time, then prints its version
-```
+source ~/.elan/env
+lake build Tau TauTest tau-sim tau-check    # a few minutes the first time
 
-**3. Build the Lean side.** This builds the library, every proof, the tests
-and the two tools. The first time takes a few minutes. It should end with
-`Build completed successfully`.
-
-```bash
-lake build Tau TauTest tau-sim tau-check
-```
-
-**4. Set up the editor.** Lean is written in an editor that shows the proof
-state as you type. Use [VS Code](https://code.visualstudio.com/) with the
-Lean 4 extension:
-
-```bash
+# Editor
 code --install-extension leanprover.lean4
-code .                    # open the repository folder itself
+code .
 ```
 
-Always open the repository folder, the one with `lakefile.toml` in it. With
-a subfolder or a single file open, `import Tau` is not found. If VS Code was
-already running when you installed elan, quit it and start it again, so that
-it can find `lake`. If the `code` command is not found: on macOS, run
-"Shell Command: Install 'code' command in PATH" from VS Code's command
-palette; under WSL, install VS Code on Windows with its WSL extension.
+Open the repository folder in VS Code, not a subfolder, or `import Tau` is
+not found.
 
-**5. Build the compiler (optional).** The compiler needs LLVM and MLIR 21.
-Everything in Lean works without it, and `examples/*/stages/` holds what it
-writes for three examples. On Debian or Ubuntu, this installs LLVM through
-its [official installer](https://apt.llvm.org/) and builds the compiler:
+The compiler is optional and needs LLVM and MLIR 21. Without it,
+`examples/*/stages/` holds its output for three examples.
 
 ```bash
 sudo apt install cmake ninja-build g++ wget lsb-release gnupg software-properties-common
@@ -95,21 +60,11 @@ wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 21 && rm llvm.sh
 sudo apt install llvm-21-dev libmlir-21-dev mlir-21-tools
 cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
 cmake --build compiler/build
+scripts/check-examples.sh                   # every line should start with "ok"
 ```
 
-On macOS, or where those packages are not available, use the container in
-[`docker/`](docker/Dockerfile), which installs the same packages; CI builds
-it and runs every check inside it. VS Code can open the repository inside
-the container through `.devcontainer/`; that part has not been tried.
-
-**6. Check the setup.** If the compiler is built, this compiles every
-example and checks every stage. Each line should start with `ok`.
-
-```bash
-scripts/check-examples.sh
-```
-
-Without the compiler, `lake build Tau TauTest` succeeding is the check.
+Or use the container in [`docker/`](docker/Dockerfile), which has
+everything.
 
 ## Try it
 
@@ -120,8 +75,6 @@ lake exe tau-sim out/compiled.json examples/linear/buffers.json
 ```
 
 Without the compiler, use `examples/linear/stages` in place of `out`.
-`lake exe` builds a tool if needed and then runs it; the built tools are
-also in `.lake/build/bin/`.
 
 `tauc` writes one file per pass, and each can be checked and run on its own:
 

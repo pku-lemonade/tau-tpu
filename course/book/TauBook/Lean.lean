@@ -29,8 +29,7 @@ open Tau
 
 `import Tau` makes the whole library available. `open Tau` lets you write
 `Block` instead of `Tau.Block`. While Lean is checking a file, an orange bar
-runs down the margin; wait for it to go away. If you skipped step 3 of
-"Setup", Lean builds the library first, which takes a few minutes.
+runs down the margin; wait for it to go away.
 
 Files in `course/Work/` are yours. VS Code checks them as you type. To check
 one from a terminal, run `lake build Work.Scratch`. A file
