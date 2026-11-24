@@ -1,0 +1,18 @@
+name = "tau-book"
+defaultTargets = ["tau-book"]
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso"
+rev = "v4.36.0"
+
+[[require]]
+name = "tau-tpu"
+path = "../.."
+
+[[lean_lib]]
+name = "TauBook"
+
+[[lean_exe]]
+name = "tau-book"
+root = "Main"

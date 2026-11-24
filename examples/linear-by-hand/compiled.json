@@ -1,0 +1,29 @@
+{
+  "config": {
+    "kinds": ["mxm", "sxm", "mem", "mem", "vxm", "mem", "mem", "sxm", "mxm"],
+    "streams": 4,
+    "memDelay": 1, "vxmDelay": 1, "sxmDelay": 1, "mxmDelay": 2
+  },
+  "memSizes": [0, 0, 2, 2, 0, 1, 0, 0, 0],
+  "map": [
+    {"slice": 2, "base": 0, "size": 1},
+    {"slice": 2, "base": 1, "size": 1},
+    {"slice": 3, "base": 0, "size": 2},
+    {"slice": 5, "base": 0, "size": 1}
+  ],
+  "cycles": 22,
+  "program": [
+    {"slice": 2, "time": 0, "op": "read", "addr": 0, "dst": {"dir": "west", "id": 0}},
+    {"slice": 0, "time": 4, "op": "load", "src": {"dir": "west", "id": 0}},
+    {"slice": 3, "time": 0, "op": "read", "addr": 0, "dst": {"dir": "west", "id": 1}},
+    {"slice": 3, "time": 1, "op": "read", "addr": 1, "dst": {"dir": "west", "id": 1}},
+    {"slice": 0, "time": 5, "op": "mac", "j": 0, "src": {"dir": "west", "id": 1}},
+    {"slice": 0, "time": 6, "op": "mac", "j": 1, "src": {"dir": "west", "id": 1}},
+    {"slice": 0, "time": 7, "op": "emit", "dst": {"dir": "east", "id": 0}},
+    {"slice": 2, "time": 10, "op": "read", "addr": 1, "dst": {"dir": "east", "id": 1}},
+    {"slice": 4, "time": 14, "op": "bin", "fn": "add", "a": {"dir": "east", "id": 0}, "b": {"dir": "east", "id": 1}, "dst": {"dir": "east", "id": 0}},
+    {"slice": 4, "time": 16, "op": "un", "fn": "requant", "k": 0, "src": {"dir": "east", "id": 0}, "dst": {"dir": "east", "id": 0}},
+    {"slice": 4, "time": 18, "op": "un", "fn": "relu", "src": {"dir": "east", "id": 0}, "dst": {"dir": "east", "id": 0}},
+    {"slice": 5, "time": 21, "op": "write", "src": {"dir": "east", "id": 0}, "addr": 0}
+  ]
+}

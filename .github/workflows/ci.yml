@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git gnupg python3 cmake ninja-build g++
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-21 main" > /etc/apt/sources.list.d/llvm.list
+          apt-get update
+          apt-get install -y --no-install-recommends llvm-21-dev libmlir-21-dev mlir-21-tools
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+      - name: Lean library, proofs and tests
+        run: lake build Tau TauTest tau-sim tau-check
+      - name: Exercises are up to date and compile
+        run: |
+          python3 scripts/make-exercises.py --check
+          lake build Exercises
+      - name: Compiler
+        run: |
+          cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
+          cmake --build compiler/build
+      - name: Examples
+        run: scripts/check-examples.sh
