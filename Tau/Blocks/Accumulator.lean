@@ -4,7 +4,7 @@ import Tau.Blocks.Basic
 # Accumulator
 
 An accumulator holds a running total. On each cycle it is told to add a value,
-to hold, or to clear back to zero. Its output is the total at the start of the
+to hold, to clear back to zero, or to load a new total. Its output is the total at the start of the
 cycle.
 
 In tau-tpu the matrix slice has one accumulator per lane.
@@ -22,6 +22,8 @@ inductive AccIn (α : Type) where
   | add (x : α)
   /-- Reset the total to zero. -/
   | clear
+  /-- Replace the total by `x`. -/
+  | load (x : α)
   deriving Repr, DecidableEq
 
 /-- Apply `f` to the value carried by an `add`. -/
@@ -29,6 +31,7 @@ def AccIn.map {α β : Type} (f : α → β) : AccIn α → AccIn β
   | .hold => .hold
   | .add x => .add (f x)
   | .clear => .clear
+  | .load x => .load (f x)
 
 variable {α : Type}
 
@@ -40,6 +43,7 @@ def accumulator [Add α] (zero : α) : Block α (AccIn α) α where
     | .hold => (s, s)
     | .add x => (s + x, s)
     | .clear => (zero, s)
+    | .load x => (x, s)
 
 example : (accumulator (0 : Nat)).trace (fun t => .add (t + 1)) 5 = [0, 1, 3, 6, 10] := by
   decide

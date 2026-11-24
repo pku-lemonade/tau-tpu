@@ -41,6 +41,7 @@ def Expr.simp : Expr → Expr
   | .un op a => simpUn op a.simp
   | .bin op a b => simpBin op a.simp b.simp
   | .mac j acc x w => .mac j acc.simp x.simp w.simp
+  | .sel m a b => .sel m.simp a.simp b.simp
   | e => e
 
 end Tau

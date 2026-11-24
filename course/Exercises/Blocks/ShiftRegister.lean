@@ -40,6 +40,11 @@ theorem shiftRegister_stateAt (n : Nat) (reset : α) (inp : Signal α)
     (t i : Nat) (hi : i < n) :
     ((shiftRegister n reset).stateAt inp t)[i] =
       if i < t then inp (t - 1 - i) else reset := by
+  -- Outline of one proof:
+  -- Induction on the cycle, for every slot at once.
+  -- Cycle 0: every slot holds the reset value.
+  -- Cycle t + 1: take one step. Slot 0 holds the input of cycle t.
+  -- Slot i > 0 holds what slot i - 1 held at cycle t: use the hypothesis there.
   sorry
 
 /-- A shift register of depth `n` delays its input by exactly `n` cycles.
@@ -47,6 +52,9 @@ For the first `n` cycles it outputs `reset`. -/
 theorem shiftRegister_outAt (n : Nat) (reset : α) (inp : Signal α) (t : Nat) :
     (shiftRegister n reset).outAt inp t =
       if n ≤ t then inp (t - n) else reset := by
+  -- Outline of one proof:
+  -- If the depth is positive, the output is the last slot: use the theorem
+  -- about slots. If the depth is zero, the output is the input.
   sorry
 
 end Tau

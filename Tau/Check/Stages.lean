@@ -59,6 +59,17 @@ inductive PInstr where
   | mac (j : Nat) (src : Var)
   /-- Matrix: `dst` is the accumulator, which is then cleared. -/
   | emit (dst : Var)
+  /-- Vector: `dst` is the constant word with lanes `xs`. -/
+  | const (dst : Var) (xs : List Int)
+  /-- Vector: `dst = sel m a b`. -/
+  | sel (dst : Var) (m a b : Var)
+  /-- Matrix: replace the accumulator by `src`. -/
+  | seed (src : Var)
+  /-- Matrix: keep `src` as stored column `j`. -/
+  | install (j : Nat) (src : Var)
+  /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
+  the accumulator. -/
+  | macw (j : Nat)
   deriving DecidableEq, Repr
 
 /-- The output of `tau-place`. -/
@@ -125,6 +136,34 @@ def PInstr.exec (S : Sem V) (kind : Kind) (vars : List (Var × V)) (sl : Slice V
   | .emit dst =>
     if kind ≠ .mxm then none
     else some ((dst, sl.acc) :: vars, { sl with acc := S.zero })
+  | .const dst xs =>
+    if kind ≠ .vxm then none
+    else some ((dst, S.const xs) :: vars, sl)
+  | .sel dst m a b =>
+    if kind ≠ .vxm then none
+    else
+      match vars.lookup m, vars.lookup a, vars.lookup b with
+      | some vm, some va, some vb => some ((dst, S.sel vm va vb) :: vars, sl)
+      | _, _, _ => none
+  | .seed src =>
+    if kind ≠ .mxm then none
+    else
+      match vars.lookup src with
+      | some v => some (vars, { sl with acc := v })
+      | none => none
+  | .install j src =>
+    if kind ≠ .mxm then none
+    else if sl.weights.length ≤ j then none
+    else
+      match vars.lookup src with
+      | some v => some (vars, { sl with weights := sl.weights.set j v })
+      | none => none
+  | .macw j =>
+    if kind ≠ .mxm then none
+    else
+      match sl.x, sl.weights[j]? with
+      | some x, some w => some (vars, { sl with acc := S.mac j sl.acc x w })
+      | _, _ => none
 
 /-- Carry out one instruction at the slice at position `p`. -/
 def PState.step (S : Sem V) (cfg : Config) (st : PState V) (p : Nat) (i : PInstr) :

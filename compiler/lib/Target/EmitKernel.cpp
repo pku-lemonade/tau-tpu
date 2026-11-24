@@ -27,11 +27,6 @@ struct Numbering {
   }
 };
 
-/// "tau.relu" -> "relu".
-StringRef shortName(Operation &op) {
-  return op.getName().getStringRef().drop_front(strlen("tau."));
-}
-
 Expected<json::Value> emitStmt(Operation &op, Numbering &num) {
   if (auto load = dyn_cast<tau::LoadOp>(op))
     return json::Object{{"op", "load"},
@@ -55,23 +50,51 @@ Expected<json::Value> emitStmt(Operation &op, Numbering &num) {
                         {"stride", static_cast<int64_t>(matvec.getStride())},
                         {"n", static_cast<int64_t>(matvec.getN())}};
   }
-  if (isa<tau::AddOp, tau::SubOp, tau::MulOp, tau::MaxOp, tau::MinOp>(op)) {
+  if (auto affine = dyn_cast<tau::AffineOp>(op)) {
+    int64_t x = num.values.lookup(affine.getX());
+    int64_t bias = num.values.lookup(affine.getBias());
+    return json::Object{{"op", "affine"},
+                        {"dst", num.define(affine.getResult())},
+                        {"x", x},
+                        {"bias", bias},
+                        {"buf", num.buffers.lookup(affine.getBuf())},
+                        {"base", static_cast<int64_t>(affine.getBase())},
+                        {"stride", static_cast<int64_t>(affine.getStride())},
+                        {"n", static_cast<int64_t>(affine.getN())}};
+  }
+  if (auto constant = dyn_cast<tau::ConstOp>(op))
+    return json::Object{{"op", "const"},
+                        {"dst", num.define(constant.getResult())},
+                        {"values", json::Array(constant.getValues())}};
+  if (auto select = dyn_cast<tau::SelectOp>(op)) {
+    int64_t m = num.values.lookup(select.getM());
+    int64_t a = num.values.lookup(select.getA());
+    int64_t b = num.values.lookup(select.getB());
+    return json::Object{{"op", "sel"},
+                        {"dst", num.define(select.getResult())},
+                        {"m", m},
+                        {"a", a},
+                        {"b", b}};
+  }
+  if (tau::isBinaryKernelOp(op)) {
     int64_t a = num.values.lookup(op.getOperand(0));
     int64_t b = num.values.lookup(op.getOperand(1));
     return json::Object{{"op", "bin"},
-                        {"fn", shortName(op)},
+                        {"fn", tau::kernelName(op)},
                         {"dst", num.define(op.getResult(0))},
                         {"a", a},
                         {"b", b}};
   }
-  if (isa<tau::ReluOp, tau::RequantOp, tau::ShiftOp, tau::RotateOp>(op)) {
+  if (tau::isUnaryKernelOp(op)) {
     int64_t a = num.values.lookup(op.getOperand(0));
     json::Object object{{"op", "un"},
-                        {"fn", shortName(op)},
+                        {"fn", tau::kernelName(op)},
                         {"dst", num.define(op.getResult(0))},
                         {"a", a}};
     if (auto k = op.getAttrOfType<IntegerAttr>("k"))
       object["k"] = k.getInt();
+    if (auto table = op.getAttrOfType<DenseI64ArrayAttr>("table"))
+      object["table"] = json::Array(table.asArrayRef());
     return std::move(object);
   }
   return createStringError("cannot emit operation '" +

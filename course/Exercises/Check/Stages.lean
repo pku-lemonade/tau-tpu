@@ -37,6 +37,10 @@ theorem checkKernels_sound (S : Sem V) (hS : S.Lawful) (k k' : Kernel)
     (bufs : List (List V)) (fill : V)
     (h : checkKernels k k' (bufs.map List.length) = true) :
     ∃ out, k.run S bufs = some out ∧ k'.run S bufs = some out := by
+  -- Outline of one proof:
+  -- Split on the two symbolic runs. Each kernel on real buffers is its
+  -- symbolic run evaluated (`Kernel.run_of_exprs`), and the two evaluated
+  -- results agree (`denote_of_simp_eq`).
   sorry
 
 /-! ## A placed program does not look at its values -/
@@ -50,6 +54,10 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
     (vars : List (Var × V)) (sl : Slice V) (i : PInstr) :
     i.exec T kind (vars.map (Prod.map id f)) (sl.map f) =
       (i.exec S kind vars sl).map fun r => (r.1.map (Prod.map id f), r.2.map f) := by
+  -- Outline of one proof:
+  -- One case per instruction, as in `exec_map` for the machine: unfold, move
+  -- the map out of each lookup (`lookup_map`), split on each check and on
+  -- what each lookup found.
   sorry
 
 theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
@@ -82,6 +90,9 @@ theorem checkPlaced_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (pl : Placed)
       pl.execute S (pl.image bufs fill) = some mem ∧
       k.run S bufs = some out ∧
       extract pl.map mem fill = out := by
+  -- Outline of one proof:
+  -- The proof of `check_sound` again, with `Placed.execute_map` in place of
+  -- `execute_map`.
   sorry
 
 end Tau

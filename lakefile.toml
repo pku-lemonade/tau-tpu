@@ -25,3 +25,10 @@ srcDir = "tools"
 name = "Exercises"
 srcDir = "course"
 globs = ["Exercises.+"]
+
+# A place for a student's own files. `course/Work/Foo.lean` is the module
+# `Work.Foo`, and files there can import each other.
+[[lean_lib]]
+name = "Work"
+srcDir = "course"
+globs = ["Work.+"]

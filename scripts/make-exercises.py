@@ -6,6 +6,10 @@ each tactic proof is replaced by `sorry`. Statements, doc comments and imports
 are kept, so an exercise file is the finished file with the proofs taken out.
 The finished file is the solution.
 
+A comment at the top level of a proof (two spaces, then `-- `) is kept in the
+exercise as an outline. Write such comments in long proofs to say what each
+part does.
+
     scripts/make-exercises.py           write course/Exercises/
     scripts/make-exercises.py --check   fail if course/Exercises/ is out of date
 
@@ -82,8 +86,15 @@ def blank_proofs(text: str) -> tuple[str, int]:
             continue
 
         # Skip the proof: every following line that is indented or blank.
+        # Comments at the top level of the proof are kept as an outline.
+        outline = []
         while j < len(lines) and (not lines[j] or lines[j][0].isspace()):
+            if lines[j].startswith("  -- "):
+                outline.append(lines[j])
             j += 1
+        if outline:
+            out.append("  -- Outline of one proof:")
+            out.extend(outline)
         out.append("  sorry")
         out.append("")
         count += 1

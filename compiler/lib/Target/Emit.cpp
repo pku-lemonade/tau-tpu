@@ -10,6 +10,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 #include <algorithm>
+#include <map>
 
 using namespace llvm;
 using namespace mlir;
@@ -53,6 +54,9 @@ json::Object common(Operation &op) {
   for (StringRef key : {"addr", "k", "j"})
     if (std::optional<int64_t> value = tau::optIntAttr(op, key))
       body[key] = *value;
+  for (StringRef key : {"table", "values"})
+    if (auto array = op.getAttrOfType<DenseI64ArrayAttr>(key))
+      body[key] = json::Array(array.asArrayRef());
   return body;
 }
 
@@ -61,16 +65,97 @@ json::Object common(Operation &op) {
 template <typename NameFn>
 void connect(Operation &op, json::Object &body, NameFn name) {
   StringRef kind = tau::instrName(op);
-  if (kind == "write" || kind == "un" || kind == "load")
+  if (kind == "write" || kind == "un" || kind == "load" || kind == "install")
     body["src"] = name(op.getOperand(0));
-  if (kind == "mac")
+  if (kind == "mac" || kind == "seed")
     body["src"] = name(op.getOperand(1));
   if (kind == "bin") {
     body["a"] = name(op.getOperand(0));
     body["b"] = name(op.getOperand(1));
   }
+  if (kind == "sel") {
+    body["m"] = name(op.getOperand(0));
+    body["a"] = name(op.getOperand(1));
+    body["b"] = name(op.getOperand(2));
+  }
   if (Value result = tau::streamResult(op))
     body["dst"] = name(result);
+}
+
+/// The field of an instruction that a repeat can step: the address of a
+/// memory instruction or the column of a matrix instruction.
+const char *steppedField(const json::Object &body) {
+  StringRef op = body.getString("op").value_or("");
+  if (op == "read" || op == "write")
+    return "addr";
+  if (op == "mac" || op == "install" || op == "macw")
+    return "j";
+  return nullptr;
+}
+
+/// Merge runs of instructions that one slice issues at a fixed spacing, and
+/// that differ only by a fixed step in their address or column, into one
+/// repeating entry each. `timed` holds (cycle, instruction) pairs.
+std::vector<std::pair<int64_t, json::Object>>
+compress(std::vector<std::pair<int64_t, json::Object>> timed) {
+  // The instructions of each slice, in order of time.
+  std::map<int64_t, std::vector<size_t>> bySlice;
+  std::stable_sort(timed.begin(), timed.end(),
+                   [](const auto &x, const auto &y) { return x.first < y.first; });
+  for (size_t i = 0; i < timed.size(); ++i)
+    bySlice[timed[i].second.getInteger("slice").value_or(0)].push_back(i);
+
+  // An instruction with its time and stepped field taken out.
+  auto shape = [](json::Object body) {
+    if (const char *field = steppedField(body))
+      body.erase(field);
+    body.erase("time");
+    return json::Value(std::move(body));
+  };
+  auto stepped = [](const json::Object &body) -> int64_t {
+    const char *field = steppedField(body);
+    return field ? body.getInteger(field).value_or(0) : 0;
+  };
+
+  std::vector<std::pair<int64_t, json::Object>> out;
+  for (auto &entry : bySlice) {
+    const std::vector<size_t> &order = entry.second;
+    for (size_t i = 0; i < order.size();) {
+      const json::Object &first = timed[order[i]].second;
+      size_t end = i + 1;
+      int64_t period = 0;
+      int64_t stride = 0;
+      if (end < order.size() &&
+          shape(first) == shape(timed[order[end]].second)) {
+        period = timed[order[end]].first - timed[order[i]].first;
+        stride = stepped(timed[order[end]].second) - stepped(first);
+        if (period >= 1 && stride >= 0) {
+          ++end;
+          while (end < order.size() &&
+                 shape(first) == shape(timed[order[end]].second) &&
+                 timed[order[end]].first - timed[order[end - 1]].first ==
+                     period &&
+                 stepped(timed[order[end]].second) -
+                         stepped(timed[order[end - 1]].second) ==
+                     stride)
+            ++end;
+        } else {
+          end = i + 1;
+        }
+      }
+      json::Object body = first;
+      if (end - i > 1) {
+        body["repeats"] = static_cast<int64_t>(end - i - 1);
+        body["gap"] = period - 1;
+        body["stride"] = stride;
+      }
+      out.push_back({timed[order[i]].first, std::move(body)});
+      i = end;
+    }
+  }
+  std::stable_sort(out.begin(), out.end(),
+                   [](const auto &x, const auto &y) { return x.first < y.first; });
+  return out;
 }
 
 } // namespace
@@ -152,10 +237,8 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func, bool idealRouting) {
     });
     timed.push_back({*time, std::move(body)});
   }
-  std::stable_sort(timed.begin(), timed.end(),
-                   [](const auto &x, const auto &y) { return x.first < y.first; });
   json::Array program;
-  for (auto &entry : timed)
+  for (auto &entry : compress(std::move(timed)))
     program.push_back(std::move(entry.second));
 
   if (idealRouting) {

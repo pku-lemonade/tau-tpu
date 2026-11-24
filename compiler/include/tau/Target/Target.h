@@ -17,6 +17,8 @@ struct Chip {
   /// or "mxm".
   std::vector<std::string> kinds;
   int streams = 8;
+  /// The number of columns a matrix slice can store.
+  int mxmWeights = 8;
   int memDelay = 1;
   int vxmDelay = 1;
   int sxmDelay = 1;
@@ -55,6 +57,19 @@ std::optional<int64_t> optIntAttr(mlir::Operation &op, llvm::StringRef name);
 void setIntAttr(mlir::Operation &op, llvm::StringRef name, int64_t value);
 /// The result of `op` that travels on a stream, if it has one.
 mlir::Value streamResult(mlir::Operation &op);
+
+//===----------------------------------------------------------------------===//
+// Kernel operations
+//===----------------------------------------------------------------------===//
+
+/// "tau.relu" -> "relu".
+llvm::StringRef kernelName(mlir::Operation &op);
+/// Whether `op` is a one-word operation such as `tau.relu` or `tau.shift`.
+bool isUnaryKernelOp(mlir::Operation &op);
+/// Whether `op` is a two-word operation such as `tau.add`.
+bool isBinaryKernelOp(mlir::Operation &op);
+/// Whether the one-word operation `name` runs on the rearrangement slice.
+bool isRearrangement(llvm::StringRef name);
 
 //===----------------------------------------------------------------------===//
 // Files for the Lean tools (docs/formats.md)

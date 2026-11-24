@@ -22,6 +22,9 @@ def Stmt.inst (k : Nat) : Stmt → Stmt
   | .un dst op a => .un dst op a
   | .bin dst op a b => .bin dst op a b
   | .matvec dst x buf ix n => .matvec dst x buf (ix.inst k) n
+  | .affine dst x bias buf ix n => .affine dst x bias buf (ix.inst k) n
+  | .const dst xs => .const dst xs
+  | .sel dst m a b => .sel dst m a b
 
 /-- The first `n` iterations of a loop body, written out. -/
 def unrollLoop (body : List Stmt) : Nat → List Stmt

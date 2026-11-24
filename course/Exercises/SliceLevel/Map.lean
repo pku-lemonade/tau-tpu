@@ -35,6 +35,7 @@ def Slice.map (f : V → W) (sl : Slice V) : Slice W where
   words := sl.words.map f
   x := sl.x.map f
   acc := f sl.acc
+  weights := sl.weights.map f
   pipe := sl.pipe.map (Option.map (Prod.map id f))
 
 /-- Apply `f` to every value in a machine state. -/
@@ -57,6 +58,11 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     (kind : Kind) (rd : Track → Option V) (rd' : Track → Option W)
     (hrd : ∀ tr, rd' tr = (rd tr).map f) (sl : Slice V) (i : Instr) :
     exec T cfg kind rd' (sl.map f) i = (exec S cfg kind rd sl i).map (mapResult f) := by
+  -- Outline of one proof:
+  -- One case per instruction, all of the same shape: unfold `exec`, rewrite
+  -- the mapped reads with `hrd`, split on each check, then split on what
+  -- each read found. Where a value is computed, `h` says `f` commutes with
+  -- the operation.
   sorry
 
 theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Track × V)) :
@@ -67,6 +73,10 @@ theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg
     (prog : Program) (s : State V) (p : Nat) (sl : Slice V) :
     stepSlice T cfg prog (s.map f) p (sl.map f) =
       (stepSlice S cfg prog s p sl).map (mapResult f) := by
+  -- Outline of one proof:
+  -- The time is the same in both states, so the same instructions are due.
+  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `shiftPipe_map`.
+  -- Two or more: the same trap on both sides.
   sorry
 
 theorem stepSlices_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)

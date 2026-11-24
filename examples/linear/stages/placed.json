@@ -1,0 +1,131 @@
+{
+  "config": {
+    "kinds": [
+      "mxm",
+      "sxm",
+      "mem",
+      "mem",
+      "vxm",
+      "mem",
+      "mem",
+      "sxm",
+      "mxm"
+    ],
+    "memDelay": 1,
+    "mxmDelay": 2,
+    "mxmWeights": 8,
+    "streams": 8,
+    "sxmDelay": 1,
+    "vxmDelay": 1
+  },
+  "instructions": [
+    {
+      "addr": 0,
+      "dst": 0,
+      "op": "read",
+      "slice": 2
+    },
+    {
+      "op": "load",
+      "slice": 0,
+      "src": 0
+    },
+    {
+      "addr": 0,
+      "dst": 1,
+      "op": "read",
+      "slice": 5
+    },
+    {
+      "j": 0,
+      "op": "mac",
+      "slice": 0,
+      "src": 1
+    },
+    {
+      "addr": 1,
+      "dst": 2,
+      "op": "read",
+      "slice": 5
+    },
+    {
+      "j": 1,
+      "op": "mac",
+      "slice": 0,
+      "src": 2
+    },
+    {
+      "dst": 3,
+      "op": "emit",
+      "slice": 0
+    },
+    {
+      "addr": 0,
+      "dst": 4,
+      "op": "read",
+      "slice": 3
+    },
+    {
+      "a": 3,
+      "b": 4,
+      "dst": 5,
+      "fn": "add",
+      "op": "bin",
+      "slice": 4
+    },
+    {
+      "dst": 6,
+      "fn": "requant",
+      "k": 0,
+      "op": "un",
+      "slice": 4,
+      "src": 5
+    },
+    {
+      "dst": 7,
+      "fn": "relu",
+      "op": "un",
+      "slice": 4,
+      "src": 6
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 6,
+      "src": 7
+    }
+  ],
+  "map": [
+    {
+      "base": 0,
+      "size": 1,
+      "slice": 2
+    },
+    {
+      "base": 0,
+      "size": 1,
+      "slice": 3
+    },
+    {
+      "base": 0,
+      "size": 2,
+      "slice": 5
+    },
+    {
+      "base": 0,
+      "size": 1,
+      "slice": 6
+    }
+  ],
+  "memSizes": [
+    0,
+    0,
+    1,
+    1,
+    0,
+    2,
+    1,
+    0,
+    0
+  ]
+}

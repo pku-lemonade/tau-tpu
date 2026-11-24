@@ -30,6 +30,15 @@ def max (a b : Lane) : Lane := if a.slt b then b else a
 /-- The smaller of two signed values. -/
 def min (a b : Lane) : Lane := if a.slt b then a else b
 
+/-- The absolute value. The most negative value stays as it is. -/
+def abs (a : Lane) : Lane := if a.slt 0 then -a else a
+
+/-- 1 if `a` is less than `b` as signed values, and 0 otherwise. -/
+def lt (a b : Lane) : Lane := if a.slt b then 1 else 0
+
+/-- `a` if the mask `m` is not zero, and `b` otherwise. -/
+def sel (m a b : Lane) : Lane := if m = 0 then b else a
+
 /-- Scale a wide value back to 8 bits: divide by `2 ^ k`, rounding down, then
 clamp to the range -128 to 127. -/
 def requant (k : Nat) (a : Lane) : Lane :=
@@ -60,6 +69,28 @@ def shift (k : Nat) (w : Word lanes) : Word lanes :=
 wrapping around. -/
 def rotate (k : Nat) (w : Word lanes) : Word lanes :=
   Vector.ofFn fun i : Fin lanes => w[(i.val + k) % lanes]?.getD 0
+
+/-- The lanes in the opposite order. -/
+def reverse (w : Word lanes) : Word lanes :=
+  Vector.ofFn fun i : Fin lanes => w[lanes - 1 - i.val]?.getD 0
+
+/-- Every lane takes the value of lane `j`. -/
+def broadcast (j : Nat) (w : Word lanes) : Word lanes :=
+  Vector.replicate lanes (w[j]?.getD 0)
+
+/-- Lane `i` takes the value of lane `table[i]`. A lane with no entry in the
+table, or an entry that names no lane, becomes zero. -/
+def permute (table : List Nat) (w : Word lanes) : Word lanes :=
+  Vector.ofFn fun i : Fin lanes =>
+    match table[i.val]? with
+    | some k => w[k]?.getD 0
+    | none => 0
+
+/-- Lane by lane: the lane of `a` where the lane of `m` is not zero, and the
+lane of `b` elsewhere. -/
+def sel (m a b : Word lanes) : Word lanes :=
+  Vector.ofFn fun i : Fin lanes =>
+    Lane.sel (m[i.val]?.getD 0) (a[i.val]?.getD 0) (b[i.val]?.getD 0)
 
 /-- One step of a matrix-vector product: add lane `j` of `x`, times `w`, to
 `acc`. With `w` a column of a matrix, doing this for every column gives the

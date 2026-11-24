@@ -1,0 +1,12 @@
+{
+  "name": "tau-tpu",
+  "build": {
+    "dockerfile": "../docker/Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["leanprover.lean4"]
+    }
+  }
+}

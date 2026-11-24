@@ -10,7 +10,11 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "End to end" =>
-*Files:* `Tau/Proofs/EndToEnd.lean`, `tests/TauTest/Axioms.lean`.
+*Read:* `tests/TauTest/Axioms.lean`.
+
+*Solutions, not to be opened yet:* `Tau/Proofs/EndToEnd.lean`.
+
+*Time:* one day.
 
 # The theorem
 
@@ -34,11 +38,20 @@ The proof is three lines. Each layer did its part: the checker is sound for
 the slice-level machine, the cell-level machine equals the slice-level
 machine, and real words obey the simplifier's laws.
 
+# How to work through it
+
+1. Do `Exercises/EndToEnd.lean`. Each proof names the theorems from earlier
+   chapters and does nothing else. If you know what each earlier theorem
+   says, this takes an hour.
+2. In your scratch file run `#print axioms Tau.end_to_end`.
+3. Go back to the three commands in "Start here" and run them again. Say what
+   each one does, in terms of definitions you have now read.
+
 # What it rests on
 
-Run `#print axioms Tau.end_to_end`. The answer lists three axioms that almost
-every Lean development uses, and nothing else. In particular there is no
-`sorryAx`, which is what an unfinished proof would leave behind. The file
+`#print axioms Tau.end_to_end` lists three axioms that almost every Lean
+development uses, and nothing else. In particular there is no `sorryAx`,
+which is what an unfinished proof would leave behind. The file
 `tests/TauTest/Axioms.lean` makes the build fail if that list changes.
 
 # What it does not say
@@ -52,21 +65,31 @@ Being exact about the limits of a theorem is part of the skill.
 * It trusts the statement. `Kernel.run`, `cellExecute`, `extract` and
   `Compiled.image` are definitions somebody wrote. Read them and decide
   whether they mean what the sentence above claims.
+* It trusts the operations. `Lane.requant` is whatever
+  `Tau/Data/Word.lean` says it is. Nothing checks that against an intention.
 * It is about a model. No hardware is involved.
 * It says nothing about speed. A program that takes a million cycles is as
   correct as one that takes twenty.
+
+# Exercises
+
+*Guided.* `Exercises/EndToEnd.lean`.
+
+*Open.* Write one page, for someone who has not taken this course, that says
+what `tau-check` printing `ACCEPT` guarantees and what it does not. Use no
+Lean. Then give it to someone and ask them what they think is guaranteed.
 
 # Where to go next
 
 * Prove something about the scheduler itself, in Lean: for instance, that a
   schedule built by `tau-schedule` from the output of `tau-place` always
-  satisfies the timing rule. This is a research-sized problem; start with single
-  operations.
+  satisfies the timing rule. This is a research-sized problem. Start with
+  groups of one operation.
 * Lean-MLIR is a framework for verifying rewrites on MLIR-style
   representations, with far more automation than this course uses.
-* CompCert is a C compiler proved correct in a different proof assistant. Its
+* CompCert is a C compiler proved correct in another proof assistant. Its
   register allocator is validated by a proved checker, which is the approach
-  of chapter 11.
+  of the chapter on the checker.
 * _Software Foundations_ is the standard introduction to proving things about
   programming languages.
 

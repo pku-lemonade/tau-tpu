@@ -34,6 +34,7 @@ int tau::Chip::maxDelay() const {
 json::Value tau::Chip::toJSON() const {
   return json::Object{
       {"kinds", json::Array(kinds)}, {"streams", streams},
+      {"mxmWeights", mxmWeights},
       {"memDelay", memDelay},        {"vxmDelay", vxmDelay},
       {"sxmDelay", sxmDelay},        {"mxmDelay", mxmDelay},
   };
@@ -72,6 +73,9 @@ Expected<tau::Chip> tau::Chip::fromJSON(const json::Value &value) {
     return std::move(e);
   if (Error e = field("mxmDelay", chip.mxmDelay))
     return std::move(e);
+  if (object->get("mxmWeights"))
+    if (Error e = field("mxmWeights", chip.mxmWeights))
+      return std::move(e);
   return chip;
 }
 
@@ -128,7 +132,35 @@ void tau::setIntAttr(Operation &op, StringRef name, int64_t value) {
 
 Value tau::streamResult(Operation &op) {
   StringRef name = instrName(op);
-  if (name == "read" || name == "un" || name == "bin" || name == "emit")
+  if (name == "read" || name == "un" || name == "bin" || name == "emit" ||
+      name == "const" || name == "sel")
     return op.getResult(0);
   return Value();
+}
+
+StringRef tau::kernelName(Operation &op) {
+  return op.getName().getStringRef().drop_front(strlen("tau."));
+}
+
+bool tau::isRearrangement(StringRef name) {
+  return name == "shift" || name == "rotate" || name == "reverse" ||
+         name == "broadcast" || name == "permute";
+}
+
+bool tau::isUnaryKernelOp(Operation &op) {
+  if (!op.getName().getStringRef().starts_with("tau.") || isInstr(op))
+    return false;
+  StringRef name = kernelName(op);
+  return name == "relu" || name == "requant" || name == "neg" ||
+         name == "abs" || name == "shl" || name == "addi" || name == "muli" ||
+         isRearrangement(name);
+}
+
+bool tau::isBinaryKernelOp(Operation &op) {
+  if (!op.getName().getStringRef().starts_with("tau.") || isInstr(op))
+    return false;
+  StringRef name = kernelName(op);
+  return name == "add" || name == "sub" || name == "mul" || name == "max" ||
+         name == "min" || name == "and" || name == "or" || name == "xor" ||
+         name == "lt";
 }

@@ -1,5 +1,5 @@
 import Tau.SliceLevel.Machine
-import Tau.Blocks.Sequencer
+import Tau.Blocks.Repeater
 import Tau.Blocks.Memory
 import Tau.Blocks.ShiftRegister
 import Tau.Blocks.Mac
@@ -11,14 +11,17 @@ This is tau-tpu with each slice opened up. Where the slice-level machine
 (`Tau/SliceLevel/Machine.lean`) treats a slice as one box, here a slice is
 built from the blocks in `Tau/Blocks/`:
 
-* a **sequencer** that counts cycles and issues the slice's instructions,
+* a **repeater** that issues the slice's instructions, counting down to each
+  one with its own registers,
 * a **memory** that holds its words,
 * a **shift register** that carries each result for the slice's delay,
-* one **multiply-accumulate cell** per lane, for the matrix slice.
+* one **multiply-accumulate cell** per lane, for the matrix slice,
+* a second small **memory** for the columns a matrix slice stores.
 
-There is no clock shared by the whole chip. Every slice keeps its own count in
-its sequencer, and the counts agree only because they all start at zero and
-all advance on every cycle.
+There is no clock shared by the whole chip. Every slice counts for itself, in
+the registers of its repeater, and the slices agree only because they all
+start together and all advance on every cycle. (Each slice also keeps a cycle
+count, used only to report where a trap happened.)
 
 This machine works on real words only. The streams between slices are the
 same as at the slice level.
@@ -32,15 +35,12 @@ namespace Tau
 
 variable {lanes : Nat}
 
-/-- The instructions for slice `p`, each with its cycle: the program of that
-slice's sequencer. -/
-def Program.forSlice (prog : Program) (p : Nat) : List (Nat × Instr) :=
-  (prog.filter fun e => e.slice == p).map fun e => (e.time, e.instr)
-
 /-- The state of one slice, as the states of its blocks. -/
 structure Cell (lanes : Nat) where
-  /-- Sequencer: the cycle count. -/
+  /-- The cycle count, used to report traps. -/
   clock : Nat
+  /-- Repeater: the registers of every instruction entry. -/
+  slots : List (Slot Instr)
   /-- Memory: the number of words. -/
   size : Nat
   /-- Memory: the stored words. -/
@@ -53,6 +53,10 @@ structure Cell (lanes : Nat) where
   x : Option (Word lanes)
   /-- Matrix slice: the total held by the multiply-accumulate cell of each lane. -/
   acc : Vector Lane lanes
+  /-- Matrix slice: the number of columns it can store. -/
+  wsize : Nat
+  /-- Matrix slice: the stored columns, kept in a small memory. -/
+  weights : Vector (Word lanes) wsize
 
 /-- Step the multiply-accumulate cell of every lane. `cmd k` is what the cell
 of lane `k` is told to do. -/
@@ -111,6 +115,41 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
     if kind ≠ .mxm then .error .wrongSlice
     else if cfg.streams ≤ dst.id then .error .badTrack
     else .ok ({ c with acc := macLanes c.acc fun _ => .clear }, some (dst, c.acc))
+  | .const xs dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if cfg.streams ≤ dst.id then .error .badTrack
+    else .ok (c, some (dst, (wordSem lanes).const xs))
+  | .sel m a b dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if cfg.streams ≤ dst.id then .error .badTrack
+    else
+      match rd m, rd a, rd b with
+      | some vm, some va, some vb => .ok (c, some (dst, (wordSem lanes).sel vm va vb))
+      | _, _, _ => .error .emptyRead
+  | .seed src =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else
+      match rd src with
+      | none => .error .emptyRead
+      -- Lane `k` loads lane `k` of the word.
+      | some v => .ok ({ c with acc := macLanes c.acc fun k => .load (v[k], 1) }, none)
+  | .install j src =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else if c.wsize ≤ j then .error .badAddress
+    else
+      match rd src with
+      | none => .error .emptyRead
+      | some v =>
+        .ok ({ c with
+          weights := ((memory c.wsize c.weights).step c.weights (.write j v)).1 }, none)
+  | .macw j =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else
+      match c.x, ((memory c.wsize c.weights).step c.weights (.read j)).2 with
+      | none, _ => .error .noOperand
+      | some _, none => .error .badAddress
+      | some x, some w =>
+        .ok ({ c with acc := macLanes c.acc fun k => .add (x[j]?.getD 0, w[k]) }, none)
 
 /-- Push a result into a slice's shift register and take out the one that
 leaves it. -/
@@ -119,14 +158,14 @@ def cellShift (c : Cell lanes) (entering : Option (Track × Word lanes)) :
   let r := (shiftRegister c.depth none).step c.pipe entering
   ({ c with pipe := r.1 }, r.2)
 
-/-- One cycle of the slice at position `p`. The sequencer issues the
-instructions due and advances the slice's clock. -/
+/-- One cycle of the slice at position `p`. The repeater issues the
+instructions due and advances its registers. -/
 def cellStep (cfg : Config) (prog : Program) (rd : Track → Option (Word lanes)) (p : Nat)
     (c : Cell lanes) : Except Trap (Cell lanes × Option (Track × Word lanes)) :=
-  let issued := (sequencer (prog.forSlice p)).step c.clock ()
+  let issued := (repeater (prog.entriesFor p)).step c.slots ()
   let tick (r : Cell lanes × Option (Track × Word lanes)) :
       Cell lanes × Option (Track × Word lanes) :=
-    ({ r.1 with clock := issued.1 }, r.2)
+    ({ r.1 with clock := c.clock + 1, slots := issued.1 }, r.2)
   match issued.2 with
   | [] => .ok (tick (cellShift c none))
   | [i] =>
@@ -185,18 +224,23 @@ def CellState.run (cfg : Config) (prog : Program) :
     | .error e => .error e
     | .ok s' => CellState.run cfg prog n s'
 
-/-- The state at cycle 0, for the given starting memory contents. -/
-def CellState.init (cfg : Config) (image : List (List (Word lanes))) : CellState lanes where
+/-- The state at cycle 0, for the given program and starting memory contents.
+Each slice's repeater is loaded with that slice's entries. -/
+def CellState.init (cfg : Config) (prog : Program) (image : List (List (Word lanes))) :
+    CellState lanes where
   east := List.replicate cfg.streams (List.replicate cfg.kinds.length none)
   west := List.replicate cfg.streams (List.replicate cfg.kinds.length none)
   cells := (List.range cfg.kinds.length).map fun p =>
     { clock := 0
+      slots := (prog.entriesFor p).map Entry.start
       size := (image[p]?.getD []).length
       mem := ⟨(image[p]?.getD []).toArray, by simp⟩
       depth := cfg.delay ((cfg.kinds[p]?).getD .vxm)
       pipe := Vector.replicate _ none
       x := none
-      acc := Vector.replicate lanes 0 }
+      acc := Vector.replicate lanes 0
+      wsize := cfg.mxmWeights
+      weights := Vector.replicate _ Word.zero }
 
 /-- The contents of every slice's memory. -/
 def CellState.memory (s : CellState lanes) : List (List (Word lanes)) :=
@@ -206,8 +250,11 @@ def CellState.memory (s : CellState lanes) : List (List (Word lanes)) :=
 memory contents. -/
 def cellExecute (cfg : Config) (prog : Program) (n : Nat) (image : List (List (Word lanes))) :
     Except Trap (List (List (Word lanes))) :=
-  match CellState.run cfg prog n (CellState.init cfg image) with
-  | .error e => .error e
-  | .ok s => .ok s.memory
+  match prog.find? fun e => cfg.kinds.length ≤ e.slice with
+  | some e => .error ⟨.noSlice, e.slice, e.time⟩
+  | none =>
+    match CellState.run cfg prog n (CellState.init cfg prog image) with
+    | .error e => .error e
+    | .ok s => .ok s.memory
 
 end Tau

@@ -1,4 +1,5 @@
 import Tau.Isa.Op
+import Tau.Blocks.Repeater
 
 /-!
 # Instructions and programs
@@ -10,6 +11,11 @@ stream to put the result on.
 
 A program is a list of instructions, each with its slice and its cycle. There
 are no branches and no waiting. Everything that will happen is in the list.
+
+An entry of the list may repeat: issue again a number of times, a fixed
+number of cycles apart, with the address or column index stepping by a fixed
+amount. What an entry issues at each cycle is given by `Entry.dueAt` in
+`Tau/Blocks/Repeater.lean`.
 
 Terms to look up: *instruction set architecture*, *static scheduling*.
 -/
@@ -49,24 +55,64 @@ inductive Instr where
   | mac (j : Nat) (src : Track)
   /-- Matrix: put the accumulator on `dst` and clear it. -/
   | emit (dst : Track)
+  /-- Vector: put the constant word with lanes `xs` on `dst`. -/
+  | const (xs : List Int) (dst : Track)
+  /-- Vector: lane by lane, the word on `a` where the word on `m` is not zero
+  and the word on `b` elsewhere. -/
+  | sel (m a b dst : Track)
+  /-- Matrix: replace the accumulator by the word on `src`. -/
+  | seed (src : Track)
+  /-- Matrix: keep the word on `src` as stored column `j`. -/
+  | install (j : Nat) (src : Track)
+  /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
+  the accumulator. -/
+  | macw (j : Nat)
   deriving DecidableEq, Repr
 
-/-- An instruction together with its slice and its cycle. -/
+/-- Add `k` to the address of a memory instruction or to the column index of a
+matrix instruction. Other instructions are unchanged. -/
+def Instr.bump (k : Nat) : Instr → Instr
+  | .read addr dst => .read (addr + k) dst
+  | .write src addr => .write src (addr + k)
+  | .mac j src => .mac (j + k) src
+  | .install j src => .install (j + k) src
+  | .macw j => .macw (j + k)
+  | i => i
+
+/-- An instruction together with its slice and its cycle, and how it
+repeats. -/
 structure Timed where
   /-- The position of the slice that executes the instruction. -/
   slice : Nat
-  /-- The cycle on which it is issued. -/
+  /-- The cycle on which it is first issued. -/
   time : Nat
   /-- What the slice is told to do. -/
   instr : Instr
+  /-- The number of further issues after the first. -/
+  repeats : Nat := 0
+  /-- The number of idle cycles between two issues. -/
+  gap : Nat := 0
+  /-- How much the address or column index grows from one issue to the next. -/
+  stride : Nat := 0
   deriving DecidableEq, Repr
+
+/-- An instruction issued once. -/
+def Timed.once (slice time : Nat) (instr : Instr) : Timed := { slice, time, instr }
+
+/-- A timed instruction as an entry of its slice's repeater. -/
+def Timed.entry (e : Timed) : Entry Instr :=
+  ⟨e.time, e.repeats, e.gap, e.instr, Instr.bump e.stride⟩
 
 /-- A program: every instruction the chip will execute. -/
 abbrev Program := List Timed
 
+/-- The entries of the program that are for slice `p`. -/
+def Program.entriesFor (prog : Program) (p : Nat) : List (Entry Instr) :=
+  (prog.filter fun e => e.slice == p).map Timed.entry
+
 /-- The instructions that slice `p` must execute at cycle `t`. -/
 def Program.dueAt (prog : Program) (p t : Nat) : List Instr :=
-  (prog.filter fun e => e.slice == p && e.time == t).map fun e => e.instr
+  (prog.entriesFor p).filterMap fun e => e.dueAt t
 
 /-- The shape of a chip. -/
 structure Config where
@@ -74,6 +120,8 @@ structure Config where
   kinds : List Kind
   /-- The number of streams in each direction. -/
   streams : Nat
+  /-- The number of columns a matrix slice can store. -/
+  mxmWeights : Nat := 8
   /-- The number of cycles a result spends inside a memory slice. -/
   memDelay : Nat
   /-- The number of cycles a result spends inside a vector slice. -/

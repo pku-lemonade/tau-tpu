@@ -26,9 +26,14 @@ What the user wrote, before any compiler pass.
 - `dst`, `src`, `a`, `b` and `x` are value numbers.
 - A position is `base + stride * i`, where `i` is the iteration of the
   enclosing loop, or 0 outside a loop.
-- One-word functions (`un`): `relu`, `requant`, `shift`, `rotate`. The last
-  three take `k`.
-- Two-word functions (`bin`): `add`, `sub`, `mul`, `max`, `min`.
+- One-word functions (`un`): `relu`, `neg`, `abs`, `reverse` take nothing;
+  `requant`, `shl`, `addi`, `muli`, `shift`, `rotate`, `broadcast` take an
+  integer `k`; `permute` takes a list `table`.
+- Two-word functions (`bin`): `add`, `sub`, `mul`, `max`, `min`, `and`, `or`,
+  `xor`, `lt`.
+- Other statements: `{"op": "const", "dst": 0, "values": [1, 2]}`,
+  `{"op": "sel", "dst": 3, "m": 0, "a": 1, "b": 2}`, and `affine`, which is
+  `matvec` with one more field, `bias`.
 - A `loop` body holds statements only. Loops do not nest.
 
 ## Placed file
@@ -54,8 +59,10 @@ the order they must take effect. There are no cycles and no streams yet.
 }
 ```
 
-- `dst`, `src`, `a` and `b` are numbers naming words in transit. Each is
-  produced once and used once.
+- `dst`, `src`, `a`, `b` and `m` are numbers naming words in transit. Each
+  is produced once and used by one instruction.
+- Instructions (`op`): `read`, `write`, `un`, `bin`, `const`, `sel`, `load`,
+  `seed`, `mac`, `install`, `macw`, `emit`.
 - The fields are those of `Tau.PInstr` in `Tau/Check/Stages.lean`.
 
 ## Compiled file
@@ -69,15 +76,16 @@ itself and `streams` is raised to make room, and `compiled.json` after
 {
   "config": {
     "kinds": ["mxm", "sxm", "mem", "mem", "vxm", "mem", "mem", "sxm", "mxm"],
-    "streams": 8,
+    "streams": 8, "mxmWeights": 8,
     "memDelay": 1, "vxmDelay": 1, "sxmDelay": 1, "mxmDelay": 2
   },
   "memSizes": [0, 0, 2, 1, 0, 2, 1, 0, 0],
   "map": [{"slice": 2, "base": 0, "size": 1}],
   "cycles": 25,
   "program": [
-    {"slice": 2, "time": 0, "op": "read", "addr": 0, "dst": {"dir": "west", "id": 0}},
-    {"slice": 0, "time": 4, "op": "load", "src": {"dir": "west", "id": 0}}
+    {"slice": 5, "time": 0, "op": "read", "addr": 0, "dst": {"dir": "west", "id": 0},
+     "repeats": 1, "gap": 0, "stride": 1},
+    {"slice": 0, "time": 6, "op": "load", "src": {"dir": "west", "id": 0}}
   ]
 }
 ```
@@ -88,8 +96,16 @@ itself and `streams` is raised to make room, and `compiled.json` after
 - `map` places each buffer, in buffer order: its slice, first address and
   length. Memory words outside every buffer are scratch space.
 - `cycles` is how long to run.
-- Instructions (`op`): `read`, `write`, `un`, `bin`, `load`, `mac`, `emit`.
-  Their fields are those of `Tau.Instr` in `Tau/Isa/Instr.lean`.
+- `mxmWeights` is the number of columns a matrix slice can store. It may be
+  left out, and is then 8.
+- Instructions (`op`): `read`, `write`, `un`, `bin`, `const`, `sel`, `load`,
+  `seed`, `mac`, `install`, `macw`, `emit`. Their fields are those of
+  `Tau.Instr` in `Tau/Isa/Instr.lean`.
+- An entry with `repeats`, `gap` and `stride` is issued `repeats` more times
+  after the first, with `gap` idle cycles between issues, and with its `addr`
+  (for `read` and `write`) or `j` (for `mac`, `install` and `macw`) growing by
+  `stride` each time. All three may be left out, and are then 0. `tauc` merges
+  runs of instructions into such entries when it writes the file.
 
 ## What `tauc` writes
 

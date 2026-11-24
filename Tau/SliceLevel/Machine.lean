@@ -63,6 +63,8 @@ structure Slice (V : Type) where
   x : Option V
   /-- Matrix slices: the accumulator. -/
   acc : V
+  /-- Matrix slices: the stored columns. -/
+  weights : List V
   /-- Results on their way out, newest first. -/
   pipe : List (Option (Track × V))
 
@@ -137,6 +139,37 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
     if kind ≠ .mxm then .error .wrongSlice
     else if cfg.streams ≤ dst.id then .error .badTrack
     else .ok ({ sl with acc := S.zero }, some (dst, sl.acc))
+  | .const xs dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if cfg.streams ≤ dst.id then .error .badTrack
+    else .ok (sl, some (dst, S.const xs))
+  | .sel m a b dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if cfg.streams ≤ dst.id then .error .badTrack
+    else
+      match rd m, rd a, rd b with
+      | some vm, some va, some vb => .ok (sl, some (dst, S.sel vm va vb))
+      | _, _, _ => .error .emptyRead
+  | .seed src =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else
+      match rd src with
+      | none => .error .emptyRead
+      | some v => .ok ({ sl with acc := v }, none)
+  | .install j src =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else if sl.weights.length ≤ j then .error .badAddress
+    else
+      match rd src with
+      | none => .error .emptyRead
+      | some v => .ok ({ sl with weights := sl.weights.set j v }, none)
+  | .macw j =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else
+      match sl.x, sl.weights[j]? with
+      | none, _ => .error .noOperand
+      | some _, none => .error .badAddress
+      | some x, some w => .ok ({ sl with acc := S.mac j sl.acc x w }, none)
 
 /-- Push a result into a slice's pipe and take out the one that has been in it
 for the full delay. -/
@@ -226,6 +259,7 @@ def State.init (S : Sem V) (cfg : Config) (image : List (List V)) : State V wher
     { words := image[p]?.getD []
       x := none
       acc := S.zero
+      weights := List.replicate cfg.mxmWeights S.zero
       pipe := List.replicate (cfg.delay ((cfg.kinds[p]?).getD .vxm)) none }
 
 /-- The contents of every slice's memory. -/
@@ -235,8 +269,13 @@ def State.memory (s : State V) : List (List V) := s.slices.map (·.words)
 memory contents. -/
 def execute (S : Sem V) (cfg : Config) (prog : Program) (n : Nat)
     (image : List (List V)) : Except Trap (List (List V)) :=
-  match run S cfg prog n (State.init S cfg image) with
-  | .error e => .error e
-  | .ok s => .ok s.memory
+  -- An instruction for a slice the chip does not have is a trap before the
+  -- first cycle.
+  match prog.find? fun e => cfg.kinds.length ≤ e.slice with
+  | some e => .error ⟨.noSlice, e.slice, e.time⟩
+  | none =>
+    match run S cfg prog n (State.init S cfg image) with
+    | .error e => .error e
+    | .ok s => .ok s.memory
 
 end Tau

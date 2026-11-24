@@ -10,6 +10,10 @@
 #   2. tau-sim must give the same buffers for it as for the kernel.
 #   3. A damaged copy of it must be rejected by tau-check.
 #
+# `examples/linear/stages/` holds a copy of those files, so that the course
+# can be followed without building the compiler. The script fails if the copy
+# is stale; UPDATE_STAGES=1 refreshes it.
+#
 # Build first: `lake build tau-sim tau-check` and `cmake --build compiler/build`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -59,12 +63,33 @@ for kernel in examples/*/kernel.mlir; do
   out="$OUT/$name"
   failed=""
 
-  if ! "$TAUC" "$kernel" -o "$out"; then
+  # An example may name the chip it is for in a file called `chip`.
+  chip=()
+  if [ -f "$dir/chip" ]; then
+    chip=(--chip "$(cat "$dir/chip")")
+  fi
+
+  if ! "$TAUC" "$kernel" -o "$out" "${chip[@]}"; then
     echo "FAIL $name: tauc failed"
     status=1
     continue
   fi
   "$SIM" "$out/kernel.json" "$dir/buffers.json" > "$out/reference.out"
+
+  # An example may keep a copy of the compiler's output in `stages/`, for
+  # readers who have not built the compiler. It must be up to date. Refresh
+  # it with UPDATE_STAGES=1.
+  if [ -d "$dir/stages" ]; then
+    if [ "${UPDATE_STAGES:-}" = 1 ]; then
+      cp "$out"/kernel.json "$out"/simplified.json "$out"/unrolled.json \
+         "$out"/placed.json "$out"/scheduled.json "$out"/compiled.json "$dir/stages/"
+    elif ! diff -rq "$dir/stages" "$out" --exclude='*.out' --exclude=verdict \
+         --exclude=damaged.json > /dev/null; then
+      echo "FAIL $name: $dir/stages is out of date (rerun with UPDATE_STAGES=1)"
+      status=1
+      continue
+    fi
+  fi
 
   for stage in $STAGES; do
     file="$out/$stage.json"

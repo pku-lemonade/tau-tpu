@@ -47,6 +47,8 @@ theorem Expr.denote_simp (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fil
   | un op a ih => simp only [Expr.simp, denote_simpUn S hS, ih, Expr.denote]
   | bin op a b iha ihb => simp only [Expr.simp, denote_simpBin S hS, iha, ihb, Expr.denote]
   | mac j acc x w iha ihx ihw => simp only [Expr.simp, Expr.denote, iha, ihx, ihw]
+  | const xs => rfl
+  | sel m a b ihm iha ihb => simp only [Expr.simp, Expr.denote, ihm, iha, ihb]
 
 /-! ## Real words obey the laws -/
 

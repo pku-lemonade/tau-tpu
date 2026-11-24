@@ -25,9 +25,21 @@ def nat (j : Json) (key : String) : Except String Nat := j.getObjValAs? Nat key
 
 def str (j : Json) (key : String) : Except String String := j.getObjValAs? String key
 
+def int (j : Json) (key : String) : Except String Int := j.getObjValAs? Int key
+
+/-- A number that may be left out, in which case it is `default`. -/
+def natOr (j : Json) (key : String) (default : Nat) : Nat :=
+  (nat j key).toOption.getD default
+
 def arr (j : Json) (key : String) : Except String (List Json) := do
   let a ← (← j.getObjVal? key).getArr?
   pure a.toList
+
+def nats (j : Json) (key : String) : Except String (List Nat) := do
+  (← arr j key).mapM fun n => n.getNat?
+
+def ints (j : Json) (key : String) : Except String (List Int) := do
+  (← arr j key).mapM fun n => n.getInt?
 
 def kind : String → Except String Kind
   | "mem" => pure .mem
@@ -48,8 +60,16 @@ def unOp (j : Json) : Except String UnOp := do
   match ← str j "fn" with
   | "relu" => pure .relu
   | "requant" => pure (.requant (← nat j "k"))
+  | "neg" => pure .neg
+  | "abs" => pure .abs
+  | "shl" => pure (.shl (← nat j "k"))
+  | "addi" => pure (.addi (← int j "k"))
+  | "muli" => pure (.muli (← int j "k"))
   | "shift" => pure (.shift (← nat j "k"))
   | "rotate" => pure (.rotate (← nat j "k"))
+  | "reverse" => pure .reverse
+  | "broadcast" => pure (.broadcast (← nat j "k"))
+  | "permute" => pure (.permute (← nats j "table"))
   | s => throw s!"unknown one-word operation '{s}'"
 
 def binOp (j : Json) : Except String BinOp := do
@@ -59,6 +79,10 @@ def binOp (j : Json) : Except String BinOp := do
   | "mul" => pure .mul
   | "max" => pure .max
   | "min" => pure .min
+  | "and" => pure .and
+  | "or" => pure .or
+  | "xor" => pure .xor
+  | "lt" => pure .lt
   | s => throw s!"unknown two-word operation '{s}'"
 
 def instr (j : Json) : Except String Instr := do
@@ -70,16 +94,28 @@ def instr (j : Json) : Except String Instr := do
   | "load" => pure (.load (← track j "src"))
   | "mac" => pure (.mac (← nat j "j") (← track j "src"))
   | "emit" => pure (.emit (← track j "dst"))
+  | "const" => pure (.const (← ints j "values") (← track j "dst"))
+  | "sel" => pure (.sel (← track j "m") (← track j "a") (← track j "b") (← track j "dst"))
+  | "seed" => pure (.seed (← track j "src"))
+  | "install" => pure (.install (← nat j "j") (← track j "src"))
+  | "macw" => pure (.macw (← nat j "j"))
   | s => throw s!"unknown instruction '{s}'"
 
 def timed (j : Json) : Except String Timed := do
-  pure ⟨← nat j "slice", ← nat j "time", ← instr j⟩
+  pure {
+    slice := ← nat j "slice"
+    time := ← nat j "time"
+    instr := ← instr j
+    repeats := natOr j "repeats" 0
+    gap := natOr j "gap" 0
+    stride := natOr j "stride" 0 }
 
 def config (j : Json) : Except String Config := do
   let ks ← (← arr j "kinds").mapM fun k => do kind (← k.getStr?)
   pure {
     kinds := ks
     streams := ← nat j "streams"
+    mxmWeights := natOr j "mxmWeights" 8
     memDelay := ← nat j "memDelay"
     vxmDelay := ← nat j "vxmDelay"
     sxmDelay := ← nat j "sxmDelay"
@@ -105,6 +141,11 @@ def pinstr (j : Json) : Except String (Nat × PInstr) := do
     | "load" => pure (PInstr.load (← nat j "src"))
     | "mac" => pure (PInstr.mac (← nat j "j") (← nat j "src"))
     | "emit" => pure (PInstr.emit (← nat j "dst"))
+    | "const" => pure (PInstr.const (← nat j "dst") (← ints j "values"))
+    | "sel" => pure (PInstr.sel (← nat j "dst") (← nat j "m") (← nat j "a") (← nat j "b"))
+    | "seed" => pure (PInstr.seed (← nat j "src"))
+    | "install" => pure (PInstr.install (← nat j "j") (← nat j "src"))
+    | "macw" => pure (PInstr.macw (← nat j "j"))
     | s => throw s!"unknown instruction '{s}'"
   pure (← nat j "slice", i)
 
@@ -126,6 +167,11 @@ def stmt (j : Json) : Except String Stmt := do
   | "bin" => pure (.bin (← nat j "dst") (← binOp j) (← nat j "a") (← nat j "b"))
   | "matvec" =>
     pure (.matvec (← nat j "dst") (← nat j "x") (← nat j "buf") (← idx j) (← nat j "n"))
+  | "affine" =>
+    pure (.affine (← nat j "dst") (← nat j "x") (← nat j "bias") (← nat j "buf") (← idx j)
+      (← nat j "n"))
+  | "const" => pure (.const (← nat j "dst") (← ints j "values"))
+  | "sel" => pure (.sel (← nat j "dst") (← nat j "m") (← nat j "a") (← nat j "b"))
   | s => throw s!"unknown statement '{s}'"
 
 def item (j : Json) : Except String Item := do

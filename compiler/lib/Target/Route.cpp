@@ -66,10 +66,13 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
         op.emitError("run tau-schedule before tau-route");
         return signalPassFailure();
       }
-      if (!result.use_empty() && !result.hasOneUse()) {
-        op.emitError("a travelling word has more than one user");
-        return signalPassFailure();
-      }
+      // One instruction may read a word in two of its operands. Two
+      // different instructions may not: the word is at each position once.
+      for (Operation *user : result.getUsers())
+        if (user != *result.user_begin()) {
+          op.emitError("a travelling word has more than one user");
+          return signalPassFailure();
+        }
 
       int64_t from = tau::intAttr(op, "slice");
       bool east = true;

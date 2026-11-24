@@ -91,17 +91,53 @@ class Tau_BinOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
   let assemblyFormat = "$a `,` $b attr-dict";
 }
 
+// Vector slice.
 def Tau_ReluOp : Tau_UnOp<"relu", "Replace negative lanes by zero">;
+def Tau_NegOp : Tau_UnOp<"neg", "Negate every lane">;
+def Tau_AbsOp : Tau_UnOp<"abs", "The absolute value of every lane">;
 def Tau_RequantOp
     : Tau_UnKOp<"requant", "Divide by 2^k, then clamp to -128..127">;
+def Tau_ShlOp : Tau_UnKOp<"shl", "Shift the bits of every lane left by k">;
+def Tau_AddiOp : Tau_UnKOp<"addi", "Add the constant k to every lane">;
+def Tau_MuliOp : Tau_UnKOp<"muli", "Multiply every lane by the constant k">;
+
+// Rearrangement slice.
 def Tau_ShiftOp : Tau_UnKOp<"shift", "Move every lane up by k places">;
 def Tau_RotateOp : Tau_UnKOp<"rotate", "Rotate the lanes by k places">;
+def Tau_ReverseOp : Tau_UnOp<"reverse", "Put the lanes in opposite order">;
+def Tau_BroadcastOp : Tau_UnKOp<"broadcast", "Copy lane k to every lane">;
+
+def Tau_PermuteOp : Tau_Op<"permute", [Pure]> {
+  let summary = "Lane i takes the value of lane table[i]";
+  let arguments = (ins Tau_WordType:$a, DenseI64ArrayAttr:$table);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = "$a `,` $table attr-dict";
+}
 
 def Tau_AddOp : Tau_BinOp<"add", "Lane-wise wrapping addition">;
 def Tau_SubOp : Tau_BinOp<"sub", "Lane-wise wrapping subtraction">;
 def Tau_MulOp : Tau_BinOp<"mul", "Lane-wise wrapping multiplication">;
 def Tau_MaxOp : Tau_BinOp<"max", "Lane-wise signed maximum">;
 def Tau_MinOp : Tau_BinOp<"min", "Lane-wise signed minimum">;
+def Tau_AndOp : Tau_BinOp<"and", "Bit-wise and">;
+def Tau_OrOp : Tau_BinOp<"or", "Bit-wise or">;
+def Tau_XorOp : Tau_BinOp<"xor", "Bit-wise exclusive or">;
+def Tau_LtOp
+    : Tau_BinOp<"lt", "Lane-wise: 1 where the first is less, else 0">;
+
+def Tau_ConstOp : Tau_Op<"const", [Pure]> {
+  let summary = "The constant word with the given lanes";
+  let arguments = (ins DenseI64ArrayAttr:$values);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = "$values attr-dict";
+}
+
+def Tau_SelectOp : Tau_Op<"select", [Pure]> {
+  let summary = "Lane-wise: a where m is not zero, b elsewhere";
+  let arguments = (ins Tau_WordType:$m, Tau_WordType:$a, Tau_WordType:$b);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = "$m `,` $a `,` $b attr-dict";
+}
 
 def Tau_MatVecOp : Tau_Op<"matvec"> {
   let summary = "Multiply a matrix by a word";
@@ -115,6 +151,20 @@ def Tau_MatVecOp : Tau_Op<"matvec"> {
   let results = (outs Tau_WordType:$result);
   let assemblyFormat =
       "$x `,` $buf `[` $base `,` $stride `]` `,` $n attr-dict `:` type($buf)";
+}
+
+def Tau_AffineOp : Tau_Op<"affine"> {
+  let summary = "Multiply a matrix by a word and add a bias word";
+  let description = [{
+    As `tau.matvec`, with the word `bias` added to the product.
+  }];
+  let arguments = (ins Tau_WordType:$x, Tau_BufType:$buf, I64Attr:$base,
+                       I64Attr:$stride, I64Attr:$n, Tau_WordType:$bias);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = [{
+    $x `,` $buf `[` $base `,` $stride `]` `,` $n `,` $bias attr-dict
+    `:` type($buf)
+  }];
 }
 
 def Tau_ForOp : Tau_Op<"for", [SingleBlock, NoTerminator]> {
@@ -167,7 +217,9 @@ def Tau_IWriteOp : Tau_Instr<"write"> {
 def Tau_IUnOp : Tau_Instr<"un"> {
   let summary = "Vector or rearrangement slice: apply `fn` to one word";
   let arguments = (ins Tau_WordType:$a, StrAttr:$fn,
-                       OptionalAttr<I64Attr>:$k, I64Attr:$slice,
+                       OptionalAttr<I64Attr>:$k,
+                       OptionalAttr<DenseI64ArrayAttr>:$table,
+                       I64Attr:$slice,
                        OptionalAttr<I64Attr>:$time,
                        OptionalAttr<BoolAttr>:$east,
                        OptionalAttr<I64Attr>:$stream);
@@ -183,6 +235,56 @@ def Tau_IBinOp : Tau_Instr<"bin"> {
                        OptionalAttr<I64Attr>:$stream);
   let results = (outs Tau_WordType:$result);
   let assemblyFormat = "$a `,` $b attr-dict";
+}
+
+def Tau_IConstOp : Tau_Instr<"const"> {
+  let summary = "Vector slice: put a constant word on a stream";
+  let arguments = (ins DenseI64ArrayAttr:$values, I64Attr:$slice,
+                       OptionalAttr<I64Attr>:$time,
+                       OptionalAttr<BoolAttr>:$east,
+                       OptionalAttr<I64Attr>:$stream);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = "attr-dict";
+}
+
+def Tau_ISelOp : Tau_Instr<"sel"> {
+  let summary = "Vector slice: lane-wise select";
+  let arguments = (ins Tau_WordType:$m, Tau_WordType:$a, Tau_WordType:$b,
+                       I64Attr:$slice, OptionalAttr<I64Attr>:$time,
+                       OptionalAttr<BoolAttr>:$east,
+                       OptionalAttr<I64Attr>:$stream);
+  let results = (outs Tau_WordType:$result);
+  let assemblyFormat = "$m `,` $a `,` $b attr-dict";
+}
+
+def Tau_IInstallOp : Tau_Instr<"install"> {
+  let summary = "Matrix slice: keep a word as stored column `j`";
+  let description = [{
+    The optional `state` links this instruction to the previous `install` of
+    the same matrix, so that the columns are installed on consecutive cycles.
+  }];
+  let arguments = (ins Tau_WordType:$w, Optional<Tau_AccType>:$state,
+                       I64Attr:$j, I64Attr:$slice,
+                       OptionalAttr<I64Attr>:$time);
+  let results = (outs Tau_AccType:$next);
+  let assemblyFormat = "$w (`,` $state^)? attr-dict";
+}
+
+def Tau_ISeedOp : Tau_Instr<"seed"> {
+  let summary = "Matrix slice: replace the accumulator by a word";
+  let arguments = (ins Tau_AccType:$state, Tau_WordType:$w, I64Attr:$slice,
+                       OptionalAttr<I64Attr>:$time);
+  let results = (outs Tau_AccType:$next);
+  let assemblyFormat = "$state `,` $w attr-dict";
+}
+
+def Tau_IMacwOp : Tau_Instr<"macw"> {
+  let summary =
+      "Matrix slice: add lane `j` of the vector operand times stored column `j`";
+  let arguments = (ins Tau_AccType:$state, I64Attr:$j, I64Attr:$slice,
+                       OptionalAttr<I64Attr>:$time);
+  let results = (outs Tau_AccType:$next);
+  let assemblyFormat = "$state attr-dict";
 }
 
 def Tau_ILoadOp : Tau_Instr<"load"> {

@@ -28,6 +28,9 @@ theorem checkKernels_sound (S : Sem V) (hS : S.Lawful) (k k' : Kernel)
     (bufs : List (List V)) (fill : V)
     (h : checkKernels k k' (bufs.map List.length) = true) :
     ∃ out, k.run S bufs = some out ∧ k'.run S bufs = some out := by
+  -- Split on the two symbolic runs. Each kernel on real buffers is its
+  -- symbolic run evaluated (`Kernel.run_of_exprs`), and the two evaluated
+  -- results agree (`denote_of_simp_eq`).
   unfold checkKernels at h
   cases ha : kernelExprs k (bufs.map List.length) with
   | none => simp [ha] at h
@@ -50,6 +53,9 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
     (vars : List (Var × V)) (sl : Slice V) (i : PInstr) :
     i.exec T kind (vars.map (Prod.map id f)) (sl.map f) =
       (i.exec S kind vars sl).map fun r => (r.1.map (Prod.map id f), r.2.map f) := by
+  -- One case per instruction, as in `exec_map` for the machine: unfold, move
+  -- the map out of each lookup (`lookup_map`), split on each check and on
+  -- what each lookup found.
   cases i with
   | read dst addr =>
     simp only [PInstr.exec, Slice.map, List.getElem?_map]
@@ -88,6 +94,33 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
     split
     · rfl
     · simp [Slice.map, h.zero]
+  | const dst xs =>
+    simp only [PInstr.exec]
+    split
+    · rfl
+    · simp [h.const]
+  | sel dst m a b =>
+    simp only [PInstr.exec, lookup_map]
+    split
+    · rfl
+    · cases vars.lookup m <;> cases vars.lookup a <;> cases vars.lookup b <;> simp [h.sel]
+  | seed src =>
+    simp only [PInstr.exec, lookup_map]
+    split
+    · rfl
+    · cases vars.lookup src <;> simp [Slice.map]
+  | install j src =>
+    simp only [PInstr.exec, lookup_map, Slice.map, List.length_map]
+    split
+    · rfl
+    · split
+      · rfl
+      · cases vars.lookup src <;> simp [List.map_set]
+  | macw j =>
+    simp only [PInstr.exec, Slice.map, List.getElem?_map]
+    split
+    · rfl
+    · cases sl.x <;> cases sl.weights[j]? <;> simp [h.mac]
 
 theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (st : PState V) (p : Nat) (i : PInstr) :
@@ -147,6 +180,8 @@ theorem checkPlaced_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (pl : Placed)
       pl.execute S (pl.image bufs fill) = some mem ∧
       k.run S bufs = some out ∧
       extract pl.map mem fill = out := by
+  -- The proof of `check_sound` again, with `Placed.execute_map` in place of
+  -- `execute_map`.
   let f := Expr.denote S bufs fill
   have hf : exprSem.Hom S f := denote_hom S bufs fill
   unfold checkPlaced at h

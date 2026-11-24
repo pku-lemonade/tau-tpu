@@ -46,6 +46,12 @@ inductive Stmt where
   /-- `dst = M * x`, where the columns of the matrix `M` are the `n` words
   `buf[ix]`, `buf[ix + 1]`, ... -/
   | matvec (dst : Var) (x : Var) (buf : Nat) (ix : Idx) (n : Nat)
+  /-- `dst = M * x + bias`, with `M` as in `matvec`. -/
+  | affine (dst : Var) (x bias : Var) (buf : Nat) (ix : Idx) (n : Nat)
+  /-- `dst` is the constant word with lanes `xs`. -/
+  | const (dst : Var) (xs : List Int)
+  /-- `dst = sel m a b`: lane by lane, `a` where `m` is not zero, else `b`. -/
+  | sel (dst : Var) (m a b : Var)
   deriving DecidableEq, Repr
 
 /-- A statement, or a loop that runs its body `n` times. Loops do not nest. -/
@@ -72,12 +78,12 @@ structure Env (V : Type) where
 def Env.bind (env : Env V) (v : Var) (x : V) : Env V :=
   { env with vars := (v, x) :: env.vars }
 
-/-- The product of a matrix with `x`, built up one column at a time.
-`cols j` is column `j`; the result is `none` if a column is missing. -/
-def matvecFrom (S : Sem V) (x : V) (cols : Nat → Option V) : Nat → Option V
-  | 0 => some S.zero
+/-- `init` plus the product of a matrix with `x`, built up one column at a
+time. `cols j` is column `j`; the result is `none` if a column is missing. -/
+def matvecFrom (S : Sem V) (x : V) (cols : Nat → Option V) (init : V) : Nat → Option V
+  | 0 => some init
   | j + 1 =>
-    match matvecFrom S x cols j, cols j with
+    match matvecFrom S x cols init j, cols j with
     | some acc, some w => some (S.mac j acc x w)
     | _, _ => none
 
@@ -106,10 +112,22 @@ def Stmt.exec (S : Sem V) (i : Nat) (env : Env V) : Stmt → Option (Env V)
   | .matvec dst x buf ix n =>
     match env.vars.lookup x with
     | some xv =>
-      match matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) n with
+      match matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) S.zero n with
       | some r => some (env.bind dst r)
       | none => none
     | none => none
+  | .affine dst x bias buf ix n =>
+    match env.vars.lookup x, env.vars.lookup bias with
+    | some xv, some bv =>
+      match matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) bv n with
+      | some r => some (env.bind dst r)
+      | none => none
+    | _, _ => none
+  | .const dst xs => some (env.bind dst (S.const xs))
+  | .sel dst m a b =>
+    match env.vars.lookup m, env.vars.lookup a, env.vars.lookup b with
+    | some vm, some va, some vb => some (env.bind dst (S.sel vm va vb))
+    | _, _, _ => none
 
 /-- Run a list of statements in order, on loop iteration `i`. -/
 def execStmts (S : Sem V) (i : Nat) : Env V → List Stmt → Option (Env V)

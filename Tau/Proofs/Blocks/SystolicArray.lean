@@ -31,6 +31,13 @@ theorem systolicArray_stateAt (zero : α) {n : Nat} (x : Vector α n)
     (c : Signal (Vector α n)) (j : Nat) (hj : j < n) (t : Nat) (ht : j + 1 ≤ t) :
     ((systolicArray zero x).stateAt c t)[j] =
       sumTo zero (fun k => (c (t - 1 - j + k))[k]?.getD zero * x[k]?.getD zero) (j + 1) := by
+  -- Induction on the cell, for every cycle at once. In both cases write the
+  -- cycle as t + 1 and take one step.
+  -- Cell 0: the sum has one term.
+  -- Cell j + 1: the stored sum is the sum after cell j at cycle t, plus one
+  -- term. Peel one term off the right-hand side, use the hypothesis, and
+  -- show the remaining sums agree term by term (the cycle index is written
+  -- two ways).
   induction j generalizing t with
   | zero =>
     obtain ⟨t, rfl⟩ : ∃ t', t = t' + 1 := ⟨t - 1, by omega⟩
@@ -58,6 +65,9 @@ theorem systolicArray_matvec (zero : α) {n : Nat} (hn : 0 < n) (x : Vector α n
     (hc : ∀ i j (hj : j < n), (c (i + j))[j] = A i j) (i : Nat) :
     (systolicArray zero x).outAt c (i + n) =
       sumTo zero (fun k => A i k * x[k]?.getD zero) n := by
+  -- The output is what is stored after the last cell: use the theorem about
+  -- stored sums at cell n - 1 and cycle i + n. Then the two sums agree term
+  -- by term, by the feeding rule `hc`.
   unfold Block.outAt
   rw [systolicArray_step]
   simp only [hn, ↓reduceDIte]

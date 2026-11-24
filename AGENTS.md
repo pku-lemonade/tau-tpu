@@ -30,9 +30,16 @@ Lake package because it depends on Verso.
 - Each definition file starts with a module comment that says what the thing
   is, where tau-tpu uses it, and which terms a newcomer should look up. It
   does not teach digital design or compilers.
+- `course/Work/` is for a student's own files. Do not put project code
+  there.
 - `course/Exercises/` is generated. Change the proof under `Tau/Proofs/` and
   rerun `scripts/make-exercises.py`; never edit an exercise file by hand in a
-  commit.
+  commit. A comment at the top level of a proof (`  -- ...`) is kept in the
+  exercise as an outline, so write such comments in long proofs.
+- To add a feature, follow the path in the book chapter "Extending the
+  machine" (`course/book/TauBook/Extending.lean`).
+- `examples/linear/stages/` is a copy of `tauc`'s output. After changing the
+  compiler, refresh it with `UPDATE_STAGES=1 scripts/check-examples.sh`.
 - After changing the compiler or the JSON formats, run
   `scripts/check-examples.sh` and update `docs/formats.md`.
 

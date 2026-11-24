@@ -39,3 +39,7 @@ compiler (see `Tau/Proofs/Data/Lane.lean`).
 /-- info: 'Tau.end_to_end' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.end_to_end
+
+/-- info: 'Tau.repeater_outAt' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.repeater_outAt

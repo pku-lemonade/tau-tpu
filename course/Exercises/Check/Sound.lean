@@ -44,11 +44,16 @@ theorem denote_hom (S : Sem V) (bufs : List (List V)) (fill : V) :
   bin _ _ _ := rfl
   zero := rfl
   mac _ _ _ _ := rfl
+  const _ := rfl
+  sel _ _ _ := rfl
 
 theorem image_map (f : V → W) (map : MemMap) (memSizes : List Nat) (word : Nat → Nat → V)
     (fill : V) :
     (image map memSizes word fill).map (List.map f) =
       image map memSizes (fun b k => f (word b k)) (f fill) := by
+  -- Outline of one proof:
+  -- Both sides are a map over positions of a map over addresses. Fuse the
+  -- maps (`List.map_map`) and compare the functions (`List.map_congr_left`).
   sorry
 
 theorem extract_map (f : V → W) (map : MemMap) (mem : List (List V)) (fill : V) :
@@ -63,6 +68,10 @@ theorem range_map_getD {α : Type} (l : List α) (d : α) :
 /-- Evaluating the symbolic buffers gives back the real buffers. -/
 theorem symBufs_denote (S : Sem V) (bufs : List (List V)) (fill : V) :
     (symBufs (bufs.map List.length)).map (List.map (Expr.denote S bufs fill)) = bufs := by
+  -- Outline of one proof:
+  -- Buffer b of the left side is the list of `bufs[b][k]` for each k, which
+  -- is `bufs[b]` by `range_map_getD`. The list of those for each b is
+  -- `bufs`, by `range_map_getD` again.
   sorry
 
 /-- If a kernel run on expressions ends with `e`, then run on real buffers it
@@ -91,6 +100,14 @@ theorem check_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (c : Compiled)
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
       k.run S bufs = some out ∧
       extract c.map mem fill = out := by
+  -- Outline of one proof:
+  -- Let f evaluate expressions. Unfold `check` and split on the two symbolic
+  -- runs; if either failed, `h` is false.
+  -- The machine on real words is the symbolic run with f applied
+  -- (`execute_map`), and so is the kernel (`Kernel.run_of_exprs`).
+  -- The two tables of expressions agree after simplifying, so they agree
+  -- after evaluating (`denote_of_simp_eq`).
+  -- Unpack the two symbolic runs that the checker made.
   sorry
 
 /-- **Safety.** A program the checker accepts never traps. -/

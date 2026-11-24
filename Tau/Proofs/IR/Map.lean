@@ -41,17 +41,21 @@ theorem bufGet_map (f : V → W) (bufs : List (List V)) (b k : Nat) :
   | some l => simp
 
 theorem matvecFrom_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (x : V)
-    (cols : Nat → Option V) (n : Nat) :
-    matvecFrom T (f x) (fun j => (cols j).map f) n = (matvecFrom S x cols n).map f := by
+    (cols : Nat → Option V) (init : V) (n : Nat) :
+    matvecFrom T (f x) (fun j => (cols j).map f) (f init) n =
+      (matvecFrom S x cols init n).map f := by
   induction n with
-  | zero => simp [matvecFrom, h.zero]
+  | zero => rfl
   | succ n ih =>
     simp only [matvecFrom, ih]
-    cases matvecFrom S x cols n <;> cases cols n <;> simp [h.mac]
+    cases matvecFrom S x cols init n <;> cases cols n <;> simp [h.mac]
 
 theorem Stmt.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i : Nat)
     (env : Env V) (s : Stmt) :
     s.exec T i (env.map f) = (s.exec S i env).map (Env.map f) := by
+  -- One case per statement. Rewrite the fields of the mapped environment as
+  -- maps (`hb`, `hv`), move the map out of each lookup, and split on what
+  -- the lookups found.
   cases s with
   | load dst buf ix =>
     simp only [Stmt.exec]
@@ -90,8 +94,37 @@ theorem Stmt.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i :
     cases env.vars.lookup x with
     | none => rfl
     | some xv =>
-      simp only [Option.map_some, bufGet_map, matvecFrom_map S T f h]
-      cases matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) n <;> rfl
+      simp only [Option.map_some, bufGet_map, ← h.zero, matvecFrom_map S T f h]
+      cases matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) S.zero n <;> rfl
+  | affine dst x bias buf ix n =>
+    simp only [Stmt.exec]
+    have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
+    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
+    rw [hb, hv, lookup_map, lookup_map]
+    cases env.vars.lookup x with
+    | none => rfl
+    | some xv =>
+      cases env.vars.lookup bias with
+      | none => rfl
+      | some bv =>
+        simp only [Option.map_some, bufGet_map, matvecFrom_map S T f h]
+        cases matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) bv n <;> rfl
+  | const dst xs =>
+    simp only [Stmt.exec, Option.map_some, ← h.const]
+    rfl
+  | sel dst m a b =>
+    simp only [Stmt.exec]
+    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
+    rw [hv, lookup_map, lookup_map, lookup_map]
+    cases env.vars.lookup m with
+    | none => rfl
+    | some vm =>
+      cases env.vars.lookup a with
+      | none => rfl
+      | some va =>
+        cases env.vars.lookup b with
+        | none => rfl
+        | some vb => simp only [Option.map_some, ← h.sel]; rfl
 
 theorem execStmts_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i : Nat)
     (env : Env V) (body : List Stmt) :

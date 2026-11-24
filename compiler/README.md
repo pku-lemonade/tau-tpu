@@ -19,7 +19,7 @@ tools/tauc/              the compiler driver
 |---|---|---|
 | `tau-simplify` | a kernel | a kernel without repeated `relu` or `max`/`min` of a word with itself |
 | `tau-unroll` | a kernel | a kernel with no loops |
-| `tau-place` | a kernel with no loops | instructions (`tau.i.*`), each with a slice; buffers have addresses |
+| `tau-place` | a kernel with no loops | instructions (`tau.i.*`), each with a slice; buffers have addresses; decides which matrices to store in a matrix slice |
 | `tau-schedule` | instructions | instructions, each with a cycle (`time`) |
 | `tau-route` | timed instructions | timed instructions whose results have streams (`east`, `stream`) |
 
@@ -74,11 +74,16 @@ In addition, `Tau/Passes/Simplify.lean` and `Tau/Passes/Unroll.lean` are Lean
 models of the first two passes, proved to keep what a kernel computes. Those
 proofs are about the models, not about the C++.
 
+Runs of instructions that one slice issues at a fixed spacing are merged into
+repeating entries when the program file is written. This is a property of the
+file, not of the IR: in the MLIR every instruction is still separate.
+
 ## Limits
 
 - Loops do not nest.
-- Each kind of operation runs on the first slice of that kind; the second
-  matrix and rearrangement slices of the standard chip are unused.
+- An operation runs on the slice of its kind nearest to its operand. Nothing
+  balances load between two slices of a kind.
 - A value that is not consumed by the very next operation waits in memory.
 - Groups of instructions run one after another; two groups never overlap in
-  time, even when they could.
+  time, even when they could. Storing a matrix therefore saves instructions
+  but not cycles.

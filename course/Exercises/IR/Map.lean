@@ -40,13 +40,18 @@ theorem bufGet_map (f : V → W) (bufs : List (List V)) (b k : Nat) :
   sorry
 
 theorem matvecFrom_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (x : V)
-    (cols : Nat → Option V) (n : Nat) :
-    matvecFrom T (f x) (fun j => (cols j).map f) n = (matvecFrom S x cols n).map f := by
+    (cols : Nat → Option V) (init : V) (n : Nat) :
+    matvecFrom T (f x) (fun j => (cols j).map f) (f init) n =
+      (matvecFrom S x cols init n).map f := by
   sorry
 
 theorem Stmt.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i : Nat)
     (env : Env V) (s : Stmt) :
     s.exec T i (env.map f) = (s.exec S i env).map (Env.map f) := by
+  -- Outline of one proof:
+  -- One case per statement. Rewrite the fields of the mapped environment as
+  -- maps (`hb`, `hv`), move the map out of each lookup, and split on what
+  -- the lookups found.
   sorry
 
 theorem execStmts_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i : Nat)

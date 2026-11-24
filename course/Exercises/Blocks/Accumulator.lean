@@ -26,7 +26,8 @@ theorem accumulator_step (zero : α) (s : α) (c : AccIn α) :
       match c with
       | .hold => (s, s)
       | .add x => (s + x, s)
-      | .clear => (zero, s) := rfl
+      | .clear => (zero, s)
+      | .load x => (x, s) := rfl
 
 /-- The output of an accumulator is its total at the start of the cycle. -/
 theorem accumulator_outAt (zero : α) (inp : Signal (AccIn α)) (t : Nat) :

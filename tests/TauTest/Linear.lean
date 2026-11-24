@@ -40,22 +40,22 @@ def image : List (List (Word 2)) :=
 
 def prog : Program :=
   [ -- x leaves slice 2 going west and reaches the matrix slice at cycle 4
-    ⟨2, 0, .read 0 (w 0)⟩,
-    ⟨0, 4, .load (w 0)⟩,
+    .once 2 0 (.read 0 (w 0)),
+    .once 0 4 (.load (w 0)),
     -- the columns of W leave slice 3 on consecutive cycles
-    ⟨3, 0, .read 0 (w 1)⟩,
-    ⟨3, 1, .read 1 (w 1)⟩,
-    ⟨0, 5, .mac 0 (w 1)⟩,
-    ⟨0, 6, .mac 1 (w 1)⟩,
+    .once 3 0 (.read 0 (w 1)),
+    .once 3 1 (.read 1 (w 1)),
+    .once 0 5 (.mac 0 (w 1)),
+    .once 0 6 (.mac 1 (w 1)),
     -- W * x leaves the matrix slice going east and reaches slice 4 at cycle 14
-    ⟨0, 7, .emit (e 0)⟩,
+    .once 0 7 (.emit (e 0)),
     -- b is timed to arrive at slice 4 on the same cycle
-    ⟨2, 10, .read 1 (e 1)⟩,
-    ⟨4, 14, .bin .add (e 0) (e 1) (e 0)⟩,
-    ⟨4, 16, .un (.requant 0) (e 0) (e 0)⟩,
-    ⟨4, 18, .un .relu (e 0) (e 0)⟩,
+    .once 2 10 (.read 1 (e 1)),
+    .once 4 14 (.bin .add (e 0) (e 1) (e 0)),
+    .once 4 16 (.un (.requant 0) (e 0) (e 0)),
+    .once 4 18 (.un .relu (e 0) (e 0)),
     -- the result moves one slice east and is stored
-    ⟨5, 21, .write (e 0) 0⟩ ]
+    .once 5 21 (.write (e 0) 0) ]
 
 /-- The word stored at slice 5, address 0, or `none` if the machine trapped. -/
 def result (prog : Program) : Option (List Int) :=

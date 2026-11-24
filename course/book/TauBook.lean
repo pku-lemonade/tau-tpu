@@ -1,10 +1,12 @@
 import VersoManual
 import TauBook.StartHere
+import TauBook.Lean
 import TauBook.ShiftRegister
 import TauBook.Accumulator
 import TauBook.Mac
 import TauBook.PipelineSequencer
 import TauBook.Memory
+import TauBook.Repeater
 import TauBook.SystolicArray
 import TauBook.SliceLevel
 import TauBook.Kernels
@@ -12,6 +14,8 @@ import TauBook.Expressions
 import TauBook.Checker
 import TauBook.CellLevel
 import TauBook.EndToEnd
+import TauBook.Extending
+import TauBook.Tactics
 import TauBook.Reading
 
 open Verso.Genre Manual
@@ -28,13 +32,17 @@ This is a self-paced course in Lean 4. It teaches Lean by working through a
 real development from the bottom up: tau-tpu, a small statically scheduled
 tensor processor, a compiler for it, and the proofs that connect them.
 
-Chapters 2 to 7 specify simple hardware components and prove what they do.
-Chapter 8 assembles a machine. Chapters 9 to 11 give the compiler's input a
-meaning and prove a checker for its output. Chapter 12 opens the machine up
-into the components of chapters 2 to 7 and proves nothing changed. Chapter 13
-states the result.
+After two introductory chapters, seven chapters specify simple hardware
+components and prove what they do. One chapter assembles a machine from a
+specification and has you program it by hand. Three chapters give the
+compiler's input a meaning and prove a checker for its output. One chapter
+opens the machine up into the components from the first half and proves that
+nothing changed. One states the result, and one sets homework: extend the
+machine and keep every theorem true.
 
 {include 1 TauBook.StartHere}
+
+{include 1 TauBook.Lean}
 
 {include 1 TauBook.ShiftRegister}
 
@@ -45,6 +53,8 @@ states the result.
 {include 1 TauBook.PipelineSequencer}
 
 {include 1 TauBook.Memory}
+
+{include 1 TauBook.Repeater}
 
 {include 1 TauBook.SystolicArray}
 
@@ -59,5 +69,9 @@ states the result.
 {include 1 TauBook.CellLevel}
 
 {include 1 TauBook.EndToEnd}
+
+{include 1 TauBook.Extending}
+
+{include 1 TauBook.Tactics}
 
 {include 1 TauBook.Reading}

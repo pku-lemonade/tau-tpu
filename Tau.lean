@@ -36,3 +36,5 @@ import Tau.Proofs.EndToEnd
 import Tau.Proofs.Data.Lane
 import Tau.Check.Stages
 import Tau.Proofs.Check.Stages
+import Tau.Blocks.Repeater
+import Tau.Proofs.Blocks.Repeater

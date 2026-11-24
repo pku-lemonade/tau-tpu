@@ -33,6 +33,10 @@ inductive Expr where
   | zero
   /-- The accumulator `acc` after adding lane `j` of `x` times `w`. -/
   | mac (j : Nat) (acc x w : Expr)
+  /-- The constant word with lanes `xs`. -/
+  | const (xs : List Int)
+  /-- Lane by lane, `a` where `m` is not zero and `b` elsewhere. -/
+  | sel (m a b : Expr)
   deriving DecidableEq, Repr
 
 /-- The operations on expressions: each one builds a bigger expression. -/
@@ -41,6 +45,8 @@ def exprSem : Sem Expr where
   bin := .bin
   zero := .zero
   mac := .mac
+  const := .const
+  sel := .sel
 
 variable {V : Type}
 
@@ -57,5 +63,8 @@ def Expr.denote (S : Sem V) (bufs : List (List V)) (fill : V) : Expr → V
   | .zero => S.zero
   | .mac j acc x w =>
     S.mac j (acc.denote S bufs fill) (x.denote S bufs fill) (w.denote S bufs fill)
+  | .const xs => S.const xs
+  | .sel m a b =>
+    S.sel (m.denote S bufs fill) (a.denote S bufs fill) (b.denote S bufs fill)
 
 end Tau

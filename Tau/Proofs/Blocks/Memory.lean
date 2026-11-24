@@ -25,6 +25,10 @@ or its starting value if nothing was written. -/
 theorem memory_stateAt (n : Nat) (init : Vector α n) (inp : Signal (MemIn α))
     (t a : Nat) (ha : a < n) :
     ((memory n init).stateAt inp t)[a] = (lastWrite inp a t).getD init[a] := by
+  -- Induction on the cycle. In the step case, split on the command.
+  -- Idle and read leave the memory alone.
+  -- A write to address a makes it the last write; a write elsewhere changes
+  -- neither the word at a nor the last write to a.
   induction t with
   | zero => rfl
   | succ t ih =>

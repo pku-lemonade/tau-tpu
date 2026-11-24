@@ -26,6 +26,7 @@ def Slice.map (f : V → W) (sl : Slice V) : Slice W where
   words := sl.words.map f
   x := sl.x.map f
   acc := f sl.acc
+  weights := sl.weights.map f
   pipe := sl.pipe.map (Option.map (Prod.map id f))
 
 /-- Apply `f` to every value in a machine state. -/
@@ -54,6 +55,10 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     (kind : Kind) (rd : Track → Option V) (rd' : Track → Option W)
     (hrd : ∀ tr, rd' tr = (rd tr).map f) (sl : Slice V) (i : Instr) :
     exec T cfg kind rd' (sl.map f) i = (exec S cfg kind rd sl i).map (mapResult f) := by
+  -- One case per instruction, all of the same shape: unfold `exec`, rewrite
+  -- the mapped reads with `hrd`, split on each check, then split on what
+  -- each read found. Where a value is computed, `h` says `f` commutes with
+  -- the operation.
   cases i with
   | read addr dst =>
     simp only [exec, Slice.map, List.getElem?_map]
@@ -100,6 +105,37 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     · split
       · rfl
       · simp [Except.map, mapResult, Slice.map, h.zero]
+  | const xs dst =>
+    simp only [exec]
+    split
+    · rfl
+    · split
+      · rfl
+      · simp [Except.map, mapResult, h.const]
+  | sel m a b dst =>
+    simp only [exec, hrd]
+    split
+    · rfl
+    · split
+      · rfl
+      · cases rd m <;> cases rd a <;> cases rd b <;> simp [Except.map, mapResult, h.sel]
+  | seed src =>
+    simp only [exec, hrd]
+    split
+    · rfl
+    · cases rd src <;> simp [Except.map, mapResult, Slice.map]
+  | install j src =>
+    simp only [exec, hrd, Slice.map, List.length_map]
+    split
+    · rfl
+    · split
+      · rfl
+      · cases rd src <;> simp [Except.map, mapResult, Slice.map, List.map_set]
+  | macw j =>
+    simp only [exec, Slice.map, List.getElem?_map]
+    split
+    · rfl
+    · cases sl.x <;> cases sl.weights[j]? <;> simp [Except.map, mapResult, Slice.map, h.mac]
 
 theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Track × V)) :
     shiftPipe (sl.map f) (r.map (Prod.map id f)) = mapResult f (shiftPipe sl r) := by
@@ -116,6 +152,9 @@ theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg
     (prog : Program) (s : State V) (p : Nat) (sl : Slice V) :
     stepSlice T cfg prog (s.map f) p (sl.map f) =
       (stepSlice S cfg prog s p sl).map (mapResult f) := by
+  -- The time is the same in both states, so the same instructions are due.
+  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `shiftPipe_map`.
+  -- Two or more: the same trap on both sides.
   unfold stepSlice
   have ht : (s.map f).time = s.time := rfl
   rw [ht]
@@ -247,9 +286,13 @@ theorem execute_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg :
     execute T cfg prog n (image.map (List.map f)) =
       (execute S cfg prog n image).map (List.map (List.map f)) := by
   unfold execute
-  rw [State.init_map S T f h, run_map S T f h]
-  cases run S cfg prog n (State.init S cfg image) with
-  | error e => rfl
-  | ok s => simp only [Except.map, State.memory_map]
+  cases prog.find? fun e => cfg.kinds.length ≤ e.slice with
+  | some e => rfl
+  | none =>
+    simp only
+    rw [State.init_map S T f h, run_map S T f h]
+    cases run S cfg prog n (State.init S cfg image) with
+    | error e => rfl
+    | ok s => simp only [Except.map, State.memory_map]
 
 end Tau
