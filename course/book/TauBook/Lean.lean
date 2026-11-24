@@ -28,8 +28,9 @@ open Tau
 ```
 
 `import Tau` makes the whole library available. `open Tau` lets you write
-`Block` instead of `Tau.Block`. The first time, Lean builds the library, which
-takes a few minutes. Wait for the orange bars in the margin to go away.
+`Block` instead of `Tau.Block`. While Lean is checking a file, an orange bar
+runs down the margin; wait for it to go away. If you skipped step 3 of
+"Setup", Lean builds the library first, which takes a few minutes.
 
 Files in `course/Work/` are yours. VS Code checks them as you type. To check
 one from a terminal, run `lake build Work.Scratch`. A file
@@ -47,6 +48,21 @@ your cursor. Keep it open at all times. If it is not there, press
 A file is correct when it has no red underlines. A yellow underline is a
 warning. The warning you will see most is `declaration uses 'sorry'`, which
 means a proof is unfinished.
+
+Lean code uses symbols such as `→`, `∀`, `⟨`, `⟩` and `·`. Type them with a
+backslash and a name: `\to` gives `→`, `\forall` gives `∀`, `\<` and `\>`
+give `⟨` and `⟩`, `\.` gives `·`, `\le` gives `≤`, `\ne` gives `≠`. The
+symbol appears when you type a space or the next character. To learn how to
+type a symbol you see, hover the mouse over it.
+
+When you change a file that another open file imports, the importing file
+does not see the change at once. It shows a message that its imports are out
+of date, with a button to restart the file. Click it.
+
+If nothing works at all (no infoview messages, `import Tau` underlined, or
+an error that `lake` cannot be found), check in this order: the folder open
+in VS Code is the repository folder; `lake build Tau` succeeds in a terminal
+in that folder; VS Code was started after elan was installed.
 
 # Programs
 

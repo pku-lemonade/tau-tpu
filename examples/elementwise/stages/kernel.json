@@ -1,0 +1,57 @@
+{
+  "body": [
+    {
+      "body": [
+        {
+          "base": 0,
+          "buf": 0,
+          "dst": 0,
+          "op": "load",
+          "stride": 1
+        },
+        {
+          "base": 0,
+          "buf": 1,
+          "dst": 1,
+          "op": "load",
+          "stride": 1
+        },
+        {
+          "a": 0,
+          "b": 1,
+          "dst": 2,
+          "fn": "add",
+          "op": "bin"
+        },
+        {
+          "a": 0,
+          "b": 1,
+          "dst": 3,
+          "fn": "sub",
+          "op": "bin"
+        },
+        {
+          "a": 2,
+          "b": 3,
+          "dst": 4,
+          "fn": "max",
+          "op": "bin"
+        },
+        {
+          "base": 0,
+          "buf": 2,
+          "op": "store",
+          "src": 4,
+          "stride": 1
+        }
+      ],
+      "n": 4,
+      "op": "loop"
+    }
+  ],
+  "buffers": [
+    4,
+    4,
+    4
+  ]
+}

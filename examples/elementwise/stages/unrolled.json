@@ -1,0 +1,177 @@
+{
+  "body": [
+    {
+      "base": 0,
+      "buf": 0,
+      "dst": 0,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "base": 0,
+      "buf": 1,
+      "dst": 1,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "a": 0,
+      "b": 1,
+      "dst": 2,
+      "fn": "add",
+      "op": "bin"
+    },
+    {
+      "a": 0,
+      "b": 1,
+      "dst": 3,
+      "fn": "sub",
+      "op": "bin"
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "dst": 4,
+      "fn": "max",
+      "op": "bin"
+    },
+    {
+      "base": 0,
+      "buf": 2,
+      "op": "store",
+      "src": 4,
+      "stride": 0
+    },
+    {
+      "base": 1,
+      "buf": 0,
+      "dst": 5,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "base": 1,
+      "buf": 1,
+      "dst": 6,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "a": 5,
+      "b": 6,
+      "dst": 7,
+      "fn": "add",
+      "op": "bin"
+    },
+    {
+      "a": 5,
+      "b": 6,
+      "dst": 8,
+      "fn": "sub",
+      "op": "bin"
+    },
+    {
+      "a": 7,
+      "b": 8,
+      "dst": 9,
+      "fn": "max",
+      "op": "bin"
+    },
+    {
+      "base": 1,
+      "buf": 2,
+      "op": "store",
+      "src": 9,
+      "stride": 0
+    },
+    {
+      "base": 2,
+      "buf": 0,
+      "dst": 10,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "base": 2,
+      "buf": 1,
+      "dst": 11,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "a": 10,
+      "b": 11,
+      "dst": 12,
+      "fn": "add",
+      "op": "bin"
+    },
+    {
+      "a": 10,
+      "b": 11,
+      "dst": 13,
+      "fn": "sub",
+      "op": "bin"
+    },
+    {
+      "a": 12,
+      "b": 13,
+      "dst": 14,
+      "fn": "max",
+      "op": "bin"
+    },
+    {
+      "base": 2,
+      "buf": 2,
+      "op": "store",
+      "src": 14,
+      "stride": 0
+    },
+    {
+      "base": 3,
+      "buf": 0,
+      "dst": 15,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "base": 3,
+      "buf": 1,
+      "dst": 16,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "a": 15,
+      "b": 16,
+      "dst": 17,
+      "fn": "add",
+      "op": "bin"
+    },
+    {
+      "a": 15,
+      "b": 16,
+      "dst": 18,
+      "fn": "sub",
+      "op": "bin"
+    },
+    {
+      "a": 17,
+      "b": 18,
+      "dst": 19,
+      "fn": "max",
+      "op": "bin"
+    },
+    {
+      "base": 3,
+      "buf": 2,
+      "op": "store",
+      "src": 19,
+      "stride": 0
+    }
+  ],
+  "buffers": [
+    4,
+    4,
+    4
+  ]
+}

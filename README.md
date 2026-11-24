@@ -30,39 +30,97 @@ What is not proved:
 - The JSON readers that the tools use.
 - Anything about hardware. The machine is a Lean model.
 
-## Build
+## Setup
 
-Lean, with [elan](https://github.com/leanprover/elan) installed:
+All commands are typed in a terminal, from the repository folder. CI runs
+the same steps on Debian 12 (`.github/workflows/ci.yml`); Ubuntu should
+behave the same. On Windows, install
+[WSL 2](https://learn.microsoft.com/windows/wsl/install) with Ubuntu and do
+everything inside it. On macOS, steps 1 to 4 should work as written (not yet tried); for step 5 see
+the note there.
+
+**1. Get the code.** On Debian or Ubuntu, first
+`sudo apt install git curl`.
 
 ```bash
-lake build                  # the library and every proof
-lake build TauTest          # the tests
-lake build tau-sim tau-check
+git clone https://github.com/pku-lemonade/tau-tpu.git
+cd tau-tpu
 ```
 
-The compiler, with LLVM and MLIR 21 development packages installed:
+**2. Install Lean.** You do not install Lean itself. You install
+[elan](https://github.com/leanprover/elan), which manages Lean versions the
+way `rustup` manages Rust's. Lean comes with Lake, its build tool, which
+plays the part of `make` or `cargo`. The file `lean-toolchain` names the
+Lean version this project uses, and elan downloads that version the first
+time you run `lake` in this folder.
 
 ```bash
-cmake -S compiler -B compiler/build -G Ninja \
-  -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
+curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+source ~/.elan/env        # or open a new terminal
+lake --version            # downloads Lean the first time, then prints its version
+```
+
+**3. Build the Lean side.** This builds the library, every proof, the tests
+and the two tools. The first time takes a few minutes. It should end with
+`Build completed successfully`.
+
+```bash
+lake build Tau TauTest tau-sim tau-check
+```
+
+**4. Set up the editor.** Lean is written in an editor that shows the proof
+state as you type. Use [VS Code](https://code.visualstudio.com/) with the
+Lean 4 extension:
+
+```bash
+code --install-extension leanprover.lean4
+code .                    # open the repository folder itself
+```
+
+Always open the repository folder, the one with `lakefile.toml` in it. With
+a subfolder or a single file open, `import Tau` is not found. If VS Code was
+already running when you installed elan, quit it and start it again, so that
+it can find `lake`. If the `code` command is not found: on macOS, run
+"Shell Command: Install 'code' command in PATH" from VS Code's command
+palette; under WSL, install VS Code on Windows with its WSL extension.
+
+**5. Build the compiler (optional).** The compiler needs LLVM and MLIR 21.
+Everything in Lean works without it, and `examples/*/stages/` holds what it
+writes for three examples. On Debian or Ubuntu, this installs LLVM through
+its [official installer](https://apt.llvm.org/) and builds the compiler:
+
+```bash
+sudo apt install cmake ninja-build g++ wget lsb-release gnupg software-properties-common
+wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 21 && rm llvm.sh
+sudo apt install llvm-21-dev libmlir-21-dev mlir-21-tools
+cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
 cmake --build compiler/build
 ```
 
-Or use the container in [`docker/`](docker/Dockerfile), which has both. VS
-Code can open the repository inside it through `.devcontainer/`. Neither has
+On macOS, or where those packages are not available, use the container in
+[`docker/`](docker/Dockerfile), which installs the same packages. It has not
 been tested yet.
 
-Without the compiler you can still build and use everything in Lean:
-`examples/linear/stages/` holds a copy of what `tauc` writes for one example,
-and `examples/linear-by-hand/` is a program written by hand.
+**6. Check the setup.** If the compiler is built, this compiles every
+example and checks every stage. Each line should start with `ok`.
+
+```bash
+scripts/check-examples.sh
+```
+
+Without the compiler, `lake build Tau TauTest` succeeding is the check.
 
 ## Try it
 
 ```bash
 compiler/build/bin/tauc examples/linear/kernel.mlir -o out
-.lake/build/bin/tau-check out/kernel.json out/compiled.json
-.lake/build/bin/tau-sim out/compiled.json examples/linear/buffers.json
+lake exe tau-check out/kernel.json out/compiled.json
+lake exe tau-sim out/compiled.json examples/linear/buffers.json
 ```
+
+Without the compiler, use `examples/linear/stages` in place of `out`.
+`lake exe` builds a tool if needed and then runs it; the built tools are
+also in `.lake/build/bin/`.
 
 `tauc` writes one file per pass, and each can be checked and run on its own:
 
@@ -76,8 +134,8 @@ compiler/build/bin/tauc examples/linear/kernel.mlir -o out
 | `compiled.json` | `tau-route` | the finished program |
 
 ```bash
-.lake/build/bin/tau-check out/kernel.json out/placed.json
-.lake/build/bin/tau-sim out/placed.json examples/linear/buffers.json
+lake exe tau-check out/kernel.json out/placed.json
+lake exe tau-sim out/placed.json examples/linear/buffers.json
 ```
 
 The first stage that `tau-check` rejects names the pass that went wrong.
@@ -146,6 +204,8 @@ Lean folders are listed in dependency order.
 | `chips/` | Chip descriptions: 9 slices and 17 slices |
 | `course/` | The course: a book and exercise files |
 | `docs/` | File formats |
+| `docker/`, `.devcontainer/` | A container with everything installed |
+| `.vscode/` | Recommended editor extension and settings |
 
 Definitions and theorems are kept apart. A file outside `Tau/Proofs/` says
 what something is. The file of the same name under `Tau/Proofs/` says what is

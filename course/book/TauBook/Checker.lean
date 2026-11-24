@@ -191,9 +191,11 @@ prints `ACCEPT`.
 ```
 compiler/build/bin/tauc examples/residual/kernel.mlir -o out
 for f in simplified unrolled placed scheduled compiled; do
-  .lake/build/bin/tau-check out/kernel.json out/$f.json
+  lake exe tau-check out/kernel.json out/$f.json
 done
 ```
+
+Without the compiler, use `examples/residual/stages` in place of `out`.
 
 The first file rejected names the faulty pass.
 

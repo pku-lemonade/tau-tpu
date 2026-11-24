@@ -10,6 +10,11 @@ scripts/check-examples.sh                    # compile every example; check and 
 python3 scripts/make-exercises.py            # regenerate course/Exercises/
 ```
 
+Run every command from the repository folder. Installing the tools is
+"Setup" in `README.md`. CI (`.github/workflows/ci.yml`) and
+`docker/Dockerfile` run the same install commands; change all three
+together.
+
 The Lean version is pinned in `lean-toolchain`. The library has no
 dependencies; do not add Mathlib. The book in `course/book/` is a separate
 Lake package because it depends on Verso.
@@ -38,8 +43,10 @@ Lake package because it depends on Verso.
   exercise as an outline, so write such comments in long proofs.
 - To add a feature, follow the path in the book chapter "Extending the
   machine" (`course/book/TauBook/Extending.lean`).
-- `examples/linear/stages/` is a copy of `tauc`'s output. After changing the
-  compiler, refresh it with `UPDATE_STAGES=1 scripts/check-examples.sh`.
+- `examples/*/stages/` (linear, elementwise, residual) are copies of
+  `tauc`'s output, for readers without the compiler; the book points to
+  them. After changing the compiler, refresh them with
+  `UPDATE_STAGES=1 scripts/check-examples.sh`.
 - After changing the compiler or the JSON formats, run
   `scripts/check-examples.sh` and update `docs/formats.md`.
 

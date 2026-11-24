@@ -28,37 +28,40 @@ comment at the top of each file in `lib/Target/` explains its method.
 
 ## Tools
 
+Commands here are run from the repository folder, after building as in
+"Setup" in the [root README](../README.md#setup).
+
 `tau-opt` runs passes and prints the result. Passes can be run one at a time,
 feeding the printed MLIR back in:
 
 ```bash
-build/bin/tau-opt ../examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place
-build/bin/tau-opt ../examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place \
-  | build/bin/tau-opt --tau-schedule \
-  | build/bin/tau-opt --tau-route
+compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place
+compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place \
+  | compiler/build/bin/tau-opt --tau-schedule \
+  | compiler/build/bin/tau-opt --tau-route
 ```
 
-`tau-place` takes the chip as an option: `--tau-place='chip=../chips/tau9.json'`.
+`tau-place` takes the chip as an option: `--tau-place='chip=chips/tau9.json'`.
 
 `tauc` runs all five passes and writes what each produced:
 
 ```bash
-build/bin/tauc ../examples/linear/kernel.mlir -o out
-build/bin/tauc ../examples/linear/kernel.mlir -o out --chip ../chips/tau9.json --print-mlir
+compiler/build/bin/tauc examples/linear/kernel.mlir -o out
+compiler/build/bin/tauc examples/linear/kernel.mlir -o out --chip chips/tau9.json --print-mlir
 ```
 
-The files are listed in `../docs/formats.md`.
+The files are described in [`docs/formats.md`](../docs/formats.md).
 
 ## Checking each pass
 
 Nothing in this directory is proved. Each pass is checked through its output:
 
 ```bash
-tau-check out/kernel.json out/simplified.json
-tau-check out/kernel.json out/unrolled.json
-tau-check out/kernel.json out/placed.json
-tau-check out/kernel.json out/scheduled.json
-tau-check out/kernel.json out/compiled.json
+lake exe tau-check out/kernel.json out/simplified.json
+lake exe tau-check out/kernel.json out/unrolled.json
+lake exe tau-check out/kernel.json out/placed.json
+lake exe tau-check out/kernel.json out/scheduled.json
+lake exe tau-check out/kernel.json out/compiled.json
 ```
 
 Every check compares against the kernel as written, and each has a soundness

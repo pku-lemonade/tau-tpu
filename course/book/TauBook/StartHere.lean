@@ -46,9 +46,9 @@ by Abts and others at ISCA 2020 and ISCA 2022.
 
 # The tour
 
-Before learning any Lean, see the finished thing work. Build everything as
-the repository's `README.md` describes. Then, from the root of the
-repository:
+Before learning any Lean, see the finished thing work. Do "Setup" in the
+repository's `README.md` first. Then, in a terminal in the repository
+folder:
 
 ```
 compiler/build/bin/tauc examples/linear/kernel.mlir -o out --print-mlir
@@ -60,7 +60,7 @@ the compiler's five passes and writes six files into `out/`. Open
 the timetable: a slice, a cycle, and an instruction.
 
 ```
-.lake/build/bin/tau-check out/kernel.json out/compiled.json
+lake exe tau-check out/kernel.json out/compiled.json
 ```
 
 This prints `ACCEPT`. That one word is backed by a theorem: for every
@@ -69,7 +69,7 @@ computes. Now open `out/compiled.json`, find the last instruction, add one to
 its `time`, and run the check again. It prints `REJECT` and says why.
 
 ```
-.lake/build/bin/tau-sim out/compiled.json examples/linear/buffers.json
+lake exe tau-sim out/compiled.json examples/linear/buffers.json
 ```
 
 This runs the program and prints the buffers. The last buffer is the result.
@@ -78,10 +78,11 @@ specification of the chip, compiled.
 
 If you have not built the compiler, skip the first command and use the
 folder `examples/linear/stages/` in place of `out/`. It holds the same six
-files. The chapters on kernels, on expressions and on the checker ask you to
-run the compiler again; the repository's `docker/` folder has a container
-with everything installed, and VS Code can open the repository inside it
-("Reopen in Container").
+files. The chapters on kernels, on expressions and on the checker run the
+compiler again, and each names a `stages/` folder to read instead.
+
+`lake exe` builds a tool if it needs to and then runs it. Like every `lake`
+command, it works only in the repository folder.
 
 You do not need to understand any of this yet. Come back to these three
 commands after the chapter on the slice-level machine and after the chapter

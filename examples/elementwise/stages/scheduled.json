@@ -1,0 +1,588 @@
+{
+  "config": {
+    "kinds": [
+      "mxm",
+      "sxm",
+      "mem",
+      "mem",
+      "vxm",
+      "mem",
+      "mem",
+      "sxm",
+      "mxm"
+    ],
+    "memDelay": 1,
+    "mxmDelay": 2,
+    "mxmWeights": 8,
+    "streams": 28,
+    "sxmDelay": 1,
+    "vxmDelay": 1
+  },
+  "cycles": 87,
+  "map": [
+    {
+      "base": 0,
+      "size": 4,
+      "slice": 2
+    },
+    {
+      "base": 0,
+      "size": 4,
+      "slice": 3
+    },
+    {
+      "base": 0,
+      "size": 4,
+      "slice": 5
+    }
+  ],
+  "memSizes": [
+    0,
+    0,
+    6,
+    6,
+    0,
+    5,
+    1,
+    0,
+    0
+  ],
+  "program": [
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 0
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 1
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "east",
+        "id": 1
+      },
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 4,
+      "time": 4
+    },
+    {
+      "addr": 4,
+      "op": "write",
+      "slice": 2,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 8
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 2
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 9
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 3
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 10
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 2
+      },
+      "b": {
+        "dir": "east",
+        "id": 3
+      },
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4,
+      "time": 13
+    },
+    {
+      "addr": 4,
+      "op": "write",
+      "slice": 3,
+      "src": {
+        "dir": "west",
+        "id": 1
+      },
+      "time": 16
+    },
+    {
+      "addr": 4,
+      "dst": {
+        "dir": "east",
+        "id": 4
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 17
+    },
+    {
+      "addr": 4,
+      "dst": {
+        "dir": "east",
+        "id": 5
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 18
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 4
+      },
+      "b": {
+        "dir": "east",
+        "id": 5
+      },
+      "dst": {
+        "dir": "east",
+        "id": 6
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 4,
+      "time": 21
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 6
+      },
+      "time": 24
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 7
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 25
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 8
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 26
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 7
+      },
+      "b": {
+        "dir": "east",
+        "id": 8
+      },
+      "dst": {
+        "dir": "east",
+        "id": 9
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 4,
+      "time": 29
+    },
+    {
+      "addr": 4,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 9
+      },
+      "time": 32
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 10
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 33
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 11
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 34
+    },
+    {
+      "addr": 4,
+      "dst": {
+        "dir": "west",
+        "id": 2
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 36
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 10
+      },
+      "b": {
+        "dir": "east",
+        "id": 11
+      },
+      "dst": {
+        "dir": "east",
+        "id": 12
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4,
+      "time": 37
+    },
+    {
+      "a": {
+        "dir": "west",
+        "id": 2
+      },
+      "b": {
+        "dir": "east",
+        "id": 12
+      },
+      "dst": {
+        "dir": "east",
+        "id": 13
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 4,
+      "time": 39
+    },
+    {
+      "addr": 1,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 13
+      },
+      "time": 42
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 14
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 43
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 15
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 44
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 14
+      },
+      "b": {
+        "dir": "east",
+        "id": 15
+      },
+      "dst": {
+        "dir": "east",
+        "id": 16
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 4,
+      "time": 47
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 16
+      },
+      "time": 51
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 17
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 52
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 18
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 53
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 3
+      },
+      "op": "read",
+      "slice": 6,
+      "time": 54
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 17
+      },
+      "b": {
+        "dir": "east",
+        "id": 18
+      },
+      "dst": {
+        "dir": "east",
+        "id": 19
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4,
+      "time": 56
+    },
+    {
+      "a": {
+        "dir": "west",
+        "id": 3
+      },
+      "b": {
+        "dir": "east",
+        "id": 19
+      },
+      "dst": {
+        "dir": "east",
+        "id": 20
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 4,
+      "time": 58
+    },
+    {
+      "addr": 2,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 20
+      },
+      "time": 61
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 21
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 62
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 22
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 63
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 21
+      },
+      "b": {
+        "dir": "east",
+        "id": 22
+      },
+      "dst": {
+        "dir": "west",
+        "id": 4
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 4,
+      "time": 66
+    },
+    {
+      "addr": 5,
+      "op": "write",
+      "slice": 2,
+      "src": {
+        "dir": "west",
+        "id": 4
+      },
+      "time": 70
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 23
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 71
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 24
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 72
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 23
+      },
+      "b": {
+        "dir": "east",
+        "id": 24
+      },
+      "dst": {
+        "dir": "west",
+        "id": 5
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4,
+      "time": 75
+    },
+    {
+      "addr": 5,
+      "op": "write",
+      "slice": 3,
+      "src": {
+        "dir": "west",
+        "id": 5
+      },
+      "time": 78
+    },
+    {
+      "addr": 5,
+      "dst": {
+        "dir": "east",
+        "id": 25
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 79
+    },
+    {
+      "addr": 5,
+      "dst": {
+        "dir": "east",
+        "id": 26
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 80
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 25
+      },
+      "b": {
+        "dir": "east",
+        "id": 26
+      },
+      "dst": {
+        "dir": "east",
+        "id": 27
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 4,
+      "time": 83
+    },
+    {
+      "addr": 3,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 27
+      },
+      "time": 86
+    }
+  ]
+}

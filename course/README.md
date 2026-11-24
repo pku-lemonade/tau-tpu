@@ -11,12 +11,15 @@ estimates; nobody has been timed.
 
 ## Start
 
-1. Install [elan](https://github.com/leanprover/elan) and
-   [VS Code](https://code.visualstudio.com/) with the Lean 4 extension, or use
-   the container in `docker/`.
-2. From the repository root run `lake build`. The first build downloads Lean.
-3. Open the repository folder (the whole folder) in VS Code.
-4. Read the book, starting with "Start here" and "Working in Lean".
+1. Do steps 1 to 4 of "Setup" in the [root README](../README.md#setup):
+   get the code, install Lean, build, and set up VS Code. Step 5, the C++
+   compiler, is optional; see "Without the C++ compiler" below.
+2. In VS Code, with the repository folder open, open
+   `course/Work/Scratch.lean`. After a few seconds the panel on the right
+   (the _infoview_) shows Lean's messages, and nothing in the file is
+   underlined in red. If `import Tau` is underlined in red, the folder you
+   opened is not the repository folder.
+3. Read the book, starting with "Start here" and "Working in Lean".
 
 ## The book
 
@@ -30,7 +33,9 @@ lake exe tau-book        # writes the HTML to _out/html-multi/
 python3 -m http.server -d _out/html-multi 8000
 ```
 
-The first build compiles Verso and takes about ten minutes. Every Lean
+Then open `http://localhost:8000` in a browser. The first build downloads
+and compiles Verso, the tool the book is written in, and takes about ten
+minutes. Every Lean
 example in the book is checked when the book is built.
 
 ## Three places for three kinds of file
@@ -69,10 +74,10 @@ it with `lake build Work.Foo`, and use it from another file with
 
 ## Without the C++ compiler
 
-Everything in Lean works without it. Three chapters ask you to run the
-compiler (kernels, expressions, the checker). For those, either use the
-container in `docker/`, or read the files in `examples/linear/stages/`, which
-are what the compiler writes for `examples/linear/kernel.mlir`.
+Everything in Lean works without it. Four chapters run the compiler: start
+here, kernels, expressions, and the checker. Each one names a folder
+`examples/<name>/stages/` that holds what the compiler writes for that
+example, so you can read the output instead of producing it.
 
 ## Order
 

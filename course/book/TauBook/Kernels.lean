@@ -36,7 +36,9 @@ compiler/build/bin/tau-opt examples/elementwise/kernel.mlir --tau-unroll
 ```
 
 The pass replaced the loop by four copies of its body, with positions
-`[0, 0]`, `[1, 0]`, `[2, 0]` and `[3, 0]`.
+`[0, 0]`, `[1, 0]`, `[2, 0]` and `[3, 0]`. Without the compiler, compare
+`examples/elementwise/stages/kernel.json` with `unrolled.json` in the same
+folder: the same kernel before and after the pass, written as JSON.
 
 The Lean type `Kernel` is a model of that dialect.
 

@@ -62,6 +62,9 @@ work on `examples/linear/kernel.mlir`, which has a `relu` of a `relu`:
 compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify
 ```
 
+Without the compiler, compare `examples/linear/stages/kernel.json` with
+`simplified.json` in the same folder.
+
 # What to prove
 
 Simplifying must not change the value. That is only true if the operations
