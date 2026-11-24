@@ -33,11 +33,11 @@ What is not proved:
 ## Setup
 
 All commands are typed in a terminal, from the repository folder. CI runs
-the same steps on Debian 12 (`.github/workflows/ci.yml`); Ubuntu should
-behave the same. On Windows, install
+these exact steps on Debian 12 and Ubuntu 24.04
+(`.github/workflows/ci.yml`). On Windows, install
 [WSL 2](https://learn.microsoft.com/windows/wsl/install) with Ubuntu and do
-everything inside it. On macOS, steps 1 to 4 should work as written (not yet tried); for step 5 see
-the note there.
+everything inside it. On macOS, steps 1 to 4 should work as written but have
+not been tried; for step 5 see the note there.
 
 **1. Get the code.** On Debian or Ubuntu, first
 `sudo apt install git curl`.
@@ -98,8 +98,9 @@ cmake --build compiler/build
 ```
 
 On macOS, or where those packages are not available, use the container in
-[`docker/`](docker/Dockerfile), which installs the same packages. It has not
-been tested yet.
+[`docker/`](docker/Dockerfile), which installs the same packages; CI builds
+it and runs every check inside it. VS Code can open the repository inside
+the container through `.devcontainer/`; that part has not been tried.
 
 **6. Check the setup.** If the compiler is built, this compiles every
 example and checks every stage. Each line should start with `ok`.
