@@ -44,7 +44,7 @@ In dependency order. A small feature touches only the first few.
    values.
 5. `Tau/IR/Kernel.lean`, `Tau/IR/Expr.lean` and their proofs, if kernels can
    say it.
-6. `Tau/Check/Stages.lean` and its proof: the placed level.
+6. `Tau/IR/Placed.lean` and its proof: the placed form.
 7. `Tau/CellLevel/Machine.lean` and `Tau/Proofs/CellLevel/Refine.lean`: how
    the slice does it with blocks, and that this is the same thing.
 8. `Tau/Sim/Json.lean`: reading it from a file.

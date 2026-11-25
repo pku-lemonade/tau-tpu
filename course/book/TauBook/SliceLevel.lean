@@ -15,6 +15,8 @@ set_option verso.code.warnLineLength 100
 *Read:* `Tau/Isa/Op.lean`, `Tau/Isa/Instr.lean`,
 `Tau/SliceLevel/Machine.lean`, `tests/TauTest/Linear.lean`.
 
+*Solutions, not to be opened yet:* `Tau/Proofs/SliceLevel/Timing.lean`.
+
 *Time:* three days.
 
 This chapter has no proofs. You read the specification of a whole machine,
@@ -98,6 +100,26 @@ Why cycle 4? Follow the word.
 That is the rule from the top of `Machine.lean`: a result computed at slice
 `p` on cycle `t` can be read at slice `q` on cycle
 `t + delay + 1 + |q - p|`. Here that is 0 + 1 + 1 + 2 = 4.
+
+The definition of the machine does not contain this rule. `step` says what
+happens in one cycle: a result enters the pipe of its slice, the oldest entry
+of the pipe comes out, and every stream moves one position. The rule is what
+follows from that over many cycles, in the same way as `shiftRegister_outAt`
+follows from the one-cycle definition of the shift register. It is a theorem,
+in `Tau/Proofs/SliceLevel/Timing.lean`:
+
+{docstring Tau.arrives_east}
+
+Three definitions appear in its statement. `IsRun` says that `st` lists the
+states of a run that does not trap, `st u` being the state at the start of
+cycle `u`. `State.result` is what a slice computes in a cycle, and
+`State.out` is what comes out of its pipe and is placed on a stream. The
+hypothesis `hfree` is the condition "if nothing else is put on that stream in
+its path": no slice on the way places a word of its own in the slot just as
+the travelling word arrives there. `arrives_west` is the mirror image.
+
+The theorem says the word is there on that cycle. It does not say the word
+is there on no other cycle.
 
 Run it. So that you can see what moves where, the memory holds names instead
 of numbers: `.init 0 0` is a name for "the word that started in buffer 0",
@@ -189,7 +211,8 @@ now.
 
 # Exercises
 
-There is no guided file for this chapter.
+There is no guided file for this chapter. The challenge at the end has
+one.
 
 *Open.* On the nine-slice chip of `tests/TauTest/Linear.lean`, write a
 schedule that adds a word held in slice 2 to a word held in slice 3 and
@@ -224,12 +247,13 @@ different one of the seven kinds of trap, and check each with an
 `step` and `execute`. One of the seven is raised by `execute` before the
 first cycle.
 
-*Challenge.* State and prove the transit lemma for one stream: if a value is
-placed on an east-going stream at position `p` on cycle `t`, and no slice
-between `p` and `q` places anything on that stream in the meantime, then the
-value is at position `q` on cycle `t + (q - p)`. Stating it precisely, in
-terms of `advanceRow`, is most of the work. Compare your statement with
-`shiftRegister_outAt`.
+*Challenge.* `Exercises/SliceLevel/Timing.lean`: prove the timing rule. This
+is the longest exercise file before the cell-level machine. Every long proof
+in it has an outline. Start with `out_delay`, which is `shiftRegister_outAt`
+for the pipe of one slice, and `sample_step`, which is one cycle of one
+stream. The two arrival theorems are short inductions once those are done.
+If it is too much now, come back to it after the chapter on the checker,
+which practises the same kind of proof on the same definitions.
 
 # Checkpoint
 

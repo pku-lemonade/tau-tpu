@@ -63,7 +63,7 @@ the order they must take effect. There are no cycles and no streams yet.
   is produced once and used by one instruction.
 - Instructions (`op`): `read`, `write`, `un`, `bin`, `const`, `sel`, `load`,
   `seed`, `mac`, `install`, `macw`, `emit`.
-- The fields are those of `Tau.PInstr` in `Tau/Check/Stages.lean`.
+- The fields are those of `Tau.PInstr` in `Tau/IR/Placed.lean`.
 
 ## Compiled file
 
@@ -118,8 +118,9 @@ itself and `streams` is raised to make room, and `compiled.json` after
 | `scheduled.json` | compiled | `tau-schedule` |
 | `compiled.json` | compiled | `tau-route` |
 
-`tau-check kernel.json <file>` and `tau-sim <file> buffers.json` accept any of
-them and tell the kind from the fields present.
+`tau-sim <file> buffers.json` runs any of them. `tau-check <before> <after>`
+compares two of them: a pass's input with its output, or `kernel.json` with
+`compiled.json`. Both tools tell the kind of a file from the fields present.
 
 ## Buffers file
 

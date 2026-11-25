@@ -67,6 +67,9 @@ Being exact about the limits of a theorem is part of the skill.
   whether they mean what the sentence above claims.
 * It trusts the operations. `Lane.requant` is whatever
   `Tau/Data/Word.lean` says it is. Nothing checks that against an intention.
+* It says nothing about how a pass did its work. A check asks whether the
+  output computes what the input computes. No Lean statement says what a
+  valid placement, schedule or routing is.
 * It is about a model. No hardware is involved.
 * It says nothing about speed. A program that takes a million cycles is as
   correct as one that takes twenty.
@@ -81,10 +84,15 @@ Lean. Then give it to someone and ask them what they think is guaranteed.
 
 # Where to go next
 
+* Write down, in Lean, what a valid schedule of a placed program is: the same
+  instructions, each operand read on the cycle the timing rule gives, and no
+  two words in one stream slot. Then prove that a valid schedule computes what
+  the placed program computes. `Tau/Proofs/SliceLevel/Timing.lean` is the
+  first lemma. This is a large project.
 * Prove something about the scheduler itself, in Lean: for instance, that a
-  schedule built by `tau-schedule` from the output of `tau-place` always
-  satisfies the timing rule. This is a research-sized problem. Start with
-  groups of one operation.
+  schedule built by `tau-schedule` from the output of `tau-place` is always
+  valid in that sense. This is a research-sized problem. Start with groups of
+  one operation.
 * Lean-MLIR is a framework for verifying rewrites on MLIR-style
   representations, with far more automation than this course uses.
 * CompCert is a C compiler proved correct in another proof assistant. Its

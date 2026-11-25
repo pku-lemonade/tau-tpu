@@ -55,27 +55,44 @@ The files are described in [`docs/formats.md`](../docs/formats.md).
 ## Checking each pass
 
 Nothing in this directory is proved. Each pass is checked through its output:
+`tau-check` takes the input of a pass and its output, and decides whether
+they compute the same thing on every buffer contents.
 
 ```bash
-lake exe tau-check out/kernel.json out/simplified.json
-lake exe tau-check out/kernel.json out/unrolled.json
-lake exe tau-check out/kernel.json out/placed.json
-lake exe tau-check out/kernel.json out/scheduled.json
-lake exe tau-check out/kernel.json out/compiled.json
+lake exe tau-check out/kernel.json out/simplified.json      # tau-simplify
+lake exe tau-check out/simplified.json out/unrolled.json    # tau-unroll
+lake exe tau-check out/unrolled.json out/placed.json        # tau-place
+lake exe tau-check out/placed.json out/scheduled.json       # tau-schedule
+lake exe tau-check out/scheduled.json out/compiled.json     # tau-route
+lake exe tau-check out/kernel.json out/compiled.json        # all five at once
 ```
 
-Every check compares against the kernel as written, and each has a soundness
-theorem in `Tau/Proofs/Check/`. The first file rejected names the faulty
-pass. If a pass has a bug, the result is a rejected file, not a wrong answer.
+Each of the six is a different check with its own soundness theorem in
+`Tau/Proofs/Check/`; `tau-check` picks the check from the kinds of the two
+files. If a pass has a bug, the result is a rejected file that names the
+pass, not a wrong answer. [`docs/overview.md`](../docs/overview.md) lists the
+checks and theorems.
+
+A check asks only whether the output computes what the input computes. It
+does not ask whether the scheduler kept the instructions that placement
+chose, or whether the router kept the cycles that the scheduler chose.
 
 `scheduled.json` is the schedule with a routing that cannot be wrong: every
-word has a stream to itself, on a chip given enough streams. So a schedule
-that is accepted followed by a finished program that is rejected means the
-routing is at fault.
+word has a stream to itself, on a chip given enough streams. `tau-route` then
+fits the words onto the streams the chip has.
 
 In addition, `Tau/Passes/Simplify.lean` and `Tau/Passes/Unroll.lean` are Lean
 models of the first two passes, proved to keep what a kernel computes. Those
-proofs are about the models, not about the C++.
+proofs are about the models, not about the C++. For `tau-unroll` the two are
+compared: `scripts/check-examples.sh` fails unless the compiler's
+`unrolled.json` is the kernel the model gives, up to the numbering of values.
+
+```bash
+lake exe tau-check --unroll out/simplified.json out/unrolled.json
+```
+
+The model of `tau-simplify` rewrites expressions, not kernels, so it has no
+output to compare with the compiler's.
 
 Runs of instructions that one slice issues at a fixed spacing are merged into
 repeating entries when the program file is written. This is a property of the

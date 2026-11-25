@@ -49,6 +49,10 @@ Lake package because it depends on Verso.
   `UPDATE_STAGES=1 scripts/check-examples.sh`.
 - After changing the compiler or the JSON formats, run
   `scripts/check-examples.sh` and update `docs/formats.md`.
+- `docs/overview.md` names every form, pass, check and main theorem, and the
+  README table "What is proved" says how each claim stands. Update both when
+  you add or rename one. They point to Lean files and do not restate
+  definitions.
 
 ## Helping a student
 

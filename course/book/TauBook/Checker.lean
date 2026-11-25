@@ -13,12 +13,14 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The checker" =>
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
-*Read:* `Tau/Check/Checker.lean`, `Tau/Check/Stages.lean`,
+*Read:* `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean`,
+`Tau/Check/Checker.lean`, `Tau/IR/Placed.lean`, `Tau/Check/Passes.lean`,
 `compiler/lib/Target/`.
 
 *Solutions, not to be opened yet:* `Tau/Proofs/SliceLevel/Map.lean`,
-`Tau/Proofs/IR/Map.lean`, `Tau/Proofs/Check/Sound.lean`,
-`Tau/Proofs/Check/Stages.lean`.
+`Tau/Proofs/IR/Map.lean`, `Tau/Proofs/IR/MemMap.lean`,
+`Tau/Proofs/Check/Sound.lean`, `Tau/Proofs/IR/Placed.lean`,
+`Tau/Proofs/Check/Passes.lean`.
 
 *Time:* five days.
 
@@ -167,49 +169,97 @@ like the code.
 
 # Checking each pass on its own
 
-When `check` rejects a finished program it does not say which pass was
-wrong. So the compiler writes a file after every pass, and each file has its
-own check against the kernel. They are in `Tau/Check/Stages.lean`.
+`check` compares the finished program with the kernel. That covers all five
+passes at once, so when it rejects it does not say which pass was wrong. And
+it is not the usual way to say what a pass must do. The usual specification
+of a compiler pass is: the output computes what the input computes.
 
-`tau-simplify` and `tau-unroll` produce kernels:
+So the compiler writes a file after every pass, and
+`Tau/Check/Passes.lean` has one check for each pass. Each compares the
+output of the pass with its input, in the same way as `check`: run both sides
+on names and compare the expressions.
 
-{docstring Tau.checkKernels}
-
-`tau-place` produces instructions in order, with slices and addresses but no
-cycles and no streams:
+A program takes three forms on the way. A kernel you know. `tau-place`
+produces instructions in order, with slices and addresses but no cycles and
+no streams; this form and its meaning are in `Tau/IR/Placed.lean`:
 
 {docstring Tau.Placed}
 
+`tau-schedule` and `tau-route` both produce a `Compiled` program. The first
+gives every word a stream to itself, on a chip with as many streams as that
+takes, so that the schedule can be checked before any stream is shared. The
+second fits the words onto the streams the chip has.
+
+`tau-simplify` and `tau-unroll`, kernel to kernel:
+
+{docstring Tau.checkKernels}
+
+`tau-place`, kernel to placed program:
+
 {docstring Tau.checkPlaced}
 
-`tau-schedule` adds cycles. Its output is checked by `check` itself, using a
-routing that cannot be wrong: every word gets a stream to itself.
+`tau-schedule`, placed program to compiled program:
 
-Run the compiler on an example and check the five files in order. Each line
-prints `ACCEPT`.
+{docstring Tau.checkScheduled}
+
+`tau-route`, compiled program to compiled program:
+
+{docstring Tau.checkRouted}
+
+Each has a soundness theorem of the same shape as `check_sound`. For
+example, for the scheduler:
+
+```lean
+example (pl : Placed) (c : Compiled) (bufs : List (List (Word 4)))
+    (h : checkScheduled pl c = true) :
+    ∃ mem mem',
+      pl.execute (wordSem 4) (pl.image bufs Word.zero) = some mem ∧
+      execute (wordSem 4) c.cfg c.prog c.cycles (c.image bufs Word.zero) = .ok mem' ∧
+      extract c.map mem' Word.zero = extract pl.map mem Word.zero :=
+  checkScheduled_sound (wordSem 4) (wordSem_lawful 4) pl c bufs Word.zero h
+```
+
+In words: the placed program can be carried out, the machine runs the timed
+program without a trap, and the two end with the same buffers.
+
+`passes_sound` chains the five theorems. If every pass is accepted, the
+finished program computes the kernel, which is the conclusion of
+`check_sound`.
+
+Run the compiler on an example and check the five passes in order. `tau-check`
+takes the input of a pass and its output. Each line prints `ACCEPT`.
 
 ```
 compiler/build/bin/tauc examples/residual/kernel.mlir -o out
-for f in simplified unrolled placed scheduled compiled; do
-  lake exe tau-check out/kernel.json out/$f.json
-done
+lake exe tau-check out/kernel.json out/simplified.json
+lake exe tau-check out/simplified.json out/unrolled.json
+lake exe tau-check out/unrolled.json out/placed.json
+lake exe tau-check out/placed.json out/scheduled.json
+lake exe tau-check out/scheduled.json out/compiled.json
 ```
 
 Without the compiler, use `examples/residual/stages` in place of `out`.
 
-The first file rejected names the faulty pass.
+A rejection names the faulty pass.
+
+Notice what these checks do not ask. `checkScheduled` accepts any timed
+program that computes what the placed program computes, even one that uses
+different instructions. Nothing in Lean says what a valid schedule is. The
+chapter "End to end" comes back to this.
 
 # How to work through it
 
-1. Read `Tau/Check/Checker.lean`. Redo the small example above in your
-   scratch file with a program of your own.
+1. Read `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean` and
+   `Tau/Check/Checker.lean`. Redo the small example above in your scratch
+   file with a program of your own.
 2. Do `Exercises/IR/Map.lean`. It is the smaller of the two "does not look at
    its values" proofs and shows the pattern.
 3. Do `Exercises/SliceLevel/Map.lean`. Go in the order of the file. Each
    lemma is about one function of the machine; have that function's
    definition open next to the proof.
-4. Do `Exercises/Check/Sound.lean`.
-5. Read `Tau/Check/Stages.lean` and do `Exercises/Check/Stages.lean`.
+4. Do `Exercises/IR/MemMap.lean`, then `Exercises/Check/Sound.lean`.
+5. Read `Tau/IR/Placed.lean` and `Tau/Check/Passes.lean`. Do
+   `Exercises/IR/Placed.lean`, then `Exercises/Check/Passes.lean`.
 
 # Lean you will need
 
@@ -225,7 +275,8 @@ The first file rejected names the faulty pass.
 # Exercises
 
 *Guided.* `Exercises/IR/Map.lean`, `Exercises/SliceLevel/Map.lean`,
-`Exercises/Check/Sound.lean`, `Exercises/Check/Stages.lean`.
+`Exercises/IR/MemMap.lean`, `Exercises/Check/Sound.lean`,
+`Exercises/IR/Placed.lean`, `Exercises/Check/Passes.lean`.
 
 *Open.* Break the compiler, one pass at a time. After each change rebuild
 with `cmake --build compiler/build` and run `scripts/check-examples.sh`.
@@ -290,30 +341,40 @@ its `sorry`. Read it first.
   functions at each element.
 * `step_map`, `run_map`, `execute_map`: each uses the one before.
 
-*`Exercises/Check/Sound.lean`.*
+*`Exercises/IR/MemMap.lean`.*
 
 * `image_map`, `extract_map`: `simp only [List.map_map]`, then
   `apply List.map_congr_left` and `intro`, twice, once for each level of
   nesting. `Function.comp` is `∘`; `simp only [Function.comp]` unfolds it.
+
+*`Exercises/Check/Sound.lean`.*
+
 * `range_map_getD`: `apply List.ext_getElem`, which asks for equal lengths
   and equal elements at each index.
-* `symBufs_denote`, `Kernel.run_of_exprs`, `denote_of_simp_eq`: follow the
+* `symBufs_denote`, `Kernel.run_of_exprs`, `denote_of_sameExprs`: follow the
   outlines.
-* `check_sound`: follow the outline. Three pieces of syntax are new.
-  `unfold check at h` unfolds in the hypothesis `h`, not in the goal.
+* `execute_of_exprs`: follow the outline. Three pieces of syntax are new.
+  `unfold machineExprs at h` unfolds in the hypothesis `h`, not in the goal.
   `cases hx : e with` splits on `e` and records which case you are in as
-  `hx`. `refine ⟨_, _, hrun, hker, ?_⟩` supplies a five-part answer in which
-  the first two parts are to be worked out by Lean and the last is left as
-  the new goal.
+  `hx`. `refine ⟨memE.map (List.map f), ?_, ?_⟩` supplies the memory the
+  theorem says exists and leaves the two facts about it as new goals.
+* `check_sound`: follow the outline. `obtain ⟨mem, hrun, hx⟩ := ...` takes
+  apart what `execute_of_exprs` gives. `refine ⟨mem, _, hrun, hker, ?_⟩`
+  supplies a five-part answer in which the second part is to be worked out by
+  Lean and the last is left as the new goal.
 
-*`Exercises/Check/Stages.lean`.* Everything here repeats a proof from the
-other files for the placed level. `PInstr.exec_map` is `exec_map` again with
-lookups in place of reads. `checkPlaced_sound` is `check_sound` again.
+*`Exercises/IR/Placed.lean` and `Exercises/Check/Passes.lean`.* Everything
+here repeats a proof from the other files. `PInstr.exec_map` is `exec_map`
+again with lookups in place of reads. `Placed.execute_of_exprs` is
+`execute_of_exprs` again. The four soundness theorems are `check_sound` again
+with different sides. `passes_sound` is new: `obtain` the conclusion of each
+of the five theorems, note that two neighbours speak about the same run in
+the middle, and chain the equations with `rw`.
 
 # Checkpoint
 
-The four exercise files build with no `sorry` warning: `lake build
-Exercises.IR.Map Exercises.SliceLevel.Map Exercises.Check.Sound
-Exercises.Check.Stages`. You can say, in two
+The six exercise files build with no `sorry` warning: `lake build
+Exercises.IR.Map Exercises.SliceLevel.Map Exercises.IR.MemMap
+Exercises.Check.Sound Exercises.IR.Placed Exercises.Check.Passes`. You can say, in two
 sentences, why checking one run on names proves something about every input,
 and which property of the machine that relies on.

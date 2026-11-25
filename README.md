@@ -24,11 +24,39 @@ exactly the buffers the kernel computes.
 The theorem rests on Lean's three standard axioms and nothing else;
 `tests/TauTest/Axioms.lean` fails the build if that changes.
 
-What is not proved:
+Every part of the project stands in one of four ways. *Proved* means a Lean
+theorem, for every input and every size. *Checked* means `tau-check` decides
+it for each compiled program. *Tested* means it holds on the examples.
+*Trusted* means nothing checks it.
 
-- The C++ compiler. A wrong compiler produces programs the checker rejects.
-- The JSON readers that the tools use.
-- Anything about hardware. The machine is a Lean model.
+| Claim | Standing | Where |
+|---|---|---|
+| Each block gives the stated output at cycle `t` | proved | `Tau/Proofs/Blocks/` |
+| The cell-level machine equals the slice-level machine | proved | `cellExecute_eq` |
+| A finished program that `check` accepts computes its kernel, without a trap | proved | `check_sound`, `end_to_end` |
+| The output of a pass that the pass's check accepts computes what the input computes | proved | `checkKernels_sound`, `checkPlaced_sound`, `checkScheduled_sound`, `checkRouted_sound` |
+| If all five per-pass checks accept, the finished program computes its kernel | proved | `passes_sound`, `end_to_end_passes` |
+| The Lean models of `simplify` and `unroll` keep what a kernel computes | proved | `Expr.denote_simp`, `Kernel.run_unroll` |
+| The output of each C++ pass computes what its input computes | checked | `tau-check`, once per pass |
+| The compiler's output is accepted | tested, on 18 kernels | `scripts/check-examples.sh` |
+| The C++ `tau-unroll` gives the kernel that its Lean model gives | tested, on 18 kernels | `tau-check --unroll` |
+| The C++ `tau-simplify` does what its Lean model does | not checked; the model rewrites expressions, not kernels | `Tau/Passes/Simplify.lean` |
+| `tau-place`, `tau-schedule` and `tau-route` have a Lean model, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing | |
+| The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
+| The result is there on no other cycle | not stated | |
+| `kernel.json` says what `kernel.mlir` says | trusted | MLIR's parser, `compiler/lib/Target/EmitKernel.cpp` |
+| The JSON files are read correctly | trusted | `Tau/Sim/Json.lean` |
+| The definitions in the theorems mean what is intended | trusted; read them | `Kernel.run`, `cellExecute`, `Tau/Data/Word.lean` |
+| Lean checks proofs and compiles `tau-check` correctly | trusted | |
+| Anything about hardware | no; the machine is a Lean model | |
+
+A bug in a C++ pass gives a program the checker rejects, not a wrong answer.
+The exception is the step that writes `kernel.json`: the chain of checks
+starts from that file, so a kernel misread there is checked faithfully
+against the wrong kernel.
+
+[`docs/overview.md`](docs/overview.md) says in words what each part is and
+names the definition and the theorem for it.
 
 ## Setup
 
@@ -87,15 +115,23 @@ Without the compiler, use `examples/linear/stages` in place of `out`.
 | `scheduled.json` | `tau-schedule` | timed instructions, one stream per word |
 | `compiled.json` | `tau-route` | the finished program |
 
+`tau-check` takes the input of a pass and its output, and decides whether
+they compute the same thing:
+
 ```bash
-lake exe tau-check out/kernel.json out/placed.json
+lake exe tau-check out/kernel.json out/simplified.json      # tau-simplify
+lake exe tau-check out/simplified.json out/unrolled.json    # tau-unroll
+lake exe tau-check out/unrolled.json out/placed.json        # tau-place
+lake exe tau-check out/placed.json out/scheduled.json       # tau-schedule
+lake exe tau-check out/scheduled.json out/compiled.json     # tau-route
 lake exe tau-sim out/placed.json examples/linear/buffers.json
 ```
 
-The first stage that `tau-check` rejects names the pass that went wrong.
+A rejection names the pass that went wrong.
 
-`scripts/check-examples.sh` compiles every example, checks and runs all five
-stages, and confirms that a damaged copy of each stage is rejected.
+`scripts/check-examples.sh` compiles every example, checks every pass against
+its input, runs every file, and confirms that a damaged copy of each file is
+rejected.
 
 ## Examples
 
@@ -146,9 +182,9 @@ Lean folders are listed in dependency order.
 | `Tau/Isa/` | Slice kinds, operations, instructions, programs, chip configuration |
 | `Tau/SliceLevel/` | The machine with each slice as one box with a delay |
 | `Tau/CellLevel/` | The machine with each slice opened into its blocks |
-| `Tau/IR/` | Kernels (the Lean model of the compiler's dialect) and symbolic expressions |
+| `Tau/IR/` | The three forms a program takes in the compiler (kernel, placed, compiled), the memory map, and symbolic expressions |
 | `Tau/Passes/` | Lean models of the compiler's `simplify` and `unroll` passes |
-| `Tau/Check/` | The checker for finished programs, and the checks for each pass |
+| `Tau/Check/` | The checker for compiled programs, and the checks for each pass |
 | `Tau/Sim/` | JSON readers and the functions behind the command-line tools |
 | `Tau/Proofs/` | Theorems about everything above, in a mirrored folder structure |
 | `tools/` | Entry points of `tau-sim` and `tau-check` |
@@ -157,7 +193,7 @@ Lean folders are listed in dependency order.
 | `examples/` | Kernels with input buffers |
 | `chips/` | Chip descriptions: 9 slices and 17 slices |
 | `course/` | The course: a book and exercise files |
-| `docs/` | File formats |
+| `docs/` | What each part is and where it is defined; file formats |
 | `docker/`, `.devcontainer/` | A container with everything installed |
 | `.vscode/` | Recommended editor extension and settings |
 
@@ -174,7 +210,24 @@ entry may repeat at a fixed spacing. There are no branches, no queues and no
 waiting. A result computed at slice `p` on
 cycle `t` can be read at slice `q` on cycle `t + delay + 1 + |q - p|`, and on
 no other cycle. The compiler's job is to make every operand arrive on time.
+The first half of that rule is a theorem, in
+`Tau/Proofs/SliceLevel/Timing.lean`.
 
 The design follows the published descriptions of tensor streaming processors
 (Abts et al., ISCA 2020 and ISCA 2022). It is a teaching model and does not
 describe any product.
+
+## The compiler in one paragraph
+
+The input is a kernel: one MLIR function in the `tau` dialect, written by
+hand as text. Its operations are loads and stores on buffers of words,
+arithmetic on words, rearrangement of lanes, matrix times vector, and a loop
+with a fixed count that does not nest. There is no front-end language and no
+import from a framework such as PyTorch or ONNX; nothing lowers into the
+dialect from another one. Five passes take the kernel to a program.
+`tau-simplify` and `tau-unroll` rewrite the kernel, `tau-place` gives each
+operation a slice and each buffer an address, `tau-schedule` gives each
+instruction a cycle, and `tau-route` gives each result a stream. The passes
+are C++ and none is proved. Each one's output is written as a JSON file, and
+`tau-check` decides whether it computes what the pass's input computes. The
+passes and their limits are in [`compiler/README.md`](compiler/README.md).
