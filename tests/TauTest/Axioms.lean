@@ -60,6 +60,10 @@ compiler (see `Tau/Proofs/Data/Lane.lean`).
 #guard_msgs in
 #print axioms Tau.end_to_end
 
+/-- info: 'Tau.Claims.endToEnd' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.Claims.endToEnd
+
 /-- info: 'Tau.repeater_outAt' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.repeater_outAt
