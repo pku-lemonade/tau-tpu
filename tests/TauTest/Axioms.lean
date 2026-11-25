@@ -36,6 +36,14 @@ compiler (see `Tau/Proofs/Data/Lane.lean`).
 #guard_msgs in
 #print axioms Tau.passes_sound
 
+/-- info: 'Tau.arrives_east' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.arrives_east
+
+/-- info: 'Tau.arrives_west' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.arrives_west
+
 /-- info: 'Tau.Kernel.exec_unroll' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.Kernel.exec_unroll

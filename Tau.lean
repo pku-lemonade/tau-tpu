@@ -29,6 +29,7 @@ import Tau.Check.Checker
 import Tau.Proofs.Passes.Unroll
 import Tau.Proofs.Passes.Simplify
 import Tau.Proofs.SliceLevel.Map
+import Tau.Proofs.SliceLevel.Timing
 import Tau.Proofs.IR.Map
 import Tau.Proofs.IR.MemMap
 import Tau.Proofs.IR.Placed
