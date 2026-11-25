@@ -1,7 +1,7 @@
 import Tau.SliceLevel.Machine
 import Tau.IR.Kernel
 import Tau.IR.Compiled
-import Tau.Passes.Simplify
+import Tau.Check.Simplify
 
 /-!
 # The schedule checker

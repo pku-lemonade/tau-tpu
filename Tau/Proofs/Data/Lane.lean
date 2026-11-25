@@ -7,7 +7,7 @@ import Std.Tactic.BVDecide
 Two ways to prove a fact about 32-bit values.
 
 The first three facts are the laws the simplifier relies on
-(`Sem.Lawful` in `Tau/Passes/Simplify.lean`). They are proved by splitting on
+(`Sem.Lawful` in `Tau/Check/Simplify.lean`). They are proved by splitting on
 the comparison and letting `simp_all` finish.
 
 The rest are proved by `bv_decide`. It turns the statement into a question

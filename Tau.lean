@@ -24,10 +24,10 @@ import Tau.IR.MemMap
 import Tau.IR.Placed
 import Tau.IR.Compiled
 import Tau.Passes.Unroll
-import Tau.Passes.Simplify
+import Tau.Check.Simplify
 import Tau.Check.Checker
 import Tau.Proofs.Passes.Unroll
-import Tau.Proofs.Passes.Simplify
+import Tau.Proofs.Check.Simplify
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.SliceLevel.Timing
 import Tau.Proofs.IR.Map

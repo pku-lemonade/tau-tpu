@@ -81,18 +81,19 @@ chose, or whether the router kept the cycles that the scheduler chose.
 word has a stream to itself, on a chip given enough streams. `tau-route` then
 fits the words onto the streams the chip has.
 
-In addition, `Tau/Passes/Simplify.lean` and `Tau/Passes/Unroll.lean` are Lean
-models of the first two passes, proved to keep what a kernel computes. Those
-proofs are about the models, not about the C++. For `tau-unroll` the two are
-compared: `scripts/check-examples.sh` fails unless the compiler's
-`unrolled.json` is the kernel the model gives, up to the numbering of values.
+In addition, `Tau/Passes/Unroll.lean` is a copy of `tau-unroll` written in
+Lean and proved to keep what a kernel computes. That proof is about the Lean
+function, not about the C++. The two are compared:
+`scripts/check-examples.sh` fails unless the compiler's `unrolled.json` is
+the kernel the Lean function gives, up to the numbering of values.
 
 ```bash
 lake exe tau-check --unroll out/simplified.json out/unrolled.json
 ```
 
-The model of `tau-simplify` rewrites expressions, not kernels, so it has no
-output to compare with the compiler's.
+`tau-simplify` has no such copy. The three rewrites it makes are the ones
+the checks apply to expressions before comparing them
+(`Tau/Check/Simplify.lean`), which is why its output is accepted.
 
 Runs of instructions that one slice issues at a fixed spacing are merged into
 repeating entries when the program file is written. This is a property of the

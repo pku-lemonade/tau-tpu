@@ -11,7 +11,7 @@ import Tau.Check.Checker
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
 import Tau.Proofs.IR.MemMap
-import Tau.Proofs.Passes.Simplify
+import Tau.Proofs.Check.Simplify
 
 /-!
 # The checker is sound

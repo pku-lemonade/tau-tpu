@@ -36,12 +36,11 @@ it for each compiled program. *Tested* means it holds on the examples.
 | A finished program that `check` accepts computes its kernel, without a trap | proved | `check_sound`, `end_to_end` |
 | The output of a pass that the pass's check accepts computes what the input computes | proved | `checkKernels_sound`, `checkPlaced_sound`, `checkScheduled_sound`, `checkRouted_sound` |
 | If all five per-pass checks accept, the finished program computes its kernel | proved | `passes_sound`, `end_to_end_passes` |
-| The Lean models of `simplify` and `unroll` keep what a kernel computes | proved | `Expr.denote_simp`, `Kernel.run_unroll` |
+| `Kernel.unroll`, the Lean copy of `tau-unroll`, keeps what a kernel computes; the simplifier inside the checks keeps the value of an expression | proved | `Kernel.run_unroll`, `Expr.denote_simp` |
 | The output of each C++ pass computes what its input computes | checked | `tau-check`, once per pass |
 | The compiler's output is accepted | tested, on 18 kernels | `scripts/check-examples.sh` |
-| The C++ `tau-unroll` gives the kernel that its Lean model gives | tested, on 18 kernels | `tau-check --unroll` |
-| The C++ `tau-simplify` does what its Lean model does | not checked; the model rewrites expressions, not kernels | `Tau/Passes/Simplify.lean` |
-| `tau-place`, `tau-schedule` and `tau-route` have a Lean model, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing | |
+| The C++ `tau-unroll` gives the kernel that its Lean copy gives | tested, on 18 kernels | `tau-check --unroll` |
+| The other four passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing | |
 | The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
 | `kernel.json` says what `kernel.mlir` says | trusted | MLIR's parser, `compiler/lib/Target/EmitKernel.cpp` |
@@ -183,8 +182,8 @@ Lean folders are listed in dependency order.
 | `Tau/SliceLevel/` | The machine with each slice as one box with a delay |
 | `Tau/CellLevel/` | The machine with each slice opened into its blocks |
 | `Tau/IR/` | The three forms a program takes in the compiler (kernel, placed, compiled), the memory map, and symbolic expressions |
-| `Tau/Passes/` | Lean models of the compiler's `simplify` and `unroll` passes |
-| `Tau/Check/` | The checker for compiled programs, and the checks for each pass |
+| `Tau/Passes/` | A Lean copy of the `unroll` pass |
+| `Tau/Check/` | The check of the whole compiler, the checks for each pass, and the simplifier they use |
 | `Tau/Sim/` | JSON readers and the functions behind the command-line tools |
 | `Tau/Proofs/` | Theorems about everything above, in a mirrored folder structure |
 | `tools/` | Entry points of `tau-sim` and `tau-check` |

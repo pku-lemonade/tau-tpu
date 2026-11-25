@@ -27,7 +27,8 @@ set_option verso.code.warnLineLength 100
 # The problem
 
 The compiler has five passes. `tau-simplify` and `tau-unroll` rewrite the
-kernel, and you have seen Lean models of both. The other three are the back
+kernel. You have seen a Lean copy of `tau-unroll`, and the rewrites that
+`tau-simplify` makes. The other three are the back
 end: `tau-place` decides where every buffer lives and which slice runs each
 operation, `tau-schedule` decides the cycle of every instruction, and
 `tau-route` decides on which stream each word travels. Read

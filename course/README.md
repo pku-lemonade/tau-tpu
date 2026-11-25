@@ -89,7 +89,7 @@ example, so you can read the output instead of producing it.
 | 10-12 | The systolic array | `Blocks/SystolicArray` |
 | 13-15 | The slice-level machine | none; you write schedules. Challenge: `SliceLevel/Timing` |
 | 16-17 | Kernels and loop unrolling | `Passes/Unroll` |
-| 18-19 | Expressions and simplification | `Passes/Simplify` |
+| 18-19 | Expressions and simplification | `Check/Simplify` |
 | 20-24 | The checker | `IR/Map`, `SliceLevel/Map`, `IR/MemMap`, `Check/Sound`, `IR/Placed`, `Check/Passes` |
 | 25-29 | The cell-level machine | `CellLevel/Refine` |
 | 30 | End to end | `EndToEnd` |

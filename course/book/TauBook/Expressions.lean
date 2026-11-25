@@ -13,10 +13,10 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* symbolic execution, abstract syntax tree, peephole
 optimization.
 
-*Read:* `Tau/IR/Expr.lean`, `Tau/Passes/Simplify.lean`,
+*Read:* `Tau/IR/Expr.lean`, `Tau/Check/Simplify.lean`,
 `compiler/lib/Transforms/Simplify.cpp`.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Passes/Simplify.lean`.
+*Solutions, not to be opened yet:* `Tau/Proofs/Check/Simplify.lean`.
 
 *Time:* two days.
 
@@ -95,10 +95,10 @@ number format untouched.
 
 # How to work through it
 
-1. Read `Tau/IR/Expr.lean` and `Tau/Passes/Simplify.lean`.
+1. Read `Tau/IR/Expr.lean` and `Tau/Check/Simplify.lean`.
 2. In your scratch file, build an expression that `simp` reduces in two
    places, and check the result with `rfl`.
-3. Do `Exercises/Passes/Simplify.lean`: first `denote_simpUn` and
+3. Do `Exercises/Check/Simplify.lean`: first `denote_simpUn` and
    `denote_simpBin`, then `Expr.denote_simp` by induction on the expression.
 
 # Lean you will need
@@ -112,11 +112,11 @@ number format untouched.
 
 # Exercises
 
-*Guided.* `Exercises/Passes/Simplify.lean`.
+*Guided.* `Exercises/Check/Simplify.lean`.
 
 The next two exercises change files under `Tau/`, which the rest of the
 course leaves alone. Do them on a branch: run `git switch -c my-simplifier`
-first. While `Tau/Passes/Simplify.lean` and its proofs disagree, `lake build`
+first. While `Tau/Check/Simplify.lean` and its proofs disagree, `lake build`
 fails and every file that imports `Tau` shows errors; that is expected, and
 it stops when both proofs are repaired. To go back, commit or discard your
 changes and run `git switch main`.
@@ -124,7 +124,7 @@ changes and run `git switch main`.
 *Open.* Add a rewrite of your own. A candidate: `max a (max a b)` becomes
 `max a b`. Add the law it needs to `Sem.Lawful`, add the case to `simpBin`,
 and repair `denote_simpBin` and `wordSem_lawful`, both in
-`Tau/Proofs/Passes/Simplify.lean`. Before proving your law for
+`Tau/Proofs/Check/Simplify.lean`. Before proving your law for
 words, state it for a single lane and try `bv_decide`. If the law is false
 you will get a counterexample in seconds.
 
@@ -152,6 +152,6 @@ definitions.
 
 # Checkpoint
 
-`lake build Exercises.Passes.Simplify` prints no `sorry` warning. You have a
+`lake build Exercises.Check.Simplify` prints no `sorry` warning. You have a
 verified optimizer whose proof is split into a generic part and a part about
 one number format.
