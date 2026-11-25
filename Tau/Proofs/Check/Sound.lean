@@ -1,6 +1,7 @@
 import Tau.Check.Checker
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
+import Tau.Proofs.IR.MemMap
 import Tau.Proofs.Passes.Simplify
 
 /-!
@@ -37,40 +38,6 @@ theorem denote_hom (S : Sem V) (bufs : List (List V)) (fill : V) :
   mac _ _ _ _ := rfl
   const _ := rfl
   sel _ _ _ := rfl
-
-theorem image_map (f : V → W) (map : MemMap) (memSizes : List Nat) (word : Nat → Nat → V)
-    (fill : V) :
-    (image map memSizes word fill).map (List.map f) =
-      image map memSizes (fun b k => f (word b k)) (f fill) := by
-  -- Both sides are a map over positions of a map over addresses. Fuse the
-  -- maps (`List.map_map`) and compare the functions (`List.map_congr_left`).
-  unfold image
-  simp only [List.map_map]
-  apply List.map_congr_left
-  intro p _
-  simp only [Function.comp, List.map_map]
-  apply List.map_congr_left
-  intro a _
-  simp only [Function.comp]
-  cases MemMap.findFrom p a 0 map with
-  | none => rfl
-  | some bk => rfl
-
-theorem extract_map (f : V → W) (map : MemMap) (mem : List (List V)) (fill : V) :
-    extract map (mem.map (List.map f)) (f fill) = (extract map mem fill).map (List.map f) := by
-  unfold extract
-  simp only [List.map_map]
-  apply List.map_congr_left
-  intro pl _
-  simp only [Function.comp, List.map_map]
-  apply List.map_congr_left
-  intro k _
-  simp only [Function.comp, List.getElem?_map]
-  cases mem[pl.slice]? with
-  | none => rfl
-  | some l =>
-    simp only [Option.map_some, Option.getD_some, List.getElem?_map]
-    cases l[pl.base + k]? <;> rfl
 
 /-- A list is the list of its own elements. -/
 theorem range_map_getD {α : Type} (l : List α) (d : α) :

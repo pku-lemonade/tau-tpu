@@ -9,6 +9,7 @@ Build this file alone with:
 
 import Tau.Check.Stages
 import Tau.Proofs.Check.Sound
+import Tau.Proofs.IR.Placed
 
 /-!
 # The per-pass checks are sound
@@ -20,9 +21,9 @@ Two results, one for each new check in `Tau/Check/Stages.lean`.
 * `checkPlaced_sound`: a placed program the check accepts, run from any
   buffer contents, ends with the buffers the kernel computes.
 
-The proofs follow `check_sound`. The new ingredient is `Placed.execute_map`:
-like the machine and like a kernel, a placed program does not look at its
-values.
+The proofs follow `check_sound`. The new ingredient is `Placed.execute_map`
+(`Tau/Proofs/IR/Placed.lean`): like the machine and like a kernel, a placed
+program does not look at its values.
 -/
 
 namespace Tau
@@ -41,41 +42,6 @@ theorem checkKernels_sound (S : Sem V) (hS : S.Lawful) (k k' : Kernel)
   -- Split on the two symbolic runs. Each kernel on real buffers is its
   -- symbolic run evaluated (`Kernel.run_of_exprs`), and the two evaluated
   -- results agree (`denote_of_simp_eq`).
-  sorry
-
-/-! ## A placed program does not look at its values -/
-
-/-- Apply `f` to every value in a placed state. -/
-def PState.map (f : V → W) (st : PState V) : PState W where
-  vars := st.vars.map (Prod.map id f)
-  slices := st.slices.map (Slice.map f)
-
-theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (kind : Kind)
-    (vars : List (Var × V)) (sl : Slice V) (i : PInstr) :
-    i.exec T kind (vars.map (Prod.map id f)) (sl.map f) =
-      (i.exec S kind vars sl).map fun r => (r.1.map (Prod.map id f), r.2.map f) := by
-  -- Outline of one proof:
-  -- One case per instruction, as in `exec_map` for the machine: unfold, move
-  -- the map out of each lookup (`lookup_map`), split on each check and on
-  -- what each lookup found.
-  sorry
-
-theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
-    (st : PState V) (p : Nat) (i : PInstr) :
-    (st.map f).step T cfg p i = (st.step S cfg p i).map (PState.map f) := by
-  sorry
-
-theorem PState.run_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
-    (st : PState V) (instrs : List (Nat × PInstr)) :
-    PState.run T cfg (st.map f) instrs = (PState.run S cfg st instrs).map (PState.map f) := by
-  sorry
-
-/-- Running a placed program on a mapped memory image gives the mapped
-result, and fails in exactly the same cases. -/
-theorem Placed.execute_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (pl : Placed)
-    (image : List (List V)) :
-    pl.execute T (image.map (List.map f)) =
-      (pl.execute S image).map (List.map (List.map f)) := by
   sorry
 
 /-! ## Placed program against kernel -/

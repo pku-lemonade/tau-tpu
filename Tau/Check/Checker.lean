@@ -1,5 +1,6 @@
 import Tau.SliceLevel.Machine
 import Tau.IR.Kernel
+import Tau.IR.Compiled
 import Tau.Passes.Simplify
 
 /-!
@@ -25,62 +26,6 @@ Terms to look up: *translation validation*.
 -/
 
 namespace Tau
-
-/-- Where a buffer lives: a memory slice, a starting address, and a length. -/
-structure Placement where
-  /-- The position of the memory slice. -/
-  slice : Nat
-  /-- The address of the buffer's first word. -/
-  base : Nat
-  /-- The number of words. -/
-  size : Nat
-  deriving DecidableEq, Repr
-
-/-- The placement of every buffer, by buffer number. -/
-abbrev MemMap := List Placement
-
-/-- A compiled program together with the chip it is for. -/
-structure Compiled where
-  /-- The chip the program is for. -/
-  cfg : Config
-  /-- The number of words in the memory at each position. -/
-  memSizes : List Nat
-  /-- Where each buffer lives. -/
-  map : MemMap
-  /-- The timed instructions. -/
-  prog : Program
-  /-- The number of cycles to run. -/
-  cycles : Nat
-  deriving Repr
-
-variable {V : Type}
-
-/-- The buffer word stored at address `a` of slice `p`, if any: the number of
-the buffer and the position within it. -/
-def MemMap.findFrom (p a : Nat) : Nat → MemMap → Option (Nat × Nat)
-  | _, [] => none
-  | b, pl :: rest =>
-    if pl.slice = p ∧ pl.base ≤ a ∧ a < pl.base + pl.size then some (b, a - pl.base)
-    else MemMap.findFrom p a (b + 1) rest
-
-/-- The starting memory contents of every slice. `word b k` is word `k` of
-buffer `b`; addresses that belong to no buffer hold `fill`. -/
-def image (map : MemMap) (memSizes : List Nat) (word : Nat → Nat → V) (fill : V) :
-    List (List V) :=
-  (List.range memSizes.length).map fun p =>
-    (List.range (memSizes[p]?.getD 0)).map fun a =>
-      match MemMap.findFrom p a 0 map with
-      | some (b, k) => word b k
-      | none => fill
-
-/-- The starting memory contents for the given buffer contents. -/
-def Compiled.image (c : Compiled) (bufs : List (List V)) (fill : V) : List (List V) :=
-  Tau.image c.map c.memSizes (bufWord bufs fill) fill
-
-/-- Read the buffers back out of the memory contents. -/
-def extract (map : MemMap) (mem : List (List V)) (fill : V) : List (List V) :=
-  map.map fun pl =>
-    (List.range pl.size).map fun k => (mem[pl.slice]?.getD [])[pl.base + k]?.getD fill
 
 /-- Buffers of the given sizes whose words are the expressions `init b k`. -/
 def symBufs (sizes : List Nat) : List (List Expr) :=

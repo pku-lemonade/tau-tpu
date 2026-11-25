@@ -20,6 +20,9 @@ import Tau.Isa.Instr
 import Tau.SliceLevel.Machine
 import Tau.IR.Kernel
 import Tau.IR.Expr
+import Tau.IR.MemMap
+import Tau.IR.Placed
+import Tau.IR.Compiled
 import Tau.Passes.Unroll
 import Tau.Passes.Simplify
 import Tau.Check.Checker
@@ -27,6 +30,8 @@ import Tau.Proofs.Passes.Unroll
 import Tau.Proofs.Passes.Simplify
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
+import Tau.Proofs.IR.MemMap
+import Tau.Proofs.IR.Placed
 import Tau.Proofs.Check.Sound
 import Tau.Sim.Json
 import Tau.Sim.Run

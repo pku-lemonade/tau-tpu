@@ -10,6 +10,7 @@ Build this file alone with:
 import Tau.Check.Checker
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
+import Tau.Proofs.IR.MemMap
 import Tau.Proofs.Passes.Simplify
 
 /-!
@@ -46,19 +47,6 @@ theorem denote_hom (S : Sem V) (bufs : List (List V)) (fill : V) :
   mac _ _ _ _ := rfl
   const _ := rfl
   sel _ _ _ := rfl
-
-theorem image_map (f : V → W) (map : MemMap) (memSizes : List Nat) (word : Nat → Nat → V)
-    (fill : V) :
-    (image map memSizes word fill).map (List.map f) =
-      image map memSizes (fun b k => f (word b k)) (f fill) := by
-  -- Outline of one proof:
-  -- Both sides are a map over positions of a map over addresses. Fuse the
-  -- maps (`List.map_map`) and compare the functions (`List.map_congr_left`).
-  sorry
-
-theorem extract_map (f : V → W) (map : MemMap) (mem : List (List V)) (fill : V) :
-    extract map (mem.map (List.map f)) (f fill) = (extract map mem fill).map (List.map f) := by
-  sorry
 
 /-- A list is the list of its own elements. -/
 theorem range_map_getD {α : Type} (l : List α) (d : α) :
