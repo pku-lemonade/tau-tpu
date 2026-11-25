@@ -2,6 +2,7 @@
 Exercise file. Generated from Tau/Proofs/Check/Sound.lean by scripts/make-exercises.py.
 
 Replace each `sorry` with a proof. The finished proofs are in Tau/Proofs/Check/Sound.lean.
+Only some proofs are taken out. The others are given, and you may use them.
 Build this file alone with:
 
     lake build Exercises.Check.Sound
@@ -55,23 +56,48 @@ theorem denote_hom (S : Sem V) (bufs : List (List V)) (fill : V) :
 /-- A list is the list of its own elements. -/
 theorem range_map_getD {α : Type} (l : List α) (d : α) :
     (List.range l.length).map (fun k => l[k]?.getD d) = l := by
-  sorry
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2
+    simp at h1
+    simp [h1]
 
 /-- Evaluating the symbolic buffers gives back the real buffers. -/
 theorem symBufs_denote (S : Sem V) (bufs : List (List V)) (fill : V) :
     (symBufs (bufs.map List.length)).map (List.map (Expr.denote S bufs fill)) = bufs := by
-  -- Outline of one proof:
   -- Buffer b of the left side is the list of `bufs[b][k]` for each k, which
   -- is `bufs[b]` by `range_map_getD`. The list of those for each b is
   -- `bufs`, by `range_map_getD` again.
-  sorry
+  unfold symBufs
+  simp only [List.map_map, List.length_map]
+  have h : ∀ b, b ∈ List.range bufs.length →
+      (List.map (Expr.denote S bufs fill) ∘ fun b =>
+        (List.range ((bufs.map List.length)[b]?.getD 0)).map fun k => Expr.init b k) b =
+      bufs[b]?.getD [] := by
+    intro b hb
+    simp only [List.mem_range] at hb
+    simp only [Function.comp, List.map_map, List.getElem?_map, List.getElem?_eq_getElem hb,
+      Option.map_some, Option.getD_some]
+    have hw : (Expr.denote S bufs fill ∘ fun k => Expr.init b k) =
+        fun k => bufs[b][k]?.getD fill := by
+      funext k
+      simp [Function.comp, Expr.denote, bufWord, List.getElem?_eq_getElem hb]
+    rw [hw]
+    exact range_map_getD bufs[b] fill
+  rw [List.map_congr_left h]
+  exact range_map_getD bufs []
 
 /-- If a kernel run on expressions ends with `e`, then run on real buffers it
 ends with `e` evaluated. -/
 theorem Kernel.run_of_exprs (S : Sem V) (k : Kernel) (bufs : List (List V)) (fill : V)
     (e : List (List Expr)) (h : kernelExprs k (bufs.map List.length) = some e) :
     k.run S bufs = some (e.map (List.map (Expr.denote S bufs fill))) := by
-  sorry
+  have hb := symBufs_denote S bufs fill
+  have hrun := Kernel.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) k
+    (symBufs (bufs.map List.length))
+  unfold kernelExprs at h
+  rw [hb, h] at hrun
+  exact hrun
 
 /-- Two tables of expressions that are the same after simplifying have the
 same values. -/
@@ -79,10 +105,21 @@ theorem denote_of_sameExprs (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (
     (a b : List (List Expr)) (h : sameExprs a b = true) :
     a.map (List.map (Expr.denote S bufs fill)) =
       b.map (List.map (Expr.denote S bufs fill)) := by
-  -- Outline of one proof:
   -- Simplifying a table and then evaluating it is the same as evaluating it
   -- (`Expr.denote_simp`, under two maps). Rewrite both sides that way.
-  sorry
+  simp only [sameExprs, beq_iff_eq] at h
+  have hsimp : ∀ l : List (List Expr),
+      (l.map (List.map Expr.simp)).map (List.map (Expr.denote S bufs fill)) =
+        l.map (List.map (Expr.denote S bufs fill)) := by
+    intro l
+    simp only [List.map_map]
+    apply List.map_congr_left
+    intro row _
+    simp only [Function.comp, List.map_map]
+    apply List.map_congr_left
+    intro e _
+    exact Expr.denote_simp S hS bufs fill e
+  rw [← hsimp a, h, hsimp]
 
 /-- If the machine run on expressions ends with the table `m`, then run on
 real buffers it does not trap, and the buffers it ends with are `m`
@@ -92,13 +129,28 @@ theorem execute_of_exprs (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill
     ∃ mem,
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
       extract c.map mem fill = m.map (List.map (Expr.denote S bufs fill)) := by
-  -- Outline of one proof:
   -- Let f evaluate expressions. Unfold `machineExprs` and split on the
   -- symbolic run; if it trapped, `h` is false.
   -- The real memory image is the symbolic one with f applied (`image_map`),
   -- so the real run is the symbolic run with f applied (`execute_map`).
   -- Reading the buffers back commutes with f (`extract_map`).
-  sorry
+  let f := Expr.denote S bufs fill
+  have hf : exprSem.Hom S f := denote_hom S bufs fill
+  unfold machineExprs at h
+  cases hx : execute exprSem c.cfg c.prog c.cycles (image c.map c.memSizes Expr.init .fill) with
+  | error e => simp [hx] at h
+  | ok memE =>
+    simp only [hx, Option.some.injEq] at h
+    have himg : c.image bufs fill =
+        (image c.map c.memSizes Expr.init .fill).map (List.map f) := by
+      rw [image_map]
+      rfl
+    refine ⟨memE.map (List.map f), ?_, ?_⟩
+    · rw [himg, execute_map exprSem S f hf, hx]
+      rfl
+    · have hext := extract_map f c.map memE .fill
+      rw [h] at hext
+      exact hext
 
 /-- **Soundness of the checker.** If `check` accepts the compiled program `c`
 for the kernel `k`, then on any buffer contents the machine runs `c` without a

@@ -2,6 +2,7 @@
 Exercise file. Generated from Tau/Proofs/Blocks/SystolicArray.lean by scripts/make-exercises.py.
 
 Replace each `sorry` with a proof. The finished proofs are in Tau/Proofs/Blocks/SystolicArray.lean.
+Only some proofs are taken out. The others are given, and you may use them.
 Build this file alone with:
 
     lake build Exercises.Blocks.SystolicArray
@@ -40,7 +41,6 @@ theorem systolicArray_stateAt (zero : α) {n : Nat} (x : Vector α n)
     (c : Signal (Vector α n)) (j : Nat) (hj : j < n) (t : Nat) (ht : j + 1 ≤ t) :
     ((systolicArray zero x).stateAt c t)[j] =
       sumTo zero (fun k => (c (t - 1 - j + k))[k]?.getD zero * x[k]?.getD zero) (j + 1) := by
-  -- Outline of one proof:
   -- Induction on the cell, for every cycle at once. In both cases write the
   -- cycle as t + 1 and take one step.
   -- Cell 0: the sum has one term.
@@ -48,7 +48,25 @@ theorem systolicArray_stateAt (zero : α) {n : Nat} (x : Vector α n)
   -- term. Peel one term off the right-hand side, use the hypothesis, and
   -- show the remaining sums agree term by term (the cycle index is written
   -- two ways).
-  sorry
+  induction j generalizing t with
+  | zero =>
+    obtain ⟨t, rfl⟩ : ∃ t', t = t' + 1 := ⟨t - 1, by omega⟩
+    rw [Block.stateAt_succ, systolicArray_step]
+    simp [sumTo, hj]
+  | succ j ih =>
+    obtain ⟨t, rfl⟩ : ∃ t', t = t' + 1 := ⟨t - 1, by omega⟩
+    rw [Block.stateAt_succ, systolicArray_step]
+    simp only [Vector.getElem_ofFn]
+    have hterm : t + 1 - 1 - (j + 1) + (j + 1) = t := by omega
+    rw [sumTo, hterm]
+    simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]
+    rw [ih (by omega) t (by omega)]
+    congr 1
+    · apply sumTo_congr
+      intro k hk
+      have hidx : t - 1 - j + k = t - (j + 1) + k := by omega
+      rw [hidx]
+    · simp [hj]
 
 /-- If the coefficient `A i j` is fed to cell `j` at cycle `i + j`, the array
 outputs `A i 0 * x[0] + ... + A i (n-1) * x[n-1]` at cycle `i + n`. -/

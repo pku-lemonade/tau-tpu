@@ -2,6 +2,7 @@
 Exercise file. Generated from Tau/Proofs/Check/Passes.lean by scripts/make-exercises.py.
 
 Replace each `sorry` with a proof. The finished proofs are in Tau/Proofs/Check/Passes.lean.
+Only some proofs are taken out. The others are given, and you may use them.
 Build this file alone with:
 
     lake build Exercises.Check.Passes
@@ -47,10 +48,25 @@ theorem Placed.execute_of_exprs (S : Sem V) (pl : Placed) (bufs : List (List V))
     ∃ mem,
       pl.execute S (pl.image bufs fill) = some mem ∧
       extract pl.map mem fill = m.map (List.map (Expr.denote S bufs fill)) := by
-  -- Outline of one proof:
   -- The proof of `execute_of_exprs` again, with `Placed.execute_map` in place
   -- of `execute_map`.
-  sorry
+  let f := Expr.denote S bufs fill
+  have hf : exprSem.Hom S f := denote_hom S bufs fill
+  unfold placedExprs at h
+  cases hx : pl.execute exprSem (Tau.image pl.map pl.memSizes Expr.init .fill) with
+  | none => simp [hx] at h
+  | some memE =>
+    simp only [hx, Option.some.injEq] at h
+    have himg : pl.image bufs fill =
+        (Tau.image pl.map pl.memSizes Expr.init .fill).map (List.map f) := by
+      rw [image_map]
+      rfl
+    refine ⟨memE.map (List.map f), ?_, ?_⟩
+    · rw [himg, Placed.execute_map exprSem S f hf, hx]
+      rfl
+    · have hext := extract_map f pl.map memE .fill
+      rw [h] at hext
+      exact hext
 
 /-! ## `tau-simplify` and `tau-unroll`: kernel to kernel -/
 
@@ -78,10 +94,22 @@ theorem checkPlaced_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (pl : Placed)
       pl.execute S (pl.image bufs fill) = some mem ∧
       k.run S bufs = some out ∧
       extract pl.map mem fill = out := by
-  -- Outline of one proof:
   -- The proof of `check_sound` again, with `Placed.execute_of_exprs` in
   -- place of `execute_of_exprs`.
-  sorry
+  unfold checkPlaced at h
+  simp only [Bool.and_eq_true] at h
+  obtain ⟨-, h⟩ := h
+  cases hk : kernelExprs k (bufs.map List.length) with
+  | none => simp [hk] at h
+  | some a =>
+    cases hp : placedExprs pl with
+    | none => simp [hk, hp] at h
+    | some b =>
+      simp only [hk, hp] at h
+      obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S pl bufs fill b hp
+      refine ⟨mem, _, hrun, Kernel.run_of_exprs S k bufs fill a hk, ?_⟩
+      rw [hx]
+      exact (denote_of_sameExprs S hS bufs fill a b h).symm
 
 /-! ## `tau-schedule`: placed program to compiled program -/
 
@@ -96,11 +124,22 @@ theorem checkScheduled_sound (S : Sem V) (hS : S.Lawful) (pl : Placed) (c : Comp
       pl.execute S (pl.image bufs fill) = some mem ∧
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem' ∧
       extract c.map mem' fill = extract pl.map mem fill := by
-  -- Outline of one proof:
   -- Split on the two symbolic runs. Each side on real buffers is its
   -- symbolic run evaluated (`Placed.execute_of_exprs`, `execute_of_exprs`),
   -- and the two evaluated tables agree (`denote_of_sameExprs`).
-  sorry
+  unfold checkScheduled at h
+  cases hp : placedExprs pl with
+  | none => simp [hp] at h
+  | some a =>
+    cases hm : machineExprs c with
+    | none => simp [hp, hm] at h
+    | some b =>
+      simp only [hp, hm] at h
+      obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S pl bufs fill a hp
+      obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S c bufs fill b hm
+      refine ⟨mem, mem', hrun, hrun', ?_⟩
+      rw [hx, hx']
+      exact (denote_of_sameExprs S hS bufs fill a b h).symm
 
 /-! ## `tau-route`: compiled program to compiled program -/
 
@@ -114,10 +153,21 @@ theorem checkRouted_sound (S : Sem V) (hS : S.Lawful) (c c' : Compiled)
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
       execute S c'.cfg c'.prog c'.cycles (c'.image bufs fill) = .ok mem' ∧
       extract c'.map mem' fill = extract c.map mem fill := by
-  -- Outline of one proof:
   -- The proof of `checkScheduled_sound` again, with `execute_of_exprs` on
   -- both sides.
-  sorry
+  unfold checkRouted at h
+  cases ha : machineExprs c with
+  | none => simp [ha] at h
+  | some a =>
+    cases hb : machineExprs c' with
+    | none => simp [ha, hb] at h
+    | some b =>
+      simp only [ha, hb] at h
+      obtain ⟨mem, hrun, hx⟩ := execute_of_exprs S c bufs fill a ha
+      obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S c' bufs fill b hb
+      refine ⟨mem, mem', hrun, hrun', ?_⟩
+      rw [hx, hx']
+      exact (denote_of_sameExprs S hS bufs fill a b h).symm
 
 /-! ## All five passes -/
 

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Generate the course exercises from the finished proofs.
+"""Generate the proof exercises from the finished proofs.
 
-Every file under Tau/Proofs/ becomes a file under course/Exercises/ in which
-each tactic proof is replaced by `sorry`. Statements, doc comments and imports
-are kept, so an exercise file is the finished file with the proofs taken out.
+The course asks for few proofs: the short ones that show what a
+specification says. `EXERCISES` below lists them. Each listed file under
+Tau/Proofs/ becomes a file under course/Exercises/ in which the listed
+proofs are replaced by `sorry`. Statements, doc comments and imports are
+kept, and so are the proofs that are not listed, which the student may use.
 The finished file is the solution.
+
+A file under Tau/Proofs/ that is not listed has no exercise file. Its proofs
+are for reading.
 
 A comment at the top level of a proof (two spaces, then `-- `) is kept in the
 exercise as an outline. Write such comments in long proofs to say what each
@@ -30,25 +35,53 @@ HEADER = """\
 Exercise file. Generated from {source} by scripts/make-exercises.py.
 
 Replace each `sorry` with a proof. The finished proofs are in {source}.
-Build this file alone with:
+{given}Build this file alone with:
 
     lake build {module}
 -/
 
 """
 
-DECL = re.compile(r"^(theorem|lemma)\b")
+GIVEN = """\
+Only some proofs are taken out. The others are given, and you may use them.
+"""
+
+DECL = re.compile(r"^(theorem|lemma)\s+(\S+)")
+
+ALL = None
+
+# Which proofs are exercises. A file maps to ALL, or to the names of the
+# theorems whose proofs are taken out; the other proofs in that file stay.
+EXERCISES: dict[str, set[str] | None] = {
+    "Blocks/Basic.lean": ALL,
+    "Blocks/ShiftRegister.lean": ALL,
+    "Blocks/Accumulator.lean": ALL,
+    "Blocks/Mac.lean": ALL,
+    "Data/Lane.lean": ALL,
+    "Blocks/Pipeline.lean": ALL,
+    "Blocks/Sequencer.lean": ALL,
+    "Blocks/Memory.lean": {"memory_outAt_read"},
+    "Blocks/Repeater.lean": {"repeater_stateAt", "repeater_outAt"},
+    "Blocks/SystolicArray.lean": {"systolicArray_matvec"},
+    "Passes/Unroll.lean": {"Idx.eval_inst", "Stmt.exec_inst", "Kernel.run_unroll"},
+    "Check/Simplify.lean": ALL,
+    "Check/Sound.lean": {"check_sound", "check_safe"},
+    "Check/Passes.lean": {"checkKernels_sound", "passes_sound"},
+    "EndToEnd.lean": ALL,
+}
 
 
-def blank_proofs(text: str) -> tuple[str, int]:
-    """Replace the body of every `theorem ... := by` with `sorry`."""
+def blank_proofs(text: str, only: set[str] | None) -> tuple[str, int]:
+    """Replace the body of `theorem ... := by` with `sorry`: of every theorem
+    if `only` is None, and otherwise of the theorems named in `only`."""
     lines = text.split("\n")
     out: list[str] = []
     count = 0
     i = 0
     while i < len(lines):
         line = lines[i]
-        if not DECL.match(line):
+        decl = DECL.match(line)
+        if not decl or (only is not None and decl.group(2) not in only):
             out.append(line)
             i += 1
             continue
@@ -104,13 +137,15 @@ def blank_proofs(text: str) -> tuple[str, int]:
 
 def generate() -> dict[pathlib.Path, str]:
     files = {}
-    for source in sorted(SOURCE.rglob("*.lean")):
+    for name, only in EXERCISES.items():
+        source = SOURCE / name
         rel = source.relative_to(SOURCE)
         module = "Exercises." + ".".join(rel.with_suffix("").parts)
-        body, count = blank_proofs(source.read_text())
-        if count == 0:
-            continue
-        header = HEADER.format(source=source.relative_to(ROOT), module=module)
+        body, count = blank_proofs(source.read_text(), only)
+        if count != (len(only) if only is not None else count) or count == 0:
+            raise SystemExit(f"{name}: expected to blank {only}, blanked {count}")
+        header = HEADER.format(source=source.relative_to(ROOT), module=module,
+                               given="" if only is None else GIVEN)
         files[TARGET / rel] = header + body
     return files
 
@@ -123,6 +158,9 @@ def main() -> int:
         for p in stale + extra:
             print(f"out of date: {p.relative_to(ROOT)}")
         return 1 if stale or extra else 0
+    for old in TARGET.rglob("*.lean") if TARGET.exists() else []:
+        if old not in files:
+            old.unlink()
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)

@@ -2,6 +2,7 @@
 Exercise file. Generated from Tau/Proofs/Blocks/Memory.lean by scripts/make-exercises.py.
 
 Replace each `sorry` with a proof. The finished proofs are in Tau/Proofs/Blocks/Memory.lean.
+Only some proofs are taken out. The others are given, and you may use them.
 Build this file alone with:
 
     lake build Exercises.Blocks.Memory
@@ -34,12 +35,23 @@ or its starting value if nothing was written. -/
 theorem memory_stateAt (n : Nat) (init : Vector α n) (inp : Signal (MemIn α))
     (t a : Nat) (ha : a < n) :
     ((memory n init).stateAt inp t)[a] = (lastWrite inp a t).getD init[a] := by
-  -- Outline of one proof:
   -- Induction on the cycle. In the step case, split on the command.
   -- Idle and read leave the memory alone.
   -- A write to address a makes it the last write; a write elsewhere changes
   -- neither the word at a nor the last write to a.
-  sorry
+  induction t with
+  | zero => rfl
+  | succ t ih =>
+    rw [Block.stateAt_succ, memory_step]
+    unfold lastWrite
+    split
+    · rename_i h; simp [h, ih]
+    · rename_i h; simp [h, ih]
+    · rename_i a' x h
+      simp only [h]
+      by_cases haa : a' = a
+      · subst haa; simp
+      · simp [haa, ih, Vector.getElem_setIfInBounds_ne]
 
 /-- A read of a valid address returns the last value written to it, or its
 starting value if nothing was written. -/
