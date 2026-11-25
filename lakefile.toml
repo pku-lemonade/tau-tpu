@@ -26,6 +26,13 @@ name = "Exercises"
 srcDir = "course"
 globs = ["Exercises.+"]
 
+# The specification exercises: definitions for you to write from a source,
+# with tests. `course/Specs/Foo.lean` is the module `Specs.Foo`.
+[[lean_lib]]
+name = "Specs"
+srcDir = "course"
+globs = ["Specs.+"]
+
 # A place for a student's own files. `course/Work/Foo.lean` is the module
 # `Work.Foo`, and files there can import each other.
 [[lean_lib]]
