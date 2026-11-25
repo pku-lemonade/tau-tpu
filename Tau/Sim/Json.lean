@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import Tau.Check.Stages
+import Tau.Check.Passes
 
 /-!
 # Reading and writing JSON
@@ -185,9 +185,10 @@ def kernel (j : Json) : Except String (List Nat × Kernel) := do
   let body ← (← arr j "body").mapM item
   pure (sizes, body)
 
-/-- The output of one compiler stage. -/
+/-- The output of one compiler stage. A kernel comes with the sizes of its
+buffers. -/
 inductive Stage where
-  | kernel (k : Kernel)
+  | kernel (sizes : List Nat) (k : Kernel)
   | placed (p : Placed)
   | compiled (c : Compiled)
 
@@ -196,7 +197,8 @@ inductive Stage where
 `program`. -/
 def stage (j : Json) : Except String Stage := do
   if (j.getObjVal? "body").toOption.isSome then
-    pure (.kernel (← kernel j).2)
+    let (sizes, k) ← kernel j
+    pure (.kernel sizes k)
   else if (j.getObjVal? "instructions").toOption.isSome then
     pure (.placed (← placed j))
   else if (j.getObjVal? "program").toOption.isSome then

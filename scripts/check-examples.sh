@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Compile every example and check every stage of the compiler on it.
+# Compile every example and check every pass of the compiler on it.
 #
-# For each examples/<name>/kernel.mlir, tauc writes one file per pass:
+# For each examples/<name>/kernel.mlir, tauc writes the kernel as written and
+# one file per pass:
 #
-#   simplified  unrolled  placed  scheduled  compiled
+#   kernel  simplified  unrolled  placed  scheduled  compiled
 #
-# For each of those files:
-#   1. tau-check must accept it against the kernel as written.
-#   2. tau-sim must give the same buffers for it as for the kernel.
-#   3. A damaged copy of it must be rejected by tau-check.
+# For each pass:
+#   1. tau-check must accept its output against its input, the file before.
+#   2. tau-sim must give the same buffers for its output as for the kernel.
+#   3. tau-check must reject a damaged copy of its output.
 #
-# In addition, unrolled.json must be the kernel that the Lean model of
-# tau-unroll gives for simplified.json (`tau-check --unroll`).
+# In addition:
+#   - tau-check must accept compiled.json against kernel.json. This is the
+#     check of the whole compiler, the one the end-to-end theorem is about.
+#   - unrolled.json must be the kernel that the Lean model of tau-unroll
+#     gives for simplified.json (`tau-check --unroll`).
 #
 # `examples/linear/stages/` holds a copy of those files, so that the course
 # can be followed without building the compiler. The script fails if the copy
@@ -98,10 +102,11 @@ for kernel in examples/*/kernel.mlir; do
     failed="unrolled: not the kernel the Lean model of tau-unroll gives"
   fi
 
+  before=kernel
   for stage in $STAGES; do
     [ -z "$failed" ] || break
     file="$out/$stage.json"
-    if ! "$CHECK" "$out/kernel.json" "$file" > "$out/verdict"; then
+    if ! "$CHECK" "$out/$before.json" "$file" > "$out/verdict"; then
       failed="$stage: $(cat "$out/verdict")"
       break
     fi
@@ -111,18 +116,24 @@ for kernel in examples/*/kernel.mlir; do
       break
     fi
     damage "$file" "$out/damaged.json"
-    if "$CHECK" "$out/kernel.json" "$out/damaged.json" > /dev/null; then
+    if "$CHECK" "$out/$before.json" "$out/damaged.json" > /dev/null; then
       failed="$stage: a damaged copy was accepted"
       break
     fi
+    before=$stage
   done
+
+  if [ -z "$failed" ] &&
+     ! "$CHECK" "$out/kernel.json" "$out/compiled.json" > "$out/verdict"; then
+    failed="whole compiler: $(cat "$out/verdict")"
+  fi
 
   if [ -n "$failed" ]; then
     echo "FAIL $name: $failed"
     status=1
   else
     cycles=$(python3 -c "import json; print(json.load(open('$out/compiled.json'))['cycles'])")
-    echo "ok   $name ($cycles cycles, 5 stages checked)"
+    echo "ok   $name ($cycles cycles, 5 passes checked)"
   fi
 done
 exit $status

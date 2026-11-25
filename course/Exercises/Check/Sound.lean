@@ -31,7 +31,11 @@ facts, each proved elsewhere:
 * simplifying an expression does not change its value (`Expr.denote_simp`).
 
 Evaluating an expression (`Expr.denote`) is a function that respects the
-operations, so the first two facts apply to it.
+operations, so the first two facts apply to it. That gives one lemma for each
+side: `Kernel.run_of_exprs` and `execute_of_exprs` say that a run on real
+buffers is the run on expressions, evaluated. `denote_of_sameExprs` says that
+two tables the checker found equal have equal values. `check_sound` puts the
+three together, and so does every theorem in `Tau/Proofs/Check/Passes.lean`.
 -/
 
 namespace Tau
@@ -69,13 +73,31 @@ theorem Kernel.run_of_exprs (S : Sem V) (k : Kernel) (bufs : List (List V)) (fil
     k.run S bufs = some (e.map (List.map (Expr.denote S bufs fill))) := by
   sorry
 
-/-- Two tables of expressions that agree after simplification have the same
-values. -/
-theorem denote_of_simp_eq (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fill : V)
-    (a b : List (List Expr))
-    (h : a.map (·.map Expr.simp) = b.map (·.map Expr.simp)) :
+/-- Two tables of expressions that are the same after simplifying have the
+same values. -/
+theorem denote_of_sameExprs (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fill : V)
+    (a b : List (List Expr)) (h : sameExprs a b = true) :
     a.map (List.map (Expr.denote S bufs fill)) =
       b.map (List.map (Expr.denote S bufs fill)) := by
+  -- Outline of one proof:
+  -- Simplifying a table and then evaluating it is the same as evaluating it
+  -- (`Expr.denote_simp`, under two maps). Rewrite both sides that way.
+  sorry
+
+/-- If the machine run on expressions ends with the table `m`, then run on
+real buffers it does not trap, and the buffers it ends with are `m`
+evaluated. -/
+theorem execute_of_exprs (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill : V)
+    (m : List (List Expr)) (h : machineExprs c = some m) :
+    ∃ mem,
+      execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
+      extract c.map mem fill = m.map (List.map (Expr.denote S bufs fill)) := by
+  -- Outline of one proof:
+  -- Let f evaluate expressions. Unfold `machineExprs` and split on the
+  -- symbolic run; if it trapped, `h` is false.
+  -- The real memory image is the symbolic one with f applied (`image_map`),
+  -- so the real run is the symbolic run with f applied (`execute_map`).
+  -- Reading the buffers back commutes with f (`extract_map`).
   sorry
 
 /-- **Soundness of the checker.** If `check` accepts the compiled program `c`
@@ -89,13 +111,12 @@ theorem check_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (c : Compiled)
       k.run S bufs = some out ∧
       extract c.map mem fill = out := by
   -- Outline of one proof:
-  -- Let f evaluate expressions. Unfold `check` and split on the two symbolic
-  -- runs; if either failed, `h` is false.
-  -- The machine on real words is the symbolic run with f applied
-  -- (`execute_map`), and so is the kernel (`Kernel.run_of_exprs`).
-  -- The two tables of expressions agree after simplifying, so they agree
-  -- after evaluating (`denote_of_simp_eq`).
-  -- Unpack the two symbolic runs that the checker made.
+  -- Unfold `check` and split on the two symbolic runs; if either failed,
+  -- `h` is false.
+  -- The kernel on real buffers is its symbolic run, evaluated
+  -- (`Kernel.run_of_exprs`), and so is the machine (`execute_of_exprs`).
+  -- The two tables are the same after simplifying, so they are the same
+  -- after evaluating (`denote_of_sameExprs`).
   sorry
 
 /-- **Safety.** A program the checker accepts never traps. -/

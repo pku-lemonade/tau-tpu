@@ -43,12 +43,16 @@ def machineExprs (c : Compiled) : Option (List (List Expr)) :=
 def kernelExprs (k : Kernel) (sizes : List Nat) : Option (List (List Expr)) :=
   k.run exprSem (symBufs sizes)
 
+/-- Whether two tables of expressions are the same after simplifying. -/
+def sameExprs (a b : List (List Expr)) : Bool :=
+  a.map (·.map Expr.simp) == b.map (·.map Expr.simp)
+
 /-- Accept or reject a compiled program for the kernel `k`, whose buffers have
 the given sizes. -/
 def check (k : Kernel) (sizes : List Nat) (c : Compiled) : Bool :=
   c.map.map (·.size) == sizes &&
-  match machineExprs c, kernelExprs k sizes with
-  | some m, some e => m.map (·.map Expr.simp) == e.map (·.map Expr.simp)
+  match kernelExprs k sizes, machineExprs c with
+  | some a, some b => sameExprs a b
   | _, _ => false
 
 end Tau

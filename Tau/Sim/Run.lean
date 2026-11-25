@@ -5,8 +5,8 @@ import Tau.Passes.Unroll
 # Running programs on real words
 
 The functions the command-line tools call. `simulate` runs a compiled program
-on the slice-level machine. `reference` runs a kernel directly. `explain` says
-why the checker rejected a program.
+on the slice-level machine. `reference` runs a kernel directly. `checkPair`
+picks the check for two stage files, and `explainPair` says why it rejected.
 -/
 
 namespace Tau.Sim
@@ -53,7 +53,7 @@ def simulatePlaced (pl : Placed) (lanes : Nat) (bufs : List (List (List Int))) :
 def runStage (st : Json.Stage) (lanes : Nat) (bufs : List (List (List Int))) :
     Except String (List (List (List Int))) :=
   match st with
-  | .kernel k => reference k lanes bufs
+  | .kernel _ k => reference k lanes bufs
   | .placed pl => simulatePlaced pl lanes bufs
   | .compiled c => simulate c lanes bufs
 
@@ -63,52 +63,59 @@ def firstDiff (a b : List (List Expr)) : Option (Nat × Nat) :=
     ((x.zip y).zipIdx.findSome? fun ((e1, e2), k) =>
       if e1.simp == e2.simp then none else some (buf, k))
 
-/-- Why `check` rejected a compiled program. Only used to print a message. -/
-def explain (k : Kernel) (sizes : List Nat) (c : Compiled) : String :=
-  if c.map.map (·.size) != sizes then
-    "the memory map does not give every buffer its declared size"
-  else
-    match execute exprSem c.cfg c.prog c.cycles (image c.map c.memSizes Expr.init .fill) with
-    | .error t => showTrap t
-    | .ok mem =>
-      match kernelExprs k sizes with
-      | none => "the kernel uses a variable with no value or a position outside a buffer"
-      | some e =>
-        match firstDiff (extract c.map mem .fill) e with
-        | some (buf, pos) =>
-          s!"buffer {buf}, word {pos}: the program does not compute what the kernel computes"
-        | none => "the program and the kernel end with different buffers"
+/-- What kind of file a stage is, for messages. -/
+def stageName : Json.Stage → String
+  | .kernel .. => "kernel"
+  | .placed _ => "placed program"
+  | .compiled _ => "compiled program"
 
-/-- The verdict on the output of any compiler stage, against the kernel `k`.
-Each case is a check with a soundness theorem. -/
-def checkStage (k : Kernel) (sizes : List Nat) : Json.Stage → Bool
-  | .kernel k' => checkKernels k k' sizes
-  | .placed pl => checkPlaced k sizes pl
-  | .compiled c => check k sizes c
+/-- Which check compares two stage files, and its verdict. Each case is a
+check with a soundness theorem (`Tau/Proofs/Check/`). `none` if no check
+compares these two kinds of file. -/
+def checkPair : Json.Stage → Json.Stage → Option Bool
+  | .kernel sizes k, .kernel _ k' => some (checkKernels k k' sizes)
+  | .kernel sizes k, .placed pl => some (checkPlaced k sizes pl)
+  | .kernel sizes k, .compiled c => some (check k sizes c)
+  | .placed pl, .compiled c => some (checkScheduled pl c)
+  | .compiled c, .compiled c' => some (checkRouted c c')
+  | _, _ => none
 
-/-- Why `checkStage` rejected. Only used to print a message. -/
-def explainStage (k : Kernel) (sizes : List Nat) : Json.Stage → String
-  | .compiled c => explain k sizes c
-  | .kernel k' =>
-    match kernelExprs k sizes, kernelExprs k' sizes with
-    | none, _ => "the kernel uses a variable with no value or a position outside a buffer"
-    | _, none => "the rewritten kernel uses a variable with no value or a position outside a buffer"
-    | some a, some b =>
-      match firstDiff a b with
-      | some (buf, pos) => s!"buffer {buf}, word {pos}: the two kernels compute different things"
-      | none => "the two kernels end with different buffers"
+/-- What one side of a check ends with, on expressions, or why it has no
+result. -/
+def stageExprs : Json.Stage → Except String (List (List Expr))
+  | .kernel sizes k =>
+    match kernelExprs k sizes with
+    | some e => .ok e
+    | none => .error "the kernel uses a variable with no value or a position outside a buffer"
   | .placed pl =>
-    if pl.map.map (·.size) != sizes then
-      "the memory map does not give every buffer its declared size"
+    match placedExprs pl with
+    | some e => .ok e
+    | none => .error "an instruction of the placed program is on the wrong kind of slice, uses a bad address, or uses a word that does not exist"
+  | .compiled c =>
+    match execute exprSem c.cfg c.prog c.cycles (image c.map c.memSizes Expr.init .fill) with
+    | .ok mem => .ok (extract c.map mem .fill)
+    | .error t => .error (showTrap t)
+
+/-- The sizes of the buffers of a stage, as its file declares them. -/
+def stageSizes : Json.Stage → List Nat
+  | .kernel sizes _ => sizes
+  | .placed pl => pl.map.map (·.size)
+  | .compiled c => c.map.map (·.size)
+
+/-- Why `checkPair` rejected. Only used to print a message. -/
+def explainPair (before after : Json.Stage) : String :=
+  match stageExprs before, stageExprs after with
+  | .error e, _ => s!"first file: {e}"
+  | _, .error e => e
+  | .ok a, .ok b =>
+    if stageSizes before != stageSizes after then
+      "the two files do not give the buffers the same sizes"
     else
-      match placedExprs pl, kernelExprs k sizes with
-      | none, _ => "an instruction is on the wrong kind of slice, uses a bad address, or uses a word that does not exist"
-      | _, none => "the kernel uses a variable with no value or a position outside a buffer"
-      | some m, some e =>
-        match firstDiff m e with
-        | some (buf, pos) =>
-          s!"buffer {buf}, word {pos}: the instructions do not compute what the kernel computes"
-        | none => "the instructions and the kernel end with different buffers"
+      match firstDiff a b with
+      | some (buf, pos) =>
+        s!"buffer {buf}, word {pos}: the {stageName after} does not compute what the " ++
+          s!"{stageName before} computes"
+      | none => s!"the {stageName after} and the {stageName before} end with different buffers"
 
 /-! ## Comparing a pass with its Lean model
 

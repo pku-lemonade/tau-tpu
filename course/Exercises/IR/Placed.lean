@@ -20,7 +20,7 @@ with carrying out a placed program. Whether the program fails depends only on
 the program and the memory sizes, never on the values.
 
 The main result is `Placed.execute_map`. `checkPlaced_sound`
-(`Tau/Proofs/Check/Stages.lean`) uses it.
+(`Tau/Proofs/Check/Passes.lean`) uses it.
 -/
 
 namespace Tau

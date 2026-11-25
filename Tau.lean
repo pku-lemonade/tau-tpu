@@ -39,7 +39,7 @@ import Tau.CellLevel.Machine
 import Tau.Proofs.CellLevel.Refine
 import Tau.Proofs.EndToEnd
 import Tau.Proofs.Data.Lane
-import Tau.Check.Stages
-import Tau.Proofs.Check.Stages
+import Tau.Check.Passes
+import Tau.Proofs.Check.Passes
 import Tau.Blocks.Repeater
 import Tau.Proofs.Blocks.Repeater

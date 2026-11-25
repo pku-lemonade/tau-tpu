@@ -1,5 +1,5 @@
 import Tau.SliceLevel.Machine
-import Tau.Check.Stages
+import Tau.Check.Passes
 import Tau.Passes.Unroll
 import Tau.Sim.Run
 import Tau.CellLevel.Machine
@@ -161,6 +161,18 @@ def placed : Placed where
       match i with
       | .bin .. => (3, i)
       | _ => (p, i) }
+
+-- Scheduling: the hand-written schedule against the placed program. The two
+-- keep their buffers at different addresses, which the check does not mind.
+#guard checkScheduled placed (compiled prog)
+
+-- A schedule that issues an instruction too early is rejected.
+#guard !checkScheduled placed (compiled early)
+
+-- Routing: a program against itself, and against one that computes
+-- something else.
+#guard checkRouted (compiled prog) (compiled prog)
+#guard !checkRouted (compiled prog) (compiled swapped)
 
 /-! ## The cell-level machine gives the same answers -/
 

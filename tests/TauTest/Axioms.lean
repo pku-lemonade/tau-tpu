@@ -24,6 +24,18 @@ compiler (see `Tau/Proofs/Data/Lane.lean`).
 #guard_msgs in
 #print axioms Tau.checkKernels_sound
 
+/-- info: 'Tau.checkScheduled_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.checkScheduled_sound
+
+/-- info: 'Tau.checkRouted_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.checkRouted_sound
+
+/-- info: 'Tau.passes_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.passes_sound
+
 /-- info: 'Tau.Kernel.exec_unroll' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.Kernel.exec_unroll

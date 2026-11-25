@@ -7,7 +7,7 @@ Build this file alone with:
     lake build Exercises.EndToEnd
 -/
 
-import Tau.Proofs.Check.Sound
+import Tau.Proofs.Check.Passes
 import Tau.Proofs.CellLevel.Refine
 import Tau.Proofs.Passes.Unroll
 
@@ -59,6 +59,22 @@ is still about the kernel as written, loops and all. -/
 theorem end_to_end_unrolled (lanes : Nat) (k : Kernel) (c : Compiled)
     (bufs : List (List (Word lanes)))
     (h : check (k.unroll.map Item.stmt) (bufs.map List.length) c = true) :
+    ∃ mem out,
+      cellExecute c.cfg c.prog c.cycles (c.image bufs Word.zero) = .ok mem ∧
+      k.run (wordSem lanes) bufs = some out ∧
+      extract c.map mem Word.zero = out := by
+  sorry
+
+/-- The same, when each of the five passes was checked on its own instead of
+the compiler as a whole. `k₁`, `k₂`, `pl` and `c₁` are the outputs of
+`tau-simplify`, `tau-unroll`, `tau-place` and `tau-schedule`. -/
+theorem end_to_end_passes (lanes : Nat) (k k₁ k₂ : Kernel) (pl : Placed) (c₁ c : Compiled)
+    (bufs : List (List (Word lanes)))
+    (hsimplify : checkKernels k k₁ (bufs.map List.length) = true)
+    (hunroll : checkKernels k₁ k₂ (bufs.map List.length) = true)
+    (hplace : checkPlaced k₂ (bufs.map List.length) pl = true)
+    (hschedule : checkScheduled pl c₁ = true)
+    (hroute : checkRouted c₁ c = true) :
     ∃ mem out,
       cellExecute c.cfg c.prog c.cycles (c.image bufs Word.zero) = .ok mem ∧
       k.run (wordSem lanes) bufs = some out ∧
