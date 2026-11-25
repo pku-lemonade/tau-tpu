@@ -10,9 +10,12 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "End to end" =>
-*Read:* `tests/TauTest/Axioms.lean`.
+*Read:* `Tau/Claims.lean`; `tests/TauTest/Axioms.lean`; `docs/overview.md`;
+the table under "What is proved" in the repository's `README.md`, after you
+have finished your own.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/EndToEnd.lean`.
+*Proofs:* `Tau/Proofs/EndToEnd.lean`. All of them are exercises, and each is
+a few lines.
 
 *Time:* one day.
 
@@ -76,9 +79,17 @@ Being exact about the limits of a theorem is part of the skill.
 
 # Exercises
 
-*Guided.* `Exercises/EndToEnd.lean`.
+*Prove.* `Exercises/EndToEnd.lean`.
 
-*Open.* Write one page, for someone who has not taken this course, that says
+*Claims.* Bring `course/Work/Claims.md` up to date: one row for everything
+you defined, stated, had proved, tested or decided in this course. Then
+compare it with `Tau/Claims.lean`, which has every main statement of the
+development as a named proposition, and with the table under "What is
+proved" in `README.md`, which also says what is not claimed. Which rows of
+that table did you not think of? The row about `kernel.json` is one that
+most people miss.
+
+*State.* Write one page, for someone who has not taken this course, that says
 what `tau-check` printing `ACCEPT` guarantees and what it does not. Use no
 Lean. Then give it to someone and ask them what they think is guaranteed.
 

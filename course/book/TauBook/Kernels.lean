@@ -13,13 +13,39 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* intermediate representation, SSA form, compiler pass,
 loop unrolling, MLIR.
 
-*Read:* `Tau/IR/Kernel.lean`, `Tau/Passes/Unroll.lean`,
-`compiler/include/tau/Dialect/TauOps.td`,
+*Sources:* `compiler/include/tau/Dialect/TauOps.td`,
 `compiler/lib/Transforms/Unroll.cpp`.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Passes/Unroll.lean`.
+*Specify:* `course/Specs/Kernel.lean`, `course/Specs/Unroll.lean`.
+
+*Read side by side:* `course/Specs/ReadCpp.lean`.
+
+*Read, after you have specified:* `Tau/IR/Kernel.lean`,
+`Tau/Passes/Unroll.lean`.
+
+*Proofs:* `Tau/Proofs/Passes/Unroll.lean`. Three short ones are exercises.
 
 *Time:* two days.
+
+# The source is code now
+
+Until here the source was a manual. For the compiler it is code: the
+definition of the compiler's input language in `TauOps.td`, and a pass in
+C++.
+
+Code differs from a manual in two ways that matter to you.
+
+* *It says too much.* `Unroll.cpp` is about eighty lines, and most are about
+  MLIR: values, regions, builders, a pass class. A handful say what the pass
+  does to a kernel. Your first job is to find them.
+* *It never says why.* Code is exact about what it does and silent about
+  what it is for. The statement "the output computes what the input
+  computes" appears nowhere in the C++. You have to supply it.
+
+Read this chapter to the end of "What a kernel means" with
+`course/Specs/Kernel.lean` open, and write `execStmt` before you read
+`Stmt.exec`. Then read `Unroll.cpp` and write `course/Specs/Unroll.lean`
+before you read "A pass and its proof".
 
 # The idea
 
@@ -40,7 +66,7 @@ The pass replaced the loop by four copies of its body, with positions
 `examples/elementwise/stages/kernel.json` with `unrolled.json` in the same
 folder: the same kernel before and after the pass, written as JSON.
 
-The Lean type `Kernel` is a model of that dialect.
+The Lean type `Kernel` says in Lean what that dialect says in MLIR.
 
 {docstring Tau.Idx}
 
@@ -119,36 +145,59 @@ about it by induction on the same structure.
 
 The proof is about the Lean function `Kernel.unroll`. It is not about the C++
 in `compiler/lib/Transforms/Unroll.cpp`. Nothing in this repository proves
-that the two do the same thing. Open both and compare them by eye. That is
-all the assurance a model gives, and it is why the course goes on to a
+that the two do the same thing. They are compared on the examples:
+
+```
+lake exe tau-check --unroll out/simplified.json out/unrolled.json
+```
+
+prints `SAME` if the compiler's output is the kernel that `Kernel.unroll`
+gives. That is a test. A Lean copy of a pass gives a proof about the copy
+and a test of the original, and no more. It is why the course goes on to a
 checker.
 
 # How to work through it
 
-1. Read `Tau/IR/Kernel.lean`. Write a kernel of your own in your scratch file
-   and run it on names, as above.
-2. Read `Tau/Passes/Unroll.lean` and evaluate `Kernel.unroll` on a kernel
-   with a loop of three iterations.
-3. Do `Exercises/Passes/Unroll.lean` in the order of the file. Each lemma is
-   used by the next.
-
-# Lean you will need
-
-* Induction on a list: `induction body generalizing env with`, with cases
-  `nil` and `cons s rest ih`. `generalizing env` is needed because the
-  environment changes as statements run.
-* `cases h : e with`, to split on the result of running one statement, which
-  is `none` or `some env'`.
-* `simp only [name1, name2]`, to unfold exactly the definitions you name and
-  nothing else.
+1. Read `examples/elementwise/kernel.mlir` and run `tau-opt` on it as above.
+2. Read the descriptions of `tau.load`, `tau.store` and the operations in
+   `TauOps.td`. Specify what a statement does, in
+   `course/Specs/Kernel.lean`.
+3. Read `Tau/IR/Kernel.lean` from `Stmt.exec` to `Kernel.run`. Write a kernel
+   of your own in your scratch file and run it on names, as above.
+4. Read `Unroll.cpp` with a pencil. Mark each group of lines "about MLIR" or
+   "about the kernel".
+5. Specify the pass, in `course/Specs/Unroll.lean`. One of its tests compares
+   your output with what the real compiler wrote.
+6. Read `Tau/Passes/Unroll.lean` beside the C++, and do
+   `course/Specs/ReadCpp.lean`: for each group of lines of the C++, what it
+   is about, and which Lean definition says the same.
+7. In `Exercises/Passes/Unroll.lean`, read the statements of the lemmas in
+   order: one for each layer of the definition. Prove the first two and the
+   last one. The ones between are given.
 
 # Exercises
 
-*Guided.* `Exercises/Passes/Unroll.lean`.
+*Specify.* `course/Specs/Kernel.lean`: what a statement does.
 
-*Open.* Write a pass that removes a `store` which is immediately followed by
-another `store` to the same position of the same buffer, in a list of
-statements:
+*Specify.* `course/Specs/Unroll.lean`: a copy of the pass.
+
+*State.* `LoadAfterStore` and `KeepsWhatIsComputed` in those two files.
+
+*Read side by side.* `course/Specs/ReadCpp.lean`. For nine groups of lines of
+`Unroll.cpp`, say whether the group is about MLIR, about the kernel, or a
+limit, and name the Lean definition that says the same. Then four questions
+about where the C++ and its copy differ. The file ends with what this
+exercise found in the compiler when it was first written.
+
+Afterwards answer in a comment: how many of the eighty lines are about the
+kernel? The C++ gives every copy of the loop body new values, and
+`Kernel.unroll` reuses the same numbers in every copy; why is that still the
+same pass, and why does `tau-check --unroll` have to compare "up to the
+numbering of values"?
+
+*Specify and state.* Write a pass that removes a `store` which is immediately
+followed by another `store` to the same position of the same buffer, in a
+list of statements:
 
 ```
 def dropDeadStores : List Stmt → List Stmt
@@ -157,30 +206,38 @@ def dropDeadStores : List Stmt → List Stmt
   | [] => []
 ```
 
-State the theorem that it keeps what the statements compute, and prove it.
-Be careful about one thing: the first store can fail, when its variable has
-no value, where your optimized list would not. Decide what your theorem
-should say about that case. There is more than one reasonable answer, and the
-statement must make the choice explicit.
+State the theorem that it keeps what the statements compute. Be careful
+about one thing: the first store can fail, when its variable has no value,
+where your optimized list would not. Decide what your theorem should say
+about that case. There is more than one reasonable answer, and the statement
+must make the choice explicit. Then give the proof to an agent and review
+what comes back.
+
+*Prove.* `Idx.eval_inst`, `Stmt.exec_inst` and `Kernel.run_unroll` in
+`Exercises/Passes/Unroll.lean`.
+
+*Questions.* The descriptions in `TauOps.td` leave at least four things open
+about what a statement does.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* Add nested loops to `Item`, with positions that may depend on
-both indices. Extend `Kernel.exec` and `Kernel.unroll` and redo the proof.
-Lean will make you deal with a type that contains lists of itself.
+both indices. Extend `Kernel.exec` and `Kernel.unroll`, and say which lemmas
+of the proof have to change. Lean will make you deal with a type that
+contains lists of itself.
 
 # Hints
 
 For `Stmt.exec_inst`: `cases s`, then `simp` with the definitions of
 `Stmt.inst` and `Stmt.exec` and the lemma `Idx.eval_inst`.
 
-For `execStmts_append` and `execStmts_map_inst`: induction on the list,
-generalizing the environment. After unfolding, split on the result of the
-first statement.
-
-For `execStmts_unrollLoop`: induction on `n`. Use `execStmts_append`, then
-the induction hypothesis, then split on the result of the first `n`
-iterations.
+For `Kernel.run_unroll`: unfold `Kernel.run`, then rewrite with the two
+lemmas just above it.
 
 # Checkpoint
 
-`lake build Exercises.Passes.Unroll` prints no `sorry` warning. You can say
-exactly what `Kernel.exec_unroll` leaves unproved about the compiler.
+The reports of the three files say that all rows agree, and your copy of the
+pass gives the kernel the compiler gave. `lake build Exercises.Passes.Unroll` prints no
+`sorry` warning. You can say exactly what `Kernel.run_unroll` leaves
+unproved about the compiler.

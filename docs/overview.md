@@ -8,6 +8,11 @@ The Lean files are the specification. This page names things and points to
 them. It does not repeat a definition, so when you want to know exactly what
 something does, open the file it names.
 
+The course has a description of the chip in words and tables,
+[`course/architecture-manual.md`](../course/architecture-manual.md). It is
+what students specify from, it says less than the Lean does on purpose, and
+it is not the specification.
+
 ## Two things, kept apart
 
 tau-tpu does two things. Each has its own specification and its own
@@ -56,7 +61,9 @@ specification is a model of a chip, and `Kernel.unroll` is a model of a C++
 pass. This page avoids the word.
 
 Definitions are under `Tau/<Area>/`. Theorems about them are under
-`Tau/Proofs/<Area>/`.
+`Tau/Proofs/<Area>/`. `Tau/Claims.lean` has every main statement named on
+this page as a proposition of its own, so that all of them can be read in
+one place without opening a proof.
 
 ## Part 1: the machine
 
@@ -198,17 +205,18 @@ In this order, each file's opening comment says what it defines:
 
 1. `Tau/Data/Word.lean`, `Tau/Isa/Op.lean`, `Tau/Isa/Instr.lean`: values,
    operations, instructions.
-2. `Tau/SliceLevel/Machine.lean`: the machine specification. Then the
-   statements in `Tau/Proofs/SliceLevel/Timing.lean`.
+2. `Tau/SliceLevel/Machine.lean`: the machine specification. Then
+   `Tau/SliceLevel/Timing.lean`: the words the timing rule is stated with.
 3. `Tau/IR/Kernel.lean`: the kernel specification.
 4. `Tau/IR/MemMap.lean`, `Tau/IR/Placed.lean`, `Tau/IR/Compiled.lean`: the
    other two forms.
 5. `Tau/IR/Expr.lean`, `Tau/Check/Checker.lean`, `Tau/Check/Passes.lean`:
    the checks.
-6. The statements, not the proofs, of `check_sound`, the theorems in
-   `Tau/Proofs/Check/Passes.lean`, and `end_to_end`.
-7. `Tau/Blocks/`, `Tau/CellLevel/Machine.lean`, and the statement of
-   `cellExecute_eq`.
+6. `Tau/Blocks/` and `Tau/CellLevel/Machine.lean`: the machine built from
+   components.
+7. `Tau/Claims.lean`: every main statement. Nothing under `Tau/Proofs/` has
+   to be read to know what is claimed.
 
-The course in `course/` covers the same ground in a different order, with
-the proofs as exercises.
+The course in `course/` covers the same ground in a different order. It has
+students write the definitions and the statements themselves, from a
+description in words and from the C++, and leaves most proofs to be read.

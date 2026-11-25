@@ -12,11 +12,25 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The systolic array" =>
 *Terms to look up:* systolic array, matrix-vector product.
 
-*Read:* `Tau/Blocks/SystolicArray.lean`.
+*Source:* `course/architecture-manual.md`, section 2.8.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/SystolicArray.lean`.
+*Specify:* `course/Specs/SystolicArray.lean`.
 
-*Time:* three days.
+*Read, after you have specified it:* `Tau/Blocks/SystolicArray.lean`.
+
+*Proofs:* `Tau/Proofs/Blocks/SystolicArray.lean`. One is an exercise.
+
+*Time:* two days.
+
+# Specify it first
+
+Stop reading here. Open section 2.8 of the manual and
+`course/Specs/SystolicArray.lean`, and follow the steps at the top of the
+file. Come back when the report says that all rows agree.
+
+The statement is the hard part of this one. The array computes a product
+only if its inputs arrive on the right cycles. Your statement has to say
+which cycles, as a hypothesis about the input signal.
 
 # The idea
 
@@ -70,7 +84,7 @@ Now follow row 1 yourself, and say where the 30 comes from.
 Then shift the second column one cycle later in your scratch file, evaluate
 again, and see the wrong answers come out with no error.
 
-# What to prove
+# The statement
 
 There are two theorems.
 
@@ -116,27 +130,19 @@ The assumption `hc` is a timetable.
 
 # How to work through it
 
-1. Read the definition and redo the table above for a 3 by 3 matrix of your
+1. Specify the array from the manual, as above.
+2. Read the definition and redo the table above for a 3 by 3 matrix of your
    choice.
-2. Read the statement of `systolicArray_stateAt` until you can explain every
-   index in it. Do not start the proof before that.
-3. Prove `systolicArray_stateAt` in `Exercises/Blocks/SystolicArray.lean`.
-   The induction is on the cell index `j`, with the cycle `t` generalized,
-   because the sum after cell `j + 1` at cycle `t + 1` is built from the sum
-   after cell `j` at cycle `t`.
-4. Prove `systolicArray_matvec` from it. No induction.
-
-Expect step 3 to take most of the time. Nearly all of the difficulty is index
-arithmetic.
+3. Compare your statement with `systolicArray_matvec`. Its hypothesis `hc`
+   is the timing assumption. Is yours the same assumption?
+4. Read the statement of `systolicArray_stateAt` until you can explain every
+   index in it. It is given in the exercise file. Its proof is nearly all
+   index arithmetic; read the outline only.
+5. Prove `systolicArray_matvec` from it, or give it to an agent and review
+   what comes back. No induction.
 
 # Lean you will need
 
-* `induction j generalizing t`.
-* `obtain ⟨t, rfl⟩ : ∃ t', t = t' + 1 := ⟨t - 1, by omega⟩`. When you know
-  `t` is positive, this replaces `t` by `t + 1` everywhere, so that
-  `Block.stateAt_succ` applies.
-* `congr 1`, to split an equation `a + b = a' + b'` into `a = a'` and
-  `b = b'`.
 * `apply sumTo_congr`, to show two sums are equal by showing their terms are.
 * `have h : (some index fact) := by omega` followed by `rw [h]`. When `omega`
   or `simp` will not see that two index expressions are equal, state the
@@ -144,44 +150,33 @@ arithmetic.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/SystolicArray.lean`.
+*Specify.* `course/Specs/SystolicArray.lean`.
 
-*Open.* The theorem counts rows from cycle 0. State and prove a version for a
-matrix whose first row starts at an arbitrary cycle `t0`. Before proving
-anything, decide whether you need a new induction or can apply
-`systolicArray_matvec` to the signal `fun t => c (t + t0)`. If the second,
-you need a lemma relating a block's behaviour on a shifted signal to its
-behaviour on the original, and you should ask whether that lemma is true.
+*State.* `ComputesMatVec` in that file.
+
+*State.* The theorem counts rows from cycle 0. State a version for a matrix
+whose first row starts at an arbitrary cycle `t0`. Before asking for a
+proof, decide whether it needs a new induction or follows from
+`systolicArray_matvec` applied to the signal `fun t => c (t + t0)`. If the
+second, it needs a lemma relating a block's behaviour on a shifted signal to
+its behaviour on the original, and you should ask whether that lemma is
+true.
+
+*Prove.* `systolicArray_matvec` in `Exercises/Blocks/SystolicArray.lean`.
+
+*Questions.* Section 2.8 leaves at least two things open.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* A two-dimensional systolic array multiplies two matrices. Each
 cell holds a running total, passes its left input to the right and its top
-input downward, and adds their product. Define it as a block whose state is a
-grid, work out on which cycle each entry of each matrix must enter, and prove
-that the totals are the matrix product.
+input downward, and adds their product. Write its page of the manual first:
+a paragraph and a table. Then define it as a block whose state is a grid,
+work out on which cycle each entry of each matrix must enter, and state that
+the totals are the matrix product.
 
 # Hints
-
-For `systolicArray_stateAt`, case `j = 0`: after `obtain` and one step, the
-goal is about a sum with one term. `simp [sumTo, hj]` finishes.
-
-Case `j + 1`, in order:
-
-1. After one step and `simp only [Vector.getElem_ofFn]`, unfold one layer of
-   `sumTo` on the right with `rw [sumTo]`.
-2. The last term on the right now mentions the cycle
-   `t + 1 - 1 - (j + 1) + (j + 1)`. State with `have` that this equals `t`,
-   prove it by `omega`, and rewrite with it.
-3. The left side still says `if j + 1 = 0 then zero else ...[j + 1 - 1]`.
-   Clean it up with
-   `simp only [Nat.add_one_ne_zero, ↓reduceIte, Nat.add_sub_cancel]`. Until
-   you do, the induction hypothesis will not match.
-4. Rewrite with the induction hypothesis at cycle `t`. The goal is now of
-   the form `a + b = a' + b'`; use `congr 1`.
-5. The first goal is two sums whose terms differ only in how the cycle index
-   is written: `apply sumTo_congr`, then state the index equation with
-   `have` and prove it by `omega`.
-6. The second goal differs only by `[j + 1]?.getD` against `[j + 1]`:
-   `simp [hj]`.
 
 For `systolicArray_matvec`: unfold `Block.outAt`, take a step, use
 `systolicArray_stateAt` at `j = n - 1` and `t = i + n`. Rewrite `n - 1 + 1`
@@ -189,6 +184,7 @@ to `n`. Then `sumTo_congr` and the hypothesis `hc`.
 
 # Checkpoint
 
-`lake build Exercises.Blocks.SystolicArray` prints no `sorry` warning. You
-have proved that a piece of hardware is correct under a stated timing
-assumption. Everything after this chapter is that idea at a larger scale.
+The report says that all rows agree. Your statement has a hypothesis about
+when the inputs arrive. You have specified a piece of hardware that is
+correct only under a stated timing assumption. Everything after this chapter
+is that idea at a larger scale.

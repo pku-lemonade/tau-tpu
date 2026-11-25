@@ -12,11 +12,25 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The cell-level machine" =>
 *Terms to look up:* refinement, simulation relation, abstraction function.
 
+*Source:* `course/architecture-manual.md`, section 4.
+
 *Read:* `Tau/CellLevel/Machine.lean`.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/CellLevel/Refine.lean`.
+*Proofs:* `Tau/Proofs/CellLevel/Refine.lean`. For reading. It is the largest
+proof of the development.
 
-*Time:* five days.
+*Time:* one day.
+
+# State it first
+
+Section 4 of the manual ends with the sentence "A chip built this way
+behaves exactly as section 3 says."
+
+Before you read on, write that sentence as a Lean proposition, in
+`course/Work/`. `cellExecute` in `Tau/CellLevel/Machine.lean` runs the
+machine built from blocks, and `execute` runs the one you know. Decide what
+"exactly" means: for which chips, which programs, how many cycles, which
+starting memory? And what should hold when the simple machine traps?
 
 # The idea
 
@@ -50,7 +64,7 @@ example :
   rfl
 ```
 
-# What to prove
+# The statement
 
 That the two machines cannot be told apart, on any chip, program, number of
 cycles and starting memory:
@@ -107,34 +121,24 @@ replaced by a different implementation with the same step behaviour.
 
 # How to work through it
 
-1. Read `Tau/CellLevel/Machine.lean` beside the slice-level machine.
-2. In `Exercises/CellLevel/Refine.lean`, do the five small facts about blocks
-   first: `macLanes_add`, `macLanes_clear`, `macLanes_load`, `toList_shift`
-   and `last_shift`.
-3. Then `cellShift_abs` and `cellExec_abs`, which use them.
-4. Then `cellRepeater_step`, `cellStep_abs` and `cellStep_sync`, about one
-   slice.
-5. Then `cellSteps_abs` and `cellSteps_synced`, about all slices, and the
-   lemmas about one cycle and many cycles, in the order of the file.
-6. Last, `cellExecute_eq`.
-
-# Lean you will need
-
-* `Vector.ext`, to prove two vectors equal by proving every slot equal:
-  `apply Vector.ext; intro k hk`.
-* `List.ext_getElem`, the same for lists.
-* Carrying a hypothesis through an induction. `Synced` is defined by
-  recursion on the list of slices, so for a list `c :: rest` the hypothesis
-  is a pair: `obtain ⟨hc, hrest⟩ := h` gives the fact about `c` and the fact
-  about `rest`, which is what the induction hypothesis wants.
-* `exact congrArg Except.ok (lemma ...)`, to turn an equation `a = b` into
-  `.ok a = .ok b`.
+1. Read section 4 of the manual and state its last sentence, as above.
+2. Read `Tau/CellLevel/Machine.lean` beside the slice-level machine. Every
+   field of `Cell` is the state of a block you specified.
+3. Compare your statement with `cellExecute_eq`.
+4. In `Tau/Proofs/CellLevel/Refine.lean`, read `Cell.abs`, `Cell.InSync` and
+   `Synced`, then the statements of `CellState.step_abs` and
+   `CellState.run_abs`, then the outline of `cellExecute_eq`. Draw the
+   square.
+5. Read the statements of `toList_shift`, `last_shift`, `macLanes_add` and
+   `cellRepeater_step`. Each says that a block you specified does what the
+   simple machine does in one line. They are where your earlier chapters are
+   used.
 
 # Exercises
 
-*Guided.* `Exercises/CellLevel/Refine.lean`.
+*State.* The last sentence of section 4, as above.
 
-*Open.* The cell-level machine does not use the systolic array. Design a
+*State.* The cell-level machine does not use the systolic array. Design a
 matrix slice that does, for products with a stored matrix. Do it for the
 slice alone, as a block, so that nothing else has to be defined:
 
@@ -156,55 +160,29 @@ theorem matSlice_refines {n : Nat} (hn : 0 < n) (x : Vector Lane n)
 Build `matSlice` from `systolicArray`. The exercise is `hfeed`: write the
 condition on the input signal under which the conclusion holds. You are done
 when the statement type-checks and you can argue, in a comment, that it is
-neither false nor impossible to satisfy. Proving it is a challenge exercise.
+neither false nor impossible to satisfy. Then give the proof to an agent.
+
+*Read a proof.* Answer from `Refine.lean`, without running anything. What
+does the abstraction function forget? What is the invariant, in one
+sentence? In which lemma is the invariant used, and in which is it shown to
+hold again? Which lemmas would have to change if the pipe were built from
+something other than a shift register?
+
+*Questions.* Section 4 is four lines of a table. List what somebody building
+the chip from it would have to ask. One to start you off: the simple machine
+has one cycle count, and section 4 gives each slice a repeater of its own.
+What keeps them in step?
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* Open the streams. Replace each stream by a row of depth-one
 shift registers with a way for a slice to overwrite a slot, define the
-abstraction to lists, and extend the refinement proof.
-
-# Hints
-
-Every long proof has an outline in the exercise file, above its `sorry`.
-
-For `macLanes_add`, `macLanes_clear` and `macLanes_load`: `apply Vector.ext`,
-`intro k hk`, then `simp` with the definitions of `macLanes`, `Word.mac` or
-`Word.zero`, `mac`, `Block.mapIn`, `accumulator` and `AccIn.map`.
-
-For `toList_shift`: `apply List.ext_getElem`. The first goal is about
-lengths. In the second, simplify both sides to an `if` on whether the index
-is 0.
-
-For `cellExec_abs`: `cases i`. Do `read` first. Each case is
-`simp only [cellExec, exec, ...]`, then `split` once per `if`, then `cases`
-on each read. The memory cases add `memory_step`, `Cell.abs` and the lemmas
-that turn a vector operation into a list operation (`Vector.getElem?_toList`,
-`Vector.length_toList`); `simp?` will name them. The matrix cases end with a
-`macLanes` lemma.
-
-For `cellRepeater_step`: rewrite the slots with the second half of the
-hypothesis, then `repeater_step`.
-
-For `cellStep_abs`: follow the outline. After `simp only` with
-`cellRepeater_step`, split on the due instructions as in `stepSlice_map`.
-`exact congrArg Except.ok (cellShift_abs c none)` closes the first case.
-
-For `cellStep_sync`: unfold `cellStep` in the hypothesis and `split` it. In
-the branches where the step succeeded, `cases h` identifies the result, and
-the two halves of `InSync` are a fact about `c.clock + 1` and the first
-component of `cellRepeater_step`.
-
-For `cellSteps_abs` and `cellSteps_synced`: induction on the list of slices,
-generalizing the position. Take the hypothesis apart with `obtain`.
-
-For `CellState.run_abs`: induction on `n`, generalizing both the state and
-the time. After a successful step, `CellState.step_synced` gives the
-invariant for the next state.
-
-For `synced_map_range'`: induction on the length; `List.range'_succ` unfolds
-one element.
+abstraction to lists, and state the refinement.
 
 # Checkpoint
 
-`lake build Exercises.CellLevel.Refine` prints no `sorry` warning. You can
-draw the square for `CellState.step_abs` and say what the invariant is, where
-it is used and where it is restored.
+Your statement of refinement has the same content as `cellExecute_eq`, or
+you can say where it differs and which is better. You can draw the square
+for `CellState.step_abs` and say what the invariant is, where it is used and
+where it is restored.

@@ -14,6 +14,9 @@ set_option verso.code.warnLineLength 100
 
 *Read:* `Tau/Blocks/Basic.lean`, `Tau/Blocks/ShiftRegister.lean`.
 
+*In the manual:* `course/architecture-manual.md`, section 2.1. Read it after the definition,
+and see how much less it says.
+
 *Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Basic.lean`,
 `Tau/Proofs/Blocks/ShiftRegister.lean`.
 
@@ -160,10 +163,10 @@ know about the state at cycle `t`, and add it to the statement.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Basic.lean`, then
+*Prove.* `Exercises/Blocks/Basic.lean`, then
 `Exercises/Blocks/ShiftRegister.lean`.
 
-*Open.* Define a register with an enable input. Its input is a pair of a
+*Specify.* Define a register with an enable input. Its input is a pair of a
 Boolean and a value, and it keeps its old contents on cycles where the
 Boolean is `false`. Start from this and fill in the step:
 

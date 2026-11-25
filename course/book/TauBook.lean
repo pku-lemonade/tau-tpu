@@ -4,6 +4,7 @@ import TauBook.Lean
 import TauBook.ShiftRegister
 import TauBook.Accumulator
 import TauBook.Mac
+import TauBook.Specifying
 import TauBook.PipelineSequencer
 import TauBook.Memory
 import TauBook.Repeater
@@ -28,17 +29,23 @@ authors := ["The tau-tpu authors"]
 shortTitle := "tau-tpu"
 %%%
 
-This is a self-paced course in Lean 4. It teaches Lean by working through a
-real development from the bottom up: tau-tpu, a small statically scheduled
-tensor processor, a compiler for it, and the proofs that connect them.
+This is a self-paced course in writing specifications in Lean 4. It works
+through a real development from the bottom up: tau-tpu, a small statically
+scheduled tensor processor, a compiler for it, and the proofs that connect
+them.
 
-After two introductory chapters, seven chapters specify simple hardware
-components and prove what they do. One chapter assembles a machine from a
-specification and has you program it by hand. Three chapters give the
-compiler's input a meaning and prove a checker for its output. One chapter
-opens the machine up into the components from the first half and proves that
-nothing changed. One states the result, and one sets homework: extend the
-machine and keep every theorem true.
+The skill it teaches is turning something that is not Lean, an architecture
+manual or a compiler pass in C++, into definitions and statements precise
+enough to prove things about. The proofs themselves it mostly leaves to an
+AI agent, and teaches you to read them and to judge what comes back.
+
+After two introductory chapters, three chapters take a small hardware
+component each, read its specification and prove what it does, so that you
+know what a proof is. One chapter sets out the method. From then on you
+write the specification first: four more components, the machine, the
+compiler's input, two of its passes, and a rule for its schedules. Two
+chapters read the two large proofs of the development. One states the
+result, and one sets homework: extend the machine.
 
 {include 1 TauBook.StartHere}
 
@@ -49,6 +56,8 @@ machine and keep every theorem true.
 {include 1 TauBook.Accumulator}
 
 {include 1 TauBook.Mac}
+
+{include 1 TauBook.Specifying}
 
 {include 1 TauBook.PipelineSequencer}
 

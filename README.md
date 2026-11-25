@@ -39,6 +39,7 @@ it for each compiled program. *Tested* means it holds on the examples.
 | `Kernel.unroll`, the Lean copy of `tau-unroll`, keeps what a kernel computes; the simplifier inside the checks keeps the value of an expression | proved | `Kernel.run_unroll`, `Expr.denote_simp` |
 | The output of each C++ pass computes what its input computes | checked | `tau-check`, once per pass |
 | The compiler's output is accepted | tested, on 19 kernels | `scripts/check-examples.sh` |
+| The tables of the course's architecture manual hold of the specification | tested | `tests/TauTest/Manual.lean` |
 | The C++ `tau-unroll` gives the kernel that its Lean copy gives | tested, on 19 kernels | `tau-check --unroll` |
 | The other four passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing | |
 | The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
@@ -186,20 +187,22 @@ Lean folders are listed in dependency order.
 | `Tau/Passes/` | A Lean copy of the `unroll` pass |
 | `Tau/Check/` | The check of the whole compiler, the checks for each pass, and the simplifier they use |
 | `Tau/Sim/` | JSON readers and the functions behind the command-line tools |
+| `Tau/Claims.lean` | Every main statement, as a named proposition |
 | `Tau/Proofs/` | Theorems about everything above, in a mirrored folder structure |
 | `tools/` | Entry points of `tau-sim` and `tau-check` |
 | `tests/` | Lean tests, run at build time |
 | `compiler/` | The C++ compiler: `tauc` and `tau-opt` |
 | `examples/` | Kernels with input buffers |
 | `chips/` | Chip descriptions: 9 slices and 17 slices |
-| `course/` | The course: a book and exercise files |
+| `course/` | The course: a book, an architecture manual to specify from, and exercise files |
 | `docs/` | What each part is and where it is defined; file formats |
 | `docker/`, `.devcontainer/` | A container with everything installed |
 | `.vscode/` | Recommended editor extension and settings |
 
 Definitions and theorems are kept apart. A file outside `Tau/Proofs/` says
 what something is. The file of the same name under `Tau/Proofs/` says what is
-true of it.
+true of it. `Tau/Claims.lean` collects the main statements, so that what is
+claimed can be read without opening a proof.
 
 ## The machine in one paragraph
 

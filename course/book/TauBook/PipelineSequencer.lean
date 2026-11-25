@@ -12,12 +12,29 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Pipeline and sequencer" =>
 *Terms to look up:* pipelining, latency, program counter, static scheduling.
 
-*Read:* `Tau/Blocks/Pipeline.lean`, `Tau/Blocks/Sequencer.lean`.
+*Source:* `course/architecture-manual.md`, sections 2.4 and 2.6.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Pipeline.lean`,
-`Tau/Proofs/Blocks/Sequencer.lean`.
+*Specify:* `course/Specs/Pipeline.lean`, `course/Specs/Sequencer.lean`.
+
+*Read, after you have specified them:* `Tau/Blocks/Pipeline.lean`,
+`Tau/Blocks/Sequencer.lean`.
+
+*Proofs:* `Tau/Proofs/Blocks/Pipeline.lean`,
+`Tau/Proofs/Blocks/Sequencer.lean`. All of them are exercises.
 
 *Time:* one day.
+
+# Specify them first
+
+These are your first two specifications. Stop reading here.
+
+Open sections 2.4 and 2.6 of the manual, and the two files under
+`course/Specs/`. Follow the steps at the top of each file: choose the state,
+write the block, read the report, list what the manual does not say. Come
+back when both reports say that all rows agree.
+
+The rest of this chapter shows the definitions in the repository. They are
+one way to say what the manual says. Yours is another.
 
 # The pipeline
 
@@ -75,19 +92,26 @@ the one tau-tpu uses.
 
 # How to work through it
 
-1. Read both definition files.
-2. Do `Exercises/Blocks/Pipeline.lean`. One proof of two lines.
-3. Do `Exercises/Blocks/Sequencer.lean` without looking at any hint. The
+1. Specify the pipeline and the sequencer from the manual, as above.
+2. Read both definition files in `Tau/Blocks/`. Compare the states. The
+   repository builds the pipeline out of the shift register and `mapIn`, so
+   its state is the shift register's. The state of its sequencer is the
+   cycle count. Were yours the same? If not, are both right?
+3. Compare your two statements with `pipeline_outAt` and `sequencer_outAt`.
+4. Do `Exercises/Blocks/Pipeline.lean`. One proof of two lines.
+5. Do `Exercises/Blocks/Sequencer.lean` without looking at any hint. The
    state theorem is about as small as an induction can be. If you can do it
    alone, the first week has worked.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Pipeline.lean`, `Exercises/Blocks/Sequencer.lean`.
+*Specify.* `course/Specs/Pipeline.lean` and `course/Specs/Sequencer.lean`.
 
-*Open.* A sequencer can be asked to issue two items on the same cycle, as in
-the example above. Write a function that decides whether a program ever does
-that:
+*State.* `OutputIsDelayed` and `IssuesWhatIsDue` in those two files.
+
+*Specify and state.* A sequencer can be asked to issue two items on the same
+cycle, as in the example above. Write a function that decides whether a
+program ever does that:
 
 ```
 def noClash {α : Type} (prog : List (Nat × α)) : Bool := sorry
@@ -95,13 +119,22 @@ def noClash {α : Type} (prog : List (Nat × α)) : Bool := sorry
 
 Then state the theorem that connects your function to the sequencer: if
 `noClash prog = true`, then for every cycle `t` the list `dueAt prog t` has
-at most one element. Prove it if you can. You have just written a small
-checker and its soundness statement. The chapter on the checker does this for
-the whole machine.
+at most one element. Give the proof to an agent, or prove it yourself. You
+have just written a small check and the statement that it can be trusted.
+The chapter on the checker does this for the whole compiler.
+
+*Prove.* `Exercises/Blocks/Pipeline.lean`, `Exercises/Blocks/Sequencer.lean`.
+
+*Questions.* Sections 2.4 and 2.6 leave at least four things open. Find them
+before you look at the `Decisions` tables.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* Define `mapOut` for blocks, the counterpart of `mapIn`, and
-prove its two lemmas. Then define a pipeline whose function is applied after
-the delay instead of before, and prove it has the same output as `pipeline`.
+state its two lemmas. Then define a pipeline whose function is applied after
+the delay instead of before, and state that it has the same output as
+`pipeline`.
 
 # Hints
 
@@ -116,5 +149,7 @@ For `sequencer_outAt`: unfold `Block.outAt`, rewrite with
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Pipeline Exercises.Blocks.Sequencer` prints no
-`sorry` warning, and you did the sequencer proofs without help.
+Both reports say that all rows agree. `lake build Exercises.Blocks.Pipeline
+Exercises.Blocks.Sequencer` prints no `sorry` warning, and you did the
+sequencer proofs without help. `course/Work/Questions.md` has four more
+entries, and `course/Work/Claims.md` has a row for each thing you wrote.

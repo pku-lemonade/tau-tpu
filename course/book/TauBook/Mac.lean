@@ -15,6 +15,8 @@ overflow, SAT solver.
 
 *Read:* `Tau/Blocks/Mac.lean`, `Tau/Data/Word.lean`.
 
+*In the manual:* `course/architecture-manual.md`, sections 1 and 2.3.
+
 *Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Mac.lean`,
 `Tau/Proofs/Data/Lane.lean`.
 
@@ -122,9 +124,9 @@ being correct. The main theorems of this course avoid it for that reason.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Mac.lean`, then `Exercises/Data/Lane.lean`.
+*Prove.* `Exercises/Blocks/Mac.lean`, then `Exercises/Data/Lane.lean`.
 
-*Open.* State and prove a fact about `Lane.requant` that a user of it would
+*State.* State and prove a fact about `Lane.requant` that a user of it would
 want to know, other than its range. For example: with `k = 0`, an input that
 is already between -128 and 127 comes out unchanged. Write the bounds with
 `slt`, as `Lane.requant_range` does. Try `bv_decide` first. If it fails, read

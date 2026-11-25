@@ -13,12 +13,16 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* symbolic execution, abstract syntax tree, peephole
 optimization.
 
-*Read:* `Tau/IR/Expr.lean`, `Tau/Check/Simplify.lean`,
-`compiler/lib/Transforms/Simplify.cpp`.
+*Source:* `compiler/lib/Transforms/Simplify.cpp`.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Check/Simplify.lean`.
+*Specify:* `course/Specs/Simplify.lean`.
 
-*Time:* two days.
+*Read:* `Tau/IR/Expr.lean`, `Tau/Check/Simplify.lean`.
+
+*Proofs:* `Tau/Proofs/Check/Simplify.lean`. All of them are exercises, and
+short.
+
+*Time:* one day.
 
 # The idea
 
@@ -100,6 +104,12 @@ number format untouched.
    places, and check the result with `rfl`.
 3. Do `Exercises/Check/Simplify.lean`: first `denote_simpUn` and
    `denote_simpBin`, then `Expr.denote_simp` by induction on the expression.
+4. Read `compiler/lib/Transforms/Simplify.cpp`. It makes the same three
+   rewrites, on a kernel.
+5. Specify that pass in Lean, in `course/Specs/Simplify.lean`. It is the
+   hardest "Specify" of the course.
+6. Compare what you wrote with `Expr.simp`. The same three rewrites take five
+   lines on expressions and several times that on kernels. Say why.
 
 # Lean you will need
 
@@ -112,7 +122,20 @@ number format untouched.
 
 # Exercises
 
-*Guided.* `Exercises/Check/Simplify.lean`.
+*Prove.* `Exercises/Check/Simplify.lean`.
+
+*Specify.* `course/Specs/Simplify.lean`: a copy of `tau-simplify`, on
+kernels. One of its tests is the check of the next chapter, `checkKernels`,
+asked whether your output computes what your input computes.
+
+*State.* `KeepsWhatIsComputed` in that file. It needs the laws as a
+hypothesis.
+
+*Questions.* `Simplify.cpp` leaves at least three things open. One to start
+you off: is `max` of two separate loads of the same word simplified?
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 The next two exercises change files under `Tau/`, which the rest of the
 course leaves alone. Do them on a branch: run `git switch -c my-simplifier`
@@ -121,20 +144,22 @@ fails and every file that imports `Tau` shows errors; that is expected, and
 it stops when both proofs are repaired. To go back, commit or discard your
 changes and run `git switch main`.
 
-*Open.* Add a rewrite of your own. A candidate: `max a (max a b)` becomes
-`max a b`. Add the law it needs to `Sem.Lawful`, add the case to `simpBin`,
-and repair `denote_simpBin` and `wordSem_lawful`, both in
-`Tau/Proofs/Check/Simplify.lean`. Before proving your law for
-words, state it for a single lane and try `bv_decide`. If the law is false
-you will get a counterexample in seconds.
+*Specify.* Add a rewrite of your own. A candidate: `max a (max a b)` becomes
+`max a b`. Add the law it needs to `Sem.Lawful` and the case to `simpBin`.
+Before asking anyone to prove your law for words, state it for a single lane
+and try `bv_decide`. If the law is false you will get a counterexample in
+seconds. Then have an agent repair `denote_simpBin` and `wordSem_lawful`, in
+`Tau/Proofs/Check/Simplify.lean`, and review the change. It should touch
+those two proofs and nothing else.
 
-*Open.* Add a rewrite that is wrong, for example `sub a a` becomes `a`. Find
+*State.* Add a rewrite that is wrong, for example `sub a a` becomes `a`. Find
 the exact place where the proof stops working, and read the goal Lean shows
-you there. It is the statement of the false law.
+you there. It is the statement of the false law. This is what a stuck proof
+looks like when the specification is at fault.
 
 *Challenge.* The simplifier makes one pass from the leaves up. Find an
 expression it does not fully simplify, define a simplifier that does, and
-prove that yours keeps values.
+state that yours keeps values.
 
 # Hints
 
@@ -150,8 +175,14 @@ For `Expr.denote_simp`: in the `un` and `bin` cases use the two lemmas and
 the induction hypotheses. The other cases are `rfl` or `simp only` with the
 definitions.
 
+For `course/Specs/Simplify.lean`: walk the statements in order and carry two
+things along, the values that were replaced and by what, and the values that
+are the result of a `relu`. Apply the replacements to the operands of every
+statement before you look at it.
+
 # Checkpoint
 
-`lake build Exercises.Check.Simplify` prints no `sorry` warning. You have a
-verified optimizer whose proof is split into a generic part and a part about
-one number format.
+`lake build Exercises.Check.Simplify` prints no `sorry` warning, and the
+report for your copy of the pass says that all rows agree. You can say why
+the proof is split into a part about any operations that obey the laws and a
+part about one number format.

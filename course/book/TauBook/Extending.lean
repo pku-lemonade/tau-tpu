@@ -15,6 +15,20 @@ set_option verso.code.warnLineLength 100
 The best test of whether you understand a system is to change it. This
 chapter is homework: add something to tau-tpu, and keep every theorem true.
 
+It is also the whole method of the course in one piece of work. For each
+feature:
+
+1. *Write its page of the manual first.* A paragraph, and a table if it has
+   timing. Add it to your copy of `course/architecture-manual.md`.
+2. *Specify it.* The definitions on the path below.
+3. *Test it* against your table.
+4. *List what your paragraph left open,* and what you decided.
+5. *State* what should be true of it, or say which existing statement
+   already covers it.
+6. *Have the proofs repaired* by an agent, and review the change as the
+   chapter "Writing a specification" shows. A feature of the first size
+   should touch no proof at all. If the agent's change does, find out why.
+
 # Why this works as homework
 
 Every feature takes the same path through the repository, and Lean tells you

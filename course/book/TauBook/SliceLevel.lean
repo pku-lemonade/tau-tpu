@@ -12,15 +12,36 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The slice-level machine" =>
 *Terms to look up:* instruction set architecture, SIMD.
 
-*Read:* `Tau/Isa/Op.lean`, `Tau/Isa/Instr.lean`,
-`Tau/SliceLevel/Machine.lean`, `tests/TauTest/Linear.lean`.
+*Source:* `course/architecture-manual.md`, section 3.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/SliceLevel/Timing.lean`.
+*Specify:* `course/Specs/Machine.lean`.
+
+*Read:* `Tau/Isa/Op.lean` and `Tau/Isa/Instr.lean` now.
+`Tau/SliceLevel/Machine.lean` and `tests/TauTest/Linear.lean` after you have
+specified.
+
+*Proofs:* `Tau/Proofs/SliceLevel/Timing.lean`,
+`Tau/Proofs/SliceLevel/Map.lean`. For reading.
 
 *Time:* three days.
 
-This chapter has no proofs. You read the specification of a whole machine,
-and then you program the machine by hand.
+The components are done. This chapter puts a machine together. You specify
+two parts of it from the manual, read the specification of the whole, and
+then program the machine by hand.
+
+# Specify two parts of it first
+
+Read section 3 of the manual, all of it. Then read `Tau/Isa/Op.lean`,
+`Tau/Isa/Instr.lean`, and the first sixty lines of
+`Tau/SliceLevel/Machine.lean`, down to the definition of `State`. Those are
+the types: operations, instructions, traps, the state of a slice. Stop
+there.
+
+The whole machine is too large to write in a day. `course/Specs/Machine.lean`
+asks for the two parts that everything else follows from: how a stream moves
+in one cycle, and what four of the instructions do, traps included. Follow
+the steps at the top of the file and come back when the three reports say
+that all rows agree.
 
 # The instruction set
 
@@ -201,20 +222,28 @@ now.
 
 # How to work through it
 
-1. Read `Tau/Isa/Op.lean` and `Tau/Isa/Instr.lean`.
-2. Read `Tau/SliceLevel/Machine.lean` top to bottom.
-3. Copy the tiny example above into your scratch file and change it: move the
+1. Read section 3 of the manual, and the types, as above.
+2. Specify streams and instructions in `course/Specs/Machine.lean`.
+3. Read `Tau/SliceLevel/Machine.lean` top to bottom. Compare `advanceRow` and
+   `exec` with yours. In which order does the repository's `exec` make its
+   checks? The manual does not say, and the `Decisions` table shows that the
+   order can be seen from outside.
+4. Copy the tiny example above into your scratch file and change it: move the
    read to cycle 3, make the word travel west from slice 2 to slice 0, add a
    `relu` at slice 1 on the way. Predict each result before you run it.
-4. Work through the hand schedule in `tests/TauTest/Linear.lean`.
-5. Do the exercises.
+5. Work through the hand schedule in `tests/TauTest/Linear.lean`.
+6. Read the statements of `out_delay`, `sample_step` and `arrives_east` in
+   `Tau/Proofs/SliceLevel/Timing.lean`, and the outline of `arrives_east`.
+   Compare `sample_step` with your own statement about one cycle.
+7. Do the exercises.
 
 # Exercises
 
-There is no guided file for this chapter. The challenge at the end has
-one.
+*Specify.* `course/Specs/Machine.lean`.
 
-*Open.* On the nine-slice chip of `tests/TauTest/Linear.lean`, write a
+*State.* `MovesOnePosition` in that file.
+
+*By hand.* On the nine-slice chip of `tests/TauTest/Linear.lean`, write a
 schedule that adds a word held in slice 2 to a word held in slice 3 and
 stores the sum in slice 5. Make a file `course/Work/Add.lean` that starts
 with the chip and the helpers of that test, and fill in the four times:
@@ -240,22 +269,28 @@ def addImage : List (List (Word 2)) :=
 Both operands must be at slice 4 on the same cycle, and they start at
 different distances from it. You are done when the guard passes. Then make
 the program one cycle shorter, or convince yourself that it cannot be done.
+You are doing by hand what the compiler's scheduler does.
 
-*Open.* Write seven small programs for `tinyChip`, each of which traps with a
-different one of the seven kinds of trap, and check each with an
-`example ... := by rfl` as above. This shows whether you have understood
-`step` and `execute`. One of the seven is raised by `execute` before the
-first cycle.
+*By hand.* Write seven small programs for `tinyChip`, each of which traps with
+a different one of the seven kinds of trap, and check each with an
+`example ... := by rfl` as above. One of the seven is raised by `execute`
+before the first cycle.
 
-*Challenge.* `Exercises/SliceLevel/Timing.lean`: prove the timing rule. This
-is the longest exercise file before the cell-level machine. Every long proof
-in it has an outline. Start with `out_delay`, which is `shiftRegister_outAt`
-for the pipe of one slice, and `sample_step`, which is one cycle of one
-stream. The two arrival theorems are short inductions once those are done.
-If it is too much now, come back to it after the chapter on the checker,
-which practises the same kind of proof on the same definitions.
+*State.* The theorem `arrives_east` has the hypothesis `hfree`. Write a
+program for `tinyChip` in which `hfree` is false, run it, and say what the
+slice at the far end reads. Then answer: is the statement without `hfree`
+false, or only harder to prove?
+
+*Questions.* Section 3 leaves at least six things open. Two to start you
+off: what happens when a word arrives at a position on the cycle a slice
+places a result there, and which trap is reported when an instruction is
+wrong in two ways.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 # Checkpoint
 
-Your add schedule passes its guard. Given a schedule and the chip, you can
-say on which cycle a given word is at a given position.
+The three reports say that all rows agree. Your add schedule passes its
+guard. Given a schedule and the chip, you can say on which cycle a given word
+is at a given position, and which theorem says so.

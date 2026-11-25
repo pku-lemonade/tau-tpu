@@ -1,13 +1,19 @@
 # The course
 
-A self-paced course in Lean 4, built on the tau-tpu development. It assumes
-programming experience and a first course in discrete mathematics. It does not
-assume a course in digital design, computer architecture or compilers; where a
-term from those fields is needed, the chapter names it and the reading list
-says where to look it up.
+A self-paced course in writing specifications in Lean 4, built on the
+tau-tpu development. You learn to turn an architecture manual and a compiler
+written in C++ into Lean definitions and statements. You prove a few short
+things yourself, so that you know what a proof is, and learn to hand the
+long proofs to an AI agent and judge what comes back.
 
-Plan for about 30 days of roughly six focused hours each. The day counts are
-estimates; nobody has been timed.
+It assumes programming experience and a first course in discrete
+mathematics. It does not assume a course in digital design, computer
+architecture or compilers; where a term from those fields is needed, the
+chapter names it and the reading list says where to look it up.
+
+Plan for about 22 days of roughly six focused hours each. The day counts are
+estimates; nobody has been timed. `Work/Log.md` is a table for your own
+times.
 
 ## Start
 
@@ -34,39 +40,50 @@ and compiles Verso, the tool the book is written in, and takes about ten
 minutes. Every Lean
 example in the book is checked when the book is built.
 
-## Three places for three kinds of file
+## Where things are
 
-| Folder | What is in it | Who edits it |
+| Place | What is in it | Who edits it |
 |---|---|---|
-| `Tau/` | The finished development. `Tau/Proofs/` holds the solutions. | Nobody, except in the exercises that say to work on a branch |
-| `course/Exercises/` | The same proof files with each proof replaced by `sorry`. | You fill in the proofs |
-| `course/Work/` | Your own files: a scratch file, and the open exercises. | You |
+| `course/architecture-manual.md` | The chip in words and tables, as an architect would write it. The source for the hardware chapters. It is not the specification and says less. | Nobody |
+| `compiler/` | The compiler in C++. The source for the compiler chapters. | Nobody |
+| `course/Specs/` | One file per thing you specify, with tests. | You write the definitions and the statements |
+| `course/Exercises/` | A few proof files with some proofs replaced by `sorry`. | You fill in the proofs |
+| `course/Work/` | Your own files: a scratch file, your questions for the architect, your claims table, your times. | You |
+| `Tau/` | The finished development. `Tau/Claims.lean` lists every main statement, and `Tau/Proofs/` holds every proof. | Nobody, except in the exercises that say to work on a branch |
 
-## Guided exercises
+## The three kinds of exercise
 
-Each chapter names its files. Open one in VS Code, put the cursor before a
-`sorry`, read the goal in the infoview, and replace the `sorry` with a proof.
-A long proof has an outline above its `sorry`.
+**Specify.** Each chapter from "Writing a specification" on names a source
+and a file under `course/Specs/`. Read the source, then write your
+definition in the file in place of `todo`. The file has `#eval report`
+lines; put the cursor on one in VS Code to see which rows of the source's
+table your definition gets right. The steps are at the top of every file.
 
-A file is finished when this prints no warning about `sorry`:
+```bash
+lake build Specs.Memory      # prints the same reports in a terminal
+```
+
+There is one rule: write your definition before you open the one in `Tau/`.
+
+**State.** In the same file, under "State", write as a proposition what
+should be true of what you defined. Nothing checks a statement but your
+judgement, the statement in `Tau/Proofs/`, and an attempt to prove it.
+
+**Prove.** A file under `course/Exercises/` in which a few proofs have been
+replaced by `sorry`. They are the short proofs that show what a
+specification means; the long ones are for reading. Put the cursor before a
+`sorry`, read the goal in the infoview, and replace the `sorry` with a
+proof. A file is finished when this prints no warning about `sorry`:
 
 ```bash
 lake build Exercises.Blocks.ShiftRegister
 ```
 
-An exercise file imports the finished library, not other exercise files, so
-you can skip one and come back.
-
 The solution to `course/Exercises/X.lean` is `Tau/Proofs/X.lean`. When you
-are stuck, follow the list in the chapter "Working in Lean", which ends with
-reading one line of the solution and going back to work.
+are stuck, follow the list in the chapter "Working in Lean".
 
-## Open and challenge exercises
-
-These have no solution. Write them in `course/Work/`. Every chapter gives a
-starting point. A file `course/Work/Foo.lean` is the module `Work.Foo`; check
-it with `lake build Work.Foo`, and use it from another file with
-`import Work.Foo`.
+Some chapters also have exercises "by hand" (writing a program for the chip)
+and a larger, optional challenge.
 
 ## Without the C++ compiler
 
@@ -77,30 +94,38 @@ example, so you can read the output instead of producing it.
 
 ## Order
 
-| Days | Chapter | Guided exercise files |
-|---|---|---|
-| 0 | Start here; Working in Lean | none |
-| 1-2 | The shift register | `Blocks/Basic`, `Blocks/ShiftRegister` |
-| 3 | The accumulator | `Blocks/Accumulator` |
-| 4 | Multiply-accumulate | `Blocks/Mac`, `Data/Lane` |
-| 5 | Pipeline and sequencer | `Blocks/Pipeline`, `Blocks/Sequencer` |
-| 6-7 | Memory | `Blocks/Memory` |
-| 8-9 | The repeater | `Blocks/Repeater` |
-| 10-12 | The systolic array | `Blocks/SystolicArray` |
-| 13-15 | The slice-level machine | none; you write schedules. Challenge: `SliceLevel/Timing` |
-| 16-17 | Kernels and loop unrolling | `Passes/Unroll` |
-| 18-19 | Expressions and simplification | `Check/Simplify` |
-| 20-24 | The checker | `IR/Map`, `SliceLevel/Map`, `IR/MemMap`, `Check/Sound`, `IR/Placed`, `Check/Passes` |
-| 25-29 | The cell-level machine | `CellLevel/Refine` |
-| 30 | End to end | `EndToEnd` |
-| after | Extending the machine | none; you add features |
+| Days | Chapter | Specify (`course/Specs/`) | Prove (`course/Exercises/`) |
+|---|---|---|---|
+| 0 | Start here; Working in Lean | | |
+| 1-2 | The shift register | | `Blocks/Basic`, `Blocks/ShiftRegister` |
+| 3 | The accumulator | | `Blocks/Accumulator` |
+| 4 | Multiply-accumulate | | `Blocks/Mac`, `Data/Lane` |
+| 5 | Writing a specification | `Candidates`, `Review`, `Repair`, `Provable` | |
+| 6 | Pipeline and sequencer | `Pipeline`, `Sequencer` | `Blocks/Pipeline`, `Blocks/Sequencer` |
+| 7 | Memory | `Memory` | `Blocks/Memory`, one proof |
+| 8-9 | The repeater | `Repeater` | `Blocks/Repeater`, two proofs |
+| 10-11 | The systolic array | `SystolicArray` | `Blocks/SystolicArray`, one proof |
+| 12-14 | The slice-level machine | `Machine` | none; you write schedules |
+| 15-16 | Kernels and loop unrolling | `Kernel`, `Unroll`, `ReadCpp` | `Passes/Unroll`, three proofs |
+| 17 | Expressions and simplification | `Simplify` | `Check/Simplify` |
+| 18-20 | The checker | `OnTime` | `Check/Sound`, `Check/Passes`, two proofs each |
+| 21 | The cell-level machine | a statement | none; you read the proof |
+| 22 | End to end | your claims table | `EndToEnd` |
+| after | Extending the machine | you add features | |
 
 The book ends with a tactic reference and a reading list.
 
 ## Working with an AI assistant
 
-`AGENTS.md` at the repository root asks assistants to give hints before
-answers and to leave the `sorry`s to you unless you ask. An assistant can fill
-most of the guided exercises by itself, so the open exercises are where you
-learn the most: deciding what a specification should say is the part that
-cannot be delegated.
+The course expects you to use one, in a particular division of work.
+
+- **You** write every definition and every statement. Deciding what a
+  specification should say is the part that cannot be handed over.
+- **You** do the "Prove" exercises of the first five chapters yourself, so
+  that you can read a proof and a goal.
+- **The assistant** may write the other proofs. You review what comes back,
+  as the chapter "Writing a specification" shows: the statement is the one
+  you asked for, its hypotheses can be met, it is about your definition, it
+  rests on no `sorry`, and no definition was changed.
+
+`AGENTS.md` at the repository root tells an assistant these rules.

@@ -13,16 +13,20 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The checker" =>
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
+*Sources:* `compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
+for their opening comments; `course/architecture-manual.md`, section 3.4.
+
+*Specify:* `course/Specs/OnTime.lean`.
+
 *Read:* `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean`,
-`Tau/Check/Checker.lean`, `Tau/IR/Placed.lean`, `Tau/Check/Passes.lean`,
-`compiler/lib/Target/`.
+`Tau/Check/Checker.lean`, `Tau/IR/Placed.lean`, `Tau/Check/Passes.lean`.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/SliceLevel/Map.lean`,
-`Tau/Proofs/IR/Map.lean`, `Tau/Proofs/IR/MemMap.lean`,
-`Tau/Proofs/Check/Sound.lean`, `Tau/Proofs/IR/Placed.lean`,
-`Tau/Proofs/Check/Passes.lean`.
+*Proofs:* `Tau/Proofs/Check/Sound.lean` and `Tau/Proofs/Check/Passes.lean`:
+four short ones are exercises. `Tau/Proofs/SliceLevel/Map.lean`,
+`Tau/Proofs/IR/Map.lean`, `Tau/Proofs/IR/MemMap.lean` and
+`Tau/Proofs/IR/Placed.lean` are for reading.
 
-*Time:* five days.
+*Time:* three days.
 
 # The problem
 
@@ -166,7 +170,15 @@ function commutes with `f`. Most are a case split followed by `simp`. Proofs
 about real systems often look like this: long, shallow, and shaped exactly
 like the code.
 
-`Tau/Proofs/Check/Sound.lean` then assembles the theorem.
+`Tau/Proofs/Check/Sound.lean` then assembles the theorem, in three lemmas of a
+few lines each and one that puts them together.
+
+You are not asked to write `execute_map`. It is the kind of proof an agent
+does well: no idea in it is new after the first case, and Lean checks every
+step. You are asked to know what it says, and to see that the whole checker
+stands on it. If someone changed the machine so that one instruction looked
+at a value, this is the proof that would stop, and the checker would be
+wrong from that day on.
 
 # Checking each pass on its own
 
@@ -248,38 +260,92 @@ program that computes what the placed program computes, even one that uses
 different instructions. Nothing in Lean says what a valid schedule is. The
 chapter "End to end" comes back to this.
 
+# Three ways to specify a pass
+
+You have now seen two of the three ways to say, in Lean, what a compiler
+pass must do. This is the choice you will make most often on a real
+compiler, once for every pass.
+
+* *A copy.* You write the pass itself, as a Lean function. What gets proved:
+  the copy keeps what is computed. What it costs: the C++ is only tested
+  against the copy, and every change to the C++ must be made twice.
+* *A check.* You write a function that compares the input and the output of
+  the pass. What gets proved: when it says yes, the output computes what the
+  input computes. What it costs: it says nothing about how the pass should
+  work, and it can reject a correct output.
+* *A rule.* You write a condition the output must meet, given the input.
+  What gets proved: an output that meets the rule computes what the input
+  computes. What it costs: the proof is hard, and the rule must be complete.
+
+tau-tpu has a copy of one pass, `tau-unroll`, and a check for all five. It
+has no rule. A copy fits a pass that is small, has one right output, and
+rarely changes. A check fits a pass whose output is one of many right
+answers, chosen by heuristics that will change: the check does not care how
+the answer was found. A rule fits when somebody needs to be told what a right
+answer is, which is what the writer of a scheduler needs.
+
+`course/Specs/OnTime.lean` has you write one part of a rule for schedules:
+every operand arrives on the cycle it is read. You do not prove it. You test
+it against the machine.
+
 # How to work through it
 
 1. Read `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean` and
    `Tau/Check/Checker.lean`. Redo the small example above in your scratch
    file with a program of your own.
-2. Do `Exercises/IR/Map.lean`. It is the smaller of the two "does not look at
-   its values" proofs and shows the pattern.
-3. Do `Exercises/SliceLevel/Map.lean`. Go in the order of the file. Each
-   lemma is about one function of the machine; have that function's
-   definition open next to the proof.
-4. Do `Exercises/IR/MemMap.lean`, then `Exercises/Check/Sound.lean`.
-5. Read `Tau/IR/Placed.lean` and `Tau/Check/Passes.lean`. Do
-   `Exercises/IR/Placed.lean`, then `Exercises/Check/Passes.lean`.
+2. Read the statements of `execute_map` and `Kernel.run_map`, and the proof
+   of one case of `exec_map`, in `Tau/Proofs/SliceLevel/Map.lean`. Every
+   other case is the same.
+3. In `Exercises/Check/Sound.lean`, read the statements of the three lemmas
+   that are given: `Kernel.run_of_exprs`, `execute_of_exprs` and
+   `denote_of_sameExprs`. Then prove `check_sound` from them, and
+   `check_safe`.
+4. Read `Tau/IR/Placed.lean` and `Tau/Check/Passes.lean`. In
+   `Exercises/Check/Passes.lean`, prove `checkKernels_sound` and
+   `passes_sound`.
+5. Run the five per-pass commands above on an example.
+6. Read the opening comments of `Place.cpp`, `Schedule.cpp` and `Route.cpp`,
+   and section 3.4 of the manual. Specify the rule in
+   `course/Specs/OnTime.lean`.
+7. Do the exercise "Choose".
 
 # Lean you will need
 
-* `cases i with`, one case per instruction, each handled the same way: unfold
-  `exec`, split on the `if`s, split on the operands.
-* `simp only [..., List.getElem?_map]` and its relatives. Most steps say that
-  mapping a function over a list commutes with some list operation. Lean's
-  library has these lemmas; `simp?` will name them.
-* `Except.map` and `Option.map`. `(r.map f)` applies `f` inside a successful
-  result and leaves a trap or `none` as it is.
-* `obtain ⟨a, b⟩ := r`, to name the two parts of a pair.
+* `unfold check at h` unfolds in the hypothesis `h`, not in the goal.
+* `cases hx : e with` splits on `e` and records which case you are in as
+  `hx`. When a check accepted, both of its runs succeeded; the cases in which
+  one failed are closed by `simp [hx] at h`.
+* `obtain ⟨mem, hrun, hx⟩ := lemma ...` takes apart what a lemma of the form
+  "there is a `mem` such that ..." gives.
+* `refine ⟨mem, _, hrun, hker, ?_⟩` supplies a five-part answer in which the
+  second part is to be worked out by Lean and the last is left as the new
+  goal.
 
 # Exercises
 
-*Guided.* `Exercises/IR/Map.lean`, `Exercises/SliceLevel/Map.lean`,
-`Exercises/IR/MemMap.lean`, `Exercises/Check/Sound.lean`,
-`Exercises/IR/Placed.lean`, `Exercises/Check/Passes.lean`.
+*Specify.* `course/Specs/OnTime.lean`.
 
-*Open.* Break the compiler, one pass at a time. After each change rebuild
+*State.* What would it mean for your rule to be right? State it: if the rule
+accepts a program, the machine does not trap with an empty read. Do not
+prove it. Then answer: which of the other six traps does your rule not
+exclude, and what does a program that passes your rule still have to satisfy
+to compute what the placed program computes?
+
+*Choose.* For each of the five passes of tau-tpu, say which of the three ways
+you would use if you were starting again, and why. Then do the same for five
+passes tau-tpu does not have: constant folding, removal of stores that are
+never read, a register allocator, a scheduler that calls an integer-program
+solver, and an encoder that turns instructions into bits. For the encoder,
+what is the property, and is it about one pass or about two? Then read
+`course/Specs/ChooseAnswers.md` and note where you disagree.
+
+*Prove.* `check_sound` and `check_safe` in `Exercises/Check/Sound.lean`;
+`checkKernels_sound` and `passes_sound` in `Exercises/Check/Passes.lean`.
+
+*Claims.* Add to `course/Work/Claims.md` a row for your rule and a row for what
+it does not cover.
+
+*By hand.* Break the compiler, one pass at a time. After each change rebuild
 with `cmake --build compiler/build` and run `scripts/check-examples.sh`.
 Write down which stage you expect to be the first rejected before you look,
 and undo the change afterwards.
@@ -293,11 +359,11 @@ and undo the change afterwards.
    the line `emitWrite(flight, scratch);`, so that a value that should wait
    in memory is never written there.
 
-*Open.* The checker rejects some correct programs. Find one. A hint: the
+*By hand.* The checker rejects some correct programs. Find one. A hint: the
 simplifier knows three rewrites, and addition is commutative. Write the
 kernel and a compiled program as Lean values, as in the small example, and
-show `check` returns `false`. Then say what you would have to add, and prove,
-for the checker to accept it.
+show `check` returns `false`. Then say what you would have to add, and what
+would then have to be proved, for the checker to accept it.
 
 *Challenge.* On a branch, as in the chapter on expressions, change `exec` in
 the machine so that one instruction looks at a value, for example a `write` that does nothing when the word equals some
@@ -308,74 +374,22 @@ machine.
 
 # Hints
 
-Every long proof in these files has an outline in the exercise file, above
-its `sorry`. Read it first.
+For `check_sound`: follow the outline. After the two `cases`, the three given
+lemmas supply the machine's run, the kernel's run, and the equation between
+the two tables.
 
-*`Exercises/IR/Map.lean`.*
+For `checkKernels_sound`: the same with a kernel on both sides.
 
-* `lookup_map`: induction on the list; take the head pair apart with
-  `obtain ⟨k, x⟩ := e`; unfold `List.lookup`; `split`.
-* `bufGet_map`: `simp only [List.getElem?_map]`, then `cases` on whether the
-  buffer exists.
-* `matvecFrom_map`: induction on `n`; split on the two things matched.
-* `Stmt.exec_map`: do the `load` case first and copy its shape. In each
-  case, name the mapped environment's fields
-  (`have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl`),
-  rewrite with them and with `lookup_map`, then `cases` on each lookup. Where
-  a value is computed, rewrite backwards with the fact that `f` respects the
-  operation, for example `← h.un`, and finish with `rfl`.
-* `execStmts_map`, `execLoop_map`, `Kernel.exec_map`: induction on the list
-  or the count; each uses the one before.
-
-*`Exercises/SliceLevel/Map.lean`.*
-
-* `State.sample_map`: unfold, `cases` on the direction, then on whether the
-  stream and the slot exist.
-* `exec_map`: one case per instruction. `simp only [exec, hrd]`, then
-  `split` once for each `if`, then `cases` on each read. A case that returns
-  a value ends with `simp [Except.map, mapResult, h.un]` or the like.
-* `shiftPipe_map`: first show, by `rfl`, that the mapped pipe with the mapped
-  result in front is the map of the original list. Then `List.getLast?_map`.
-* `stepSlice_map`: `cases` on the list of due instructions: none, one, more.
-* `inject_map`, `advanceRow_map`: unfold; `List.map_congr_left` reduces an
-  equation between two maps over the same list to an equation between the
-  functions at each element.
-* `step_map`, `run_map`, `execute_map`: each uses the one before.
-
-*`Exercises/IR/MemMap.lean`.*
-
-* `image_map`, `extract_map`: `simp only [List.map_map]`, then
-  `apply List.map_congr_left` and `intro`, twice, once for each level of
-  nesting. `Function.comp` is `∘`; `simp only [Function.comp]` unfolds it.
-
-*`Exercises/Check/Sound.lean`.*
-
-* `range_map_getD`: `apply List.ext_getElem`, which asks for equal lengths
-  and equal elements at each index.
-* `symBufs_denote`, `Kernel.run_of_exprs`, `denote_of_sameExprs`: follow the
-  outlines.
-* `execute_of_exprs`: follow the outline. Three pieces of syntax are new.
-  `unfold machineExprs at h` unfolds in the hypothesis `h`, not in the goal.
-  `cases hx : e with` splits on `e` and records which case you are in as
-  `hx`. `refine ⟨memE.map (List.map f), ?_, ?_⟩` supplies the memory the
-  theorem says exists and leaves the two facts about it as new goals.
-* `check_sound`: follow the outline. `obtain ⟨mem, hrun, hx⟩ := ...` takes
-  apart what `execute_of_exprs` gives. `refine ⟨mem, _, hrun, hker, ?_⟩`
-  supplies a five-part answer in which the second part is to be worked out by
-  Lean and the last is left as the new goal.
-
-*`Exercises/IR/Placed.lean` and `Exercises/Check/Passes.lean`.* Everything
-here repeats a proof from the other files. `PInstr.exec_map` is `exec_map`
-again with lookups in place of reads. `Placed.execute_of_exprs` is
-`execute_of_exprs` again. The four soundness theorems are `check_sound` again
-with different sides. `passes_sound` is new: `obtain` the conclusion of each
-of the five theorems, note that two neighbours speak about the same run in
-the middle, and chain the equations with `rw`.
+For `passes_sound`: `obtain` the conclusion of each of the five theorems.
+Two neighbouring theorems speak about the same run in the middle, so their
+results are equal: `Option.some.inj (h.symm.trans h')` for a run that gives
+`some`, `Except.ok.inj` for one that gives `.ok`. Then chain the equations
+with `rw`.
 
 # Checkpoint
 
-The six exercise files build with no `sorry` warning: `lake build
-Exercises.IR.Map Exercises.SliceLevel.Map Exercises.IR.MemMap
-Exercises.Check.Sound Exercises.IR.Placed Exercises.Check.Passes`. You can say, in two
-sentences, why checking one run on names proves something about every input,
-and which property of the machine that relies on.
+`lake build Exercises.Check.Sound Exercises.Check.Passes` prints no `sorry`
+warning. Your rule agrees with the machine on the examples. You can say, in
+two sentences, why checking one run on names proves something about every
+input, and which property of the machine that relies on. You can say for a
+pass you have never seen which of the three ways you would specify it.

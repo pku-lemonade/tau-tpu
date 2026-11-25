@@ -12,11 +12,27 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The repeater" =>
 *Terms to look up:* down counter, loop counter.
 
-*Read:* `Tau/Blocks/Repeater.lean`.
+*Source:* `course/architecture-manual.md`, section 2.7.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Repeater.lean`.
+*Specify:* `course/Specs/Repeater.lean`.
+
+*Read, after you have specified it:* `Tau/Blocks/Repeater.lean`.
+
+*Proofs:* `Tau/Proofs/Blocks/Repeater.lean`. Two short ones are exercises.
+The invariant is for reading.
 
 *Time:* two days.
+
+# Specify it first
+
+Stop reading here. Open section 2.7 of the manual and
+`course/Specs/Repeater.lean`, and follow the steps at the top of the file.
+
+This one is harder than the memory, because the manual describes the
+repeater twice: by what it issues on each cycle, and by the registers it is
+built from. You may write either. The "State" step asks for the other one,
+and for the statement that the two agree. Come back when the report says
+that all rows agree.
 
 # The idea
 
@@ -86,7 +102,7 @@ example :
   decide
 ```
 
-# What to prove
+# The statement
 
 That the counting registers issue exactly what the specification says, at
 every cycle, for every program:
@@ -122,34 +138,28 @@ statement says "there is a `k`", and the proof supplies it.
 
 # How to work through it
 
-1. Read `Tau/Blocks/Repeater.lean`. In your scratch file define an entry of
+1. Specify the repeater from the manual, as above.
+2. Read `Tau/Blocks/Repeater.lean`. In your scratch file define an entry of
    your own and evaluate `timeAt`, `dueAt` and `slotAt` at several cycles.
-2. On paper, write the registers of `readThree` at cycles 0 to 7 and, next
-   to each, the `k` of the invariant.
-3. In `Exercises/Blocks/Repeater.lean` do `Entry.timeAt_lt`, then
-   `Entry.dueUpTo_none` and `Entry.dueUpTo_some`. Each is a short induction.
-4. Do `Entry.slotAt_spec`. Use your table from step 2 to see what `k` and the
-   wait should be in each branch.
-5. Do `Entry.step_slotAt`, which reads the output off the invariant.
-6. Do the three theorems about the whole repeater. They are short.
-
-# Lean you will need
-
-* A statement that starts `∃ k w, ...` is proved by giving the `k` and the
-  `w`: `refine ⟨k + 1, e.gap, ?_, ?_, ?_, ?_⟩` gives them and leaves the four
-  facts as goals. A hypothesis of that form is taken apart with
-  `obtain ⟨k, w, hk, hs, hlt, heq⟩ := ih`.
-* `by_cases hdone : e.repeats + 1 - k = 0`, then inside it
-  `by_cases hw : w = 0`, to follow the branches of `Slot.step`.
-* `omega`, given the right hypotheses. Before calling it, bring the facts it
-  needs into the context with `have := hlt i hi`.
+3. Which of the two descriptions did you write, the one with registers or the
+   one without? The repository has both, and the theorem says they agree.
+4. On paper, write the registers of `readThree` at cycles 0 to 7 and, next
+   to each, the `k` of the invariant. This is how you read an invariant
+   somebody else proved: check it on one run.
+5. Read the statement and the outline of `Entry.slotAt_spec` in
+   `Tau/Proofs/Blocks/Repeater.lean`. Do not work through its steps.
+6. In `Exercises/Blocks/Repeater.lean`, prove `repeater_stateAt` and
+   `repeater_outAt`. Everything above them is given.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Repeater.lean`.
+*Specify.* `course/Specs/Repeater.lean`.
 
-*Open.* The specification defines the time of issue `i` by recursion. State
-and prove the closed form:
+*State.* `IssuesWhatIsDue` in that file: the description without registers,
+and the statement that the block agrees with it.
+
+*State.* The specification defines the time of issue `i` by recursion. State
+the closed form:
 
 ```
 theorem Entry.timeAt_eq {α : Type} (e : Entry α) (i : Nat) :
@@ -157,41 +167,38 @@ theorem Entry.timeAt_eq {α : Type} (e : Entry α) (i : Nat) :
   sorry
 ```
 
-`omega` does not multiply two variables, so the step case needs a rewrite
-with a lemma about `(i + 1) * n` first. Find it with `exact?` or `rw?`. Then
-say, in a comment, which of the two definitions of `timeAt` you would rather
-have in the specification, and why the file uses the recursive one.
+Give the proof to an agent, or do it: `omega` does not multiply two
+variables, so the step case needs a rewrite with a lemma about `(i + 1) * n`
+first. Then say, in a comment, which of the two definitions of `timeAt` you
+would rather have in the specification, and why the file uses the recursive
+one.
 
-*Open.* Define an entry that repeats for ever: no `repeats` field, and a slot
-with no `left` register. Write its specification and its step function, and
-state the invariant. It is simpler than the one in this chapter. Prove it.
+*Specify.* Define an entry that repeats for ever: no `repeats` field, and a
+slot with no `left` register. Write the description without registers, the
+step function, and the invariant that connects them. It is simpler than the
+one in this chapter.
+
+*Prove.* `repeater_stateAt` and `repeater_outAt` in
+`Exercises/Blocks/Repeater.lean`.
+
+*Questions.* Section 2.7 leaves at least three things open.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* Define a repeater whose entries can nest: repeat a group of
 items. Decide what the registers are before writing any Lean.
 
 # Hints
 
-For `Entry.timeAt_lt`: induction on `j`. In the step case either `i = j` or
-`i < j`; in the second, use the induction hypothesis.
+For `repeater_stateAt`: induction on `t`. In the step case, rewrite with
+`Block.stateAt_succ`, the induction hypothesis and `repeater_step`.
 
-For `Entry.dueUpTo_some`: induction on `n`. If `k = n + 1` the first `if` is
-taken. Otherwise the time of issue `n + 1` is later than the time of issue
-`k`, by `Entry.timeAt_lt`, so it is not `t`, and the induction hypothesis
-applies.
-
-For `Entry.slotAt_spec`, the three branches:
-
-* nothing left: give the same `k` and `w`;
-* wait over: give `k + 1` and `e.gap`. The fact about earlier issues needs a
-  case split on whether the issue is `k` itself;
-* still waiting: give `k` and `w - 1`.
-
-For `repeater_step`: `stepSlots_map` turns stepping a mapped list into a map.
-The outputs are then a `filterMap` of a function that `Entry.step_slotAt`
-says is `dueAt`.
+For `repeater_outAt`: unfold `Block.outAt`, then rewrite with
+`repeater_stateAt` and `repeater_step`.
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Repeater` prints no `sorry` warning. You can say
-what an invariant is, and why this one mentions a number the registers do not
-hold.
+The report says that all rows agree. `lake build Exercises.Blocks.Repeater`
+prints no `sorry` warning. You can say what an invariant is, and why this one
+mentions a number the registers do not hold.

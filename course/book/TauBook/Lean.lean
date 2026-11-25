@@ -325,9 +325,9 @@ Work down this list. Do not skip to the last item.
 
 # Exercises
 
-*Guided.* None yet. The exercise files start in the next chapter.
+*Prove.* None yet. The exercise files start in the next chapter.
 
-*Open.* In `course/Work/Scratch.lean`, define a block that remembers the
+*Specify.* In `course/Work/Scratch.lean`, define a block that remembers the
 largest input it has seen so far:
 
 ```
@@ -343,7 +343,7 @@ on an input for which you know the answer, and prove
 If you defined things the natural way, the step case needs only
 `rw [Block.stateAt_succ, ih]` and `rfl`.
 
-*Open.* Change `counter` so that it counts down from a starting value and
+*Specify.* Change `counter` so that it counts down from a starting value and
 stops at zero. Write the function it should compute, test the function on
 two inputs, and prove the state theorem.
 

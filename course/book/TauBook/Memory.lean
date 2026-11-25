@@ -12,11 +12,21 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Memory" =>
 *Terms to look up:* random-access memory, address, read port, write port.
 
-*Read:* `Tau/Blocks/Memory.lean`.
+*Source:* `course/architecture-manual.md`, section 2.5.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Memory.lean`.
+*Specify:* `course/Specs/Memory.lean`.
 
-*Time:* two days.
+*Read, after you have specified it:* `Tau/Blocks/Memory.lean`.
+
+*Proofs:* `Tau/Proofs/Blocks/Memory.lean`. One of them is an exercise.
+
+*Time:* one day.
+
+# Specify it first
+
+Stop reading here. Open section 2.5 of the manual and
+`course/Specs/Memory.lean`, and follow the steps at the top of the file.
+Come back when the report says that all rows agree.
 
 # The idea
 
@@ -45,7 +55,7 @@ example :
   decide
 ```
 
-# What to prove
+# The statement
 
 What does a read return? The value most recently written to that address, or
 the starting value if the address has never been written. To state this you
@@ -82,55 +92,43 @@ there.
 
 # How to work through it
 
-1. Read `Tau/Blocks/Memory.lean`. Evaluate `lastWrite` on a signal of your
+1. Specify the memory from the manual, as above.
+2. Read `Tau/Blocks/Memory.lean`. Evaluate `lastWrite` on a signal of your
    own, including one with no write to the address.
-2. Do `memory_stateAt` in `Exercises/Blocks/Memory.lean`. It is an induction
-   on the cycle with a case split on the command. Two of the three cases are
-   one line.
-3. The write case splits again: was the write to the address `a` or to
-   another address? You will need a library fact about reading a vector after
-   `setIfInBounds`. Do not guess its name. Type `exact?` or `simp?` at the
-   point where you need it and read what Lean suggests.
-4. Do `memory_outAt_read`.
-
-# Lean you will need
-
-* `split` on a goal with a `match`, then `rename_i a x h` to give names to
-  the variables and the hypothesis that `split` introduced without names. The
-  names are assigned in order to the nameless items in the context, oldest
-  first.
-* `subst h`, when `h : a' = a`, replaces one variable by the other
-  everywhere.
-* `unfold lastWrite` to expose its `match`.
+3. Compare your statement with `memory_outAt_read`. Did you need a function
+   like `lastWrite`? Does your statement have the hypothesis that the
+   address is valid? Without it the statement is false: this is the third
+   statement of `course/Specs/Repair.lean`.
+4. In `Exercises/Blocks/Memory.lean`, read the statement and the outline of
+   `memory_stateAt`, which is given. Then prove `memory_outAt_read` from it.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Memory.lean`.
+*Specify.* `course/Specs/Memory.lean`.
 
-*Open.* This memory answers a read in the same cycle. Define a memory whose
+*State.* `ReadsLastWrite` in that file.
+
+*Specify.* This memory answers a read in the same cycle. Define a memory whose
 reads come back one cycle later, by putting a pipeline of depth one behind
 this one. You will need a way to chain two blocks; write it for this one
-case if you did not do the challenge in the shift register chapter. State its
-read theorem. Then say, in a comment, what a read returns if the same address
-is written on the cycle in between, and check your claim by running your
-definition.
+case. State its read theorem. Then say, in a comment, what a read returns if
+the same address is written on the cycle in between, and check your claim by
+running your definition. The manual would have to say this too.
+
+*Prove.* `memory_outAt_read` in `Exercises/Blocks/Memory.lean`.
+
+*Questions.* Section 2.5 leaves at least three things open.
+
+*Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
+chapter: what it is, and how it stands.
 
 *Challenge.* A memory with two ports can take two commands per cycle. Define
 it, decide what happens when both ports write the same address on the same
-cycle, and prove a read theorem. There is more than one defensible answer for
-the conflict. tau-tpu avoids the question by giving each memory slice one
-instruction per cycle.
+cycle, and state a read theorem. There is more than one defensible answer for
+the conflict, which makes it a question for the architect. tau-tpu avoids it
+by giving each memory slice one instruction per cycle.
 
 # Hints
-
-For `memory_stateAt`, the step case: `rw [Block.stateAt_succ, memory_step]`,
-then `unfold lastWrite`, then `split`. In the idle and read cases the state
-is unchanged: `simp` with the hypothesis from `split` and the induction
-hypothesis.
-
-In the write case, use `by_cases haa : a' = a`. If equal, `subst` and `simp`.
-If not, the fact you need says that reading slot `a` after setting a
-different slot gives the old value.
 
 For `memory_outAt_read`: unfold `Block.outAt`, rewrite with `memory_step` and
 the hypothesis that the command is a read, then `simp` with `ha` and
@@ -138,5 +136,6 @@ the hypothesis that the command is a read, then `simp` with `ha` and
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Memory` prints no `sorry` warning. You found a
-library lemma by asking Lean for it.
+The report says that all rows agree. `lake build Exercises.Blocks.Memory`
+prints no `sorry` warning. You can say why `lastWrite` belongs to the
+specification and is not a helper for the proof.

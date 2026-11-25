@@ -14,6 +14,8 @@ set_option verso.code.warnLineLength 100
 
 *Read:* `Tau/Blocks/Accumulator.lean`.
 
+*In the manual:* `course/architecture-manual.md`, section 2.2.
+
 *Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Accumulator.lean`.
 
 *Time:* one day.
@@ -98,9 +100,9 @@ specification, not the proof.
 
 # Exercises
 
-*Guided.* `Exercises/Blocks/Accumulator.lean`.
+*Prove.* `Exercises/Blocks/Accumulator.lean`.
 
-*Open.* The theorem covers only the case where every command is `add`. State
+*State.* The theorem covers only the case where every command is `add`. State
 what the total is when the commands are arbitrary. One way is to define the
 total as a function `total zero cmds t` by recursion on `t`, and prove the
 accumulator's state equals it:

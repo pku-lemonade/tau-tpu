@@ -10,12 +10,23 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "Start here" =>
-This course teaches Lean 4 by taking you through one real development from
-the bottom up. The development is tau-tpu: a small tensor processor, a
-compiler for it, and proofs that connect the two. By the end you will have
-proved, or at least read closely, a theorem that says a compiled program
-computes what its source says, on a model of the hardware built from
-components you specified yourself.
+This course teaches you to write specifications in Lean 4. It takes you
+through one real development from the bottom up. The development is tau-tpu:
+a small tensor processor, a compiler for it, and proofs that connect the two.
+
+A specification is a definition, in Lean, of what something does. The
+hardware is described in a manual and the compiler is written in C++. Neither
+is precise enough to prove anything about. By the end you will have turned
+both into Lean yourself: the components, the machine, the compiler's input,
+two of its passes. You will have stated what each should satisfy. And you
+will have read a theorem that says a compiled program computes what its
+source says, on hardware built from the components you specified.
+
+You will write few proofs. In real work on a chip or a compiler the proofs
+are long, and an AI agent writes most of them. What cannot be handed to an
+agent is deciding what the definitions and the statements should say. That is
+what the course is about. The first chapters still have you prove things, so
+that you know what a proof is and can read one.
 
 # Who this is for
 
@@ -23,7 +34,8 @@ You can program, and you have seen proof by induction. You have not
 necessarily used Lean, and you have not necessarily taken a course in digital
 design, computer architecture or compilers.
 
-The course teaches the Lean. It does not teach the other three subjects.
+The course teaches the Lean and the method. It does not teach the other
+three subjects.
 Where a chapter needs a term from one of them, it lists the term under "Terms
 to look up", and the reading list at the end of the book says where to look
 each one up. Ten minutes per term is enough.
@@ -93,30 +105,42 @@ on the checker, and see how much more they say.
 Every chapter has the same parts.
 
 * *Terms to look up*. Look them up in the reading list.
-* *Read*: definition files. Open them now.
-* *Solutions*: proof files. They are the solutions to the chapter's guided
-  exercises. Do not open them until the list in "Working in Lean" tells you
-  to.
+* *Source*: what you specify from. A section of the manual,
+  `course/architecture-manual.md`, or a C++ file of the compiler.
+* *Specify*: the file under `course/Specs/` in which you write your
+  definition.
+* *Read*: the definition files of the repository. In the first three
+  chapters you open them at once. From the chapter "Writing a specification"
+  on, you open them after you have written your own.
+* *Proofs*: proof files. A few of their proofs are exercises. The rest are
+  for reading.
 * *The idea*, with something you can run.
-* *What to prove*, with the statement of the main theorem.
 * *How to work through it*: numbered steps. Do them in order.
-* *Exercises*, in three kinds.
+* *Exercises*.
 * *Hints*, to read only when stuck.
 * *Checkpoint*: how to tell you are done.
 
-The three kinds of exercise are these.
+The exercises come in three kinds, and every chapter after the fifth has all
+three.
 
-* *Guided.* A file under `course/Exercises/` in which the proofs have been
-  replaced by `sorry`. Proofs that are a single `rfl` are left in, and a long
-  proof is replaced by a `sorry` with an outline above it. You fill the
-  proofs in. The solution is the file of the same name under `Tau/Proofs/`.
-* *Open.* You write the definition or the statement yourself, in a file of
-  your own. There is no solution to compare with. This is the hard part and
-  the useful part: deciding what a specification should say is a skill that a
-  proof assistant cannot check for you.
-* *Challenge.* Larger, and optional.
+* *Specify.* You write a definition from the source, in a file under
+  `course/Specs/`. Tests in the file say which rows of the source's table
+  your definition gets right. Then you list what the source did not say.
+* *State.* You write, as a proposition, a property the thing you defined
+  should have. There is nothing to check a statement against except your
+  judgement, the statement in the repository, and an agent's attempt to
+  prove it.
+* *Prove.* A file under `course/Exercises/` in which a few proofs have been
+  replaced by `sorry`. They are the short proofs that show what a
+  specification means. The solution is the file of the same name under
+  `Tau/Proofs/`.
 
-Do every guided exercise and at least one open exercise per chapter.
+Do every "Specify" and every "State". Do the "Prove" exercises of the first
+five chapters yourself. After that you may give them to an agent, as long as
+you review what comes back the way the chapter "Writing a specification"
+shows.
+
+Some chapters add a *Challenge*, which is larger and optional.
 
 # How the Lean code is laid out
 
@@ -126,25 +150,42 @@ Definitions and theorems live in separate trees.
 to know what something does, read the first kind of file. It contains no
 proofs.
 
+That split is also the split of the work. A person writes and judges what is
+outside `Tau/Proofs/`. What is inside it, Lean checks, and an agent can
+write. Every proof of the development is there, for the whole machine and
+the whole compiler, whether or not the course asks you for it.
+
+`docs/overview.md` says in two pages what the parts are and names the
+definition and the theorem for each. `course/architecture-manual.md` is the architecture
+manual that the hardware chapters specify from.
+
 # A plan
 
 One day means about six hours of focused work. The numbers are estimates, and
-nobody has yet been timed.
+nobody has yet been timed. `course/Work/Log.md` is a table for your own
+times.
 
 * Day 0: this chapter and "Working in Lean".
-* Days 1 to 12: seven chapters on hardware blocks. The repeater takes two of
-  those days and the systolic array three.
-* Days 13 to 15: the slice-level machine. No proofs. You program it by hand.
-* Days 16 to 19: kernels, a compiler pass, expressions, a simplifier.
-* Days 20 to 24: the checker. The longest proofs of the course.
-* Days 25 to 29: the cell-level machine and refinement.
-* Day 30: the end-to-end theorem.
+* Days 1 to 4: the shift register, the accumulator, the multiply-accumulate
+  cell. You read a specification and prove what it does.
+* Day 5: "Writing a specification". The method for everything after it.
+* Days 6 to 11: pipeline and sequencer, memory, repeater, systolic array.
+  You write each from its page of the manual.
+* Days 12 to 14: the slice-level machine. You specify its streams and some
+  of its instructions, and program it by hand.
+* Days 15 to 17: kernels, and two compiler passes that you write in Lean
+  from their C++.
+* Days 18 to 20: the checker, three ways to specify a pass, and a rule for
+  schedules.
+* Day 21: the cell-level machine. You read the largest proof.
+* Day 22: the end-to-end theorem, and your claims table.
 * After that: the chapter "Extending the machine" has as much homework as you
   want.
 
-If you fall behind, skip challenge exercises first, then the open exercises
-of the block chapters. Do not skip a guided exercise file by reading its
-solution. Read one line of the solution and go back to work.
+If you fall behind, skip challenge exercises first, then "Prove" exercises
+after day 5. Do not skip a "Specify" by reading the definition in `Tau/`.
+The tests tell you how far you are, and that is worth more than the
+answer.
 
 # Before day one
 
