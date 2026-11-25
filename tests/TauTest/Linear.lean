@@ -1,6 +1,7 @@
 import Tau.SliceLevel.Machine
 import Tau.Check.Stages
 import Tau.Passes.Unroll
+import Tau.Sim.Run
 import Tau.CellLevel.Machine
 
 /-!
@@ -120,6 +121,17 @@ def swapped : Program :=
 
 -- Unrolling: the kernel against its unrolled form.
 #guard checkKernels kernel (kernel.unroll.map Item.stmt) sizes
+
+-- The comparison the examples script makes between the compiler's unrolled
+-- kernel and the Lean model's: equal up to the numbering of values.
+#guard Sim.sameUnroll
+  [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .store 1 1 ⟨0, 1⟩]]
+  [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.store 1 1 ⟨0, 0⟩),
+   .stmt (.load 2 0 ⟨1, 0⟩), .stmt (.un 3 .relu 2), .stmt (.store 3 1 ⟨1, 0⟩)]
+#guard !Sim.sameUnroll
+  [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .store 1 1 ⟨0, 1⟩]]
+  [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.store 1 1 ⟨0, 0⟩),
+   .stmt (.load 2 0 ⟨1, 0⟩), .stmt (.un 3 .relu 2), .stmt (.store 1 1 ⟨1, 0⟩)]
 
 -- A kernel that stores the wrong value is rejected.
 #guard !checkKernels kernel (kernel.take 5 ++ [.stmt (.store 3 3 ⟨0, 0⟩)]) sizes

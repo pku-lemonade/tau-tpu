@@ -10,6 +10,9 @@
 #   2. tau-sim must give the same buffers for it as for the kernel.
 #   3. A damaged copy of it must be rejected by tau-check.
 #
+# In addition, unrolled.json must be the kernel that the Lean model of
+# tau-unroll gives for simplified.json (`tau-check --unroll`).
+#
 # `examples/linear/stages/` holds a copy of those files, so that the course
 # can be followed without building the compiler. The script fails if the copy
 # is stale; UPDATE_STAGES=1 refreshes it.
@@ -91,7 +94,12 @@ for kernel in examples/*/kernel.mlir; do
     fi
   fi
 
+  if ! "$CHECK" --unroll "$out/simplified.json" "$out/unrolled.json" > /dev/null; then
+    failed="unrolled: not the kernel the Lean model of tau-unroll gives"
+  fi
+
   for stage in $STAGES; do
+    [ -z "$failed" ] || break
     file="$out/$stage.json"
     if ! "$CHECK" "$out/kernel.json" "$file" > "$out/verdict"; then
       failed="$stage: $(cat "$out/verdict")"

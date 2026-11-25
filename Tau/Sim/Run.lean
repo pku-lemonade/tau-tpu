@@ -1,4 +1,5 @@
 import Tau.Sim.Json
+import Tau.Passes.Unroll
 
 /-!
 # Running programs on real words
@@ -108,5 +109,55 @@ def explainStage (k : Kernel) (sizes : List Nat) : Json.Stage → String
         | some (buf, pos) =>
           s!"buffer {buf}, word {pos}: the instructions do not compute what the kernel computes"
         | none => "the instructions and the kernel end with different buffers"
+
+/-! ## Comparing a pass with its Lean model
+
+`Kernel.unroll` (`Tau/Passes/Unroll.lean`) is the Lean model of the compiler's
+`tau-unroll`. The functions below decide whether the two gave the same kernel
+for one input. This is a test of the compiler against the model. It is not
+covered by a proof and no theorem depends on it. -/
+
+/-- Give every value of a kernel without loops a number in order of
+definition. `m` maps old numbers to new ones, most recent first; `next` is
+the next free number. `none` if a statement uses a value before it is
+defined. -/
+def renumber (m : List (Var × Var)) (next : Nat) : List Stmt → Option (List Stmt)
+  | [] => some []
+  | s :: rest =>
+    let def_ (dst : Var) (s' : Stmt) : Option (List Stmt) :=
+      (renumber ((dst, next) :: m) (next + 1) rest).map (s' :: ·)
+    match s with
+    | .load dst buf ix => def_ dst (.load next buf ix)
+    | .store src buf ix => do
+      let src ← m.lookup src
+      (renumber m next rest).map (Stmt.store src buf ix :: ·)
+    | .un dst op a => do
+      let a ← m.lookup a
+      def_ dst (.un next op a)
+    | .bin dst op a b => do
+      let a ← m.lookup a
+      let b ← m.lookup b
+      def_ dst (.bin next op a b)
+    | .matvec dst x buf ix n => do
+      let x ← m.lookup x
+      def_ dst (.matvec next x buf ix n)
+    | .affine dst x bias buf ix n => do
+      let x ← m.lookup x
+      let bias ← m.lookup bias
+      def_ dst (.affine next x bias buf ix n)
+    | .const dst xs => def_ dst (.const next xs)
+    | .sel dst c a b => do
+      let c ← m.lookup c
+      let a ← m.lookup a
+      let b ← m.lookup b
+      def_ dst (.sel next c a b)
+
+/-- Whether `after` is the kernel that `Kernel.unroll` gives for `before`, up
+to the numbering of values. -/
+def sameUnroll (before after : Kernel) : Bool :=
+  after.all (fun | .stmt _ => true | .loop _ _ => false) &&
+  match renumber [] 0 (Kernel.unroll before), renumber [] 0 (Kernel.unroll after) with
+  | some a, some b => a == b
+  | _, _ => false
 
 end Tau.Sim
