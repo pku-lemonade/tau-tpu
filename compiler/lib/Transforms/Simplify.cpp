@@ -6,8 +6,8 @@
 //   max(a, a)    -> a
 //   min(a, a)    -> a
 //
-// Tau/Passes/Simplify.lean applies the same rewrites to expressions, and
-// Tau/Proofs/Passes/Simplify.lean proves they keep values. This C++ code is
+// Tau/Check/Simplify.lean applies the same rewrites to expressions, and
+// Tau/Proofs/Check/Simplify.lean proves they keep values. This C++ code is
 // not proved. Its output is checked on every compile by tau-check.
 //
 //===----------------------------------------------------------------------===//

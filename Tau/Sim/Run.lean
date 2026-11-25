@@ -111,11 +111,13 @@ def explainPair (before after : Json.Stage) : String :=
     if stageSizes before != stageSizes after then
       "the two files do not give the buffers the same sizes"
     else
+      let same := stageName before == stageName after
+      let first := if same then s!"first {stageName before}" else stageName before
+      let second := if same then s!"second {stageName after}" else stageName after
       match firstDiff a b with
       | some (buf, pos) =>
-        s!"buffer {buf}, word {pos}: the {stageName after} does not compute what the " ++
-          s!"{stageName before} computes"
-      | none => s!"the {stageName after} and the {stageName before} end with different buffers"
+        s!"buffer {buf}, word {pos}: the {second} does not compute what the {first} computes"
+      | none => s!"the {second} and the {first} end with different buffers"
 
 /-! ## Comparing a pass with its Lean model
 

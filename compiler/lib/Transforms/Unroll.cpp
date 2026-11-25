@@ -4,10 +4,11 @@
 // iteration filled into each position: `[base, stride]` becomes
 // `[base + stride * k, 0]` in copy number k.
 //
-// Tau/Passes/Unroll.lean is the Lean model, and
-// Tau/Proofs/Passes/Unroll.lean proves the model keeps what a kernel
+// Tau/Passes/Unroll.lean is a copy of this pass in Lean, and
+// Tau/Proofs/Passes/Unroll.lean proves the copy keeps what a kernel
 // computes. This C++ code is not proved. Its output is checked on every
-// compile by tau-check.
+// compile by tau-check, and compared with the copy's by
+// scripts/check-examples.sh.
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,6 +38,8 @@ static void instantiate(Operation *op, uint64_t k) {
     instantiate(store, k);
   else if (auto matvec = dyn_cast<tau::MatVecOp>(op))
     instantiate(matvec, k);
+  else if (auto affine = dyn_cast<tau::AffineOp>(op))
+    instantiate(affine, k);
 }
 
 struct UnrollPass : PassWrapper<UnrollPass, OperationPass<func::FuncOp>> {

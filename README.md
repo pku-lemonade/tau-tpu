@@ -38,8 +38,8 @@ it for each compiled program. *Tested* means it holds on the examples.
 | If all five per-pass checks accept, the finished program computes its kernel | proved | `passes_sound`, `end_to_end_passes` |
 | `Kernel.unroll`, the Lean copy of `tau-unroll`, keeps what a kernel computes; the simplifier inside the checks keeps the value of an expression | proved | `Kernel.run_unroll`, `Expr.denote_simp` |
 | The output of each C++ pass computes what its input computes | checked | `tau-check`, once per pass |
-| The compiler's output is accepted | tested, on 18 kernels | `scripts/check-examples.sh` |
-| The C++ `tau-unroll` gives the kernel that its Lean copy gives | tested, on 18 kernels | `tau-check --unroll` |
+| The compiler's output is accepted | tested, on 19 kernels | `scripts/check-examples.sh` |
+| The C++ `tau-unroll` gives the kernel that its Lean copy gives | tested, on 19 kernels | `tau-check --unroll` |
 | The other four passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing | |
 | The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
@@ -138,6 +138,7 @@ rejected.
 |---|---|
 | `linear` | one quantized linear layer; a redundant `relu` for the simplifier |
 | `affine` | the same layer with the bias added inside the matrix slice |
+| `affine-batch` | two affine layers in a loop, each with its own matrix |
 | `mlp` | two linear layers in a row |
 | `mlp-wide` | the same kernel on the 17-slice chip |
 | `batch-linear` | a matrix multiplied four times; its columns are stored in the matrix slice once |
