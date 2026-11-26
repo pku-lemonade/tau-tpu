@@ -161,10 +161,11 @@ Each folder's README says what is in it and where to start.
 
 tau-tpu is a teaching model and does not describe any product:
 
-- No floating point, and no lane narrower than 32 bits.
+- No floating point, and no lane narrower than 32 bits (Machine 1).
 - No delay that differs between the operations of one slice.
 - No address computed from data.
-- No import from a framework such as PyTorch or ONNX.
+- No loop inside a loop, and no call inside a loop (Programs 3 and 4).
+- No bit fields in the image: its numbers have no fixed width (Machine 3.10).
 
 Compiler-specific limits are listed in
 [`compiler/README.md`](compiler/README.md#limits).

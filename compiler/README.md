@@ -142,7 +142,8 @@ why its output is accepted.
 
 ## Limits
 
-- Loops do not nest, and a call is not inside a loop.
+- A program is a Python function written with `tau`, or MLIR in the `tau`
+  dialect. Nothing reads a model from a framework such as PyTorch or ONNX.
 - A loop is unrolled before placement. A program is as large as its
   iterations until `tau-fold` merges what it can, and compiling and checking
   take time in proportion.
@@ -155,4 +156,3 @@ why its output is accepted.
   overlap.
 - A pinned load with more than one use is read into a scratch word, even if
   one of its uses could have taken it directly.
-- The image is a list of numbers of no fixed width, not bit fields.
