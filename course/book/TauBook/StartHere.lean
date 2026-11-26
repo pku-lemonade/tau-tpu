@@ -42,34 +42,53 @@ each one up. Ten minutes per term is enough.
 
 # What tau-tpu is
 
-A tau-tpu machine is a row of _slices_. Each slice does one kind of job: store
-words, do arithmetic on them, rearrange them, or multiply by a matrix. Between
-the slices run _streams_, which carry words east or west, one slice per cycle.
-
-A program for the machine is a timetable. It lists every instruction together
-with the slice that executes it and the cycle on which it does so. The machine
-has no branches, no queues, and nothing that waits. If an instruction looks
-for its operand on a stream one cycle too early, the operand is not there yet
+A tau-tpu machine is a row of _slices_ connected by directional _streams_
+that carry words east or west, one slice per cycle. A program for the
+machine is a fixed timetable of instructions with no branches and no queues:
+if an instruction reads a stream slot on the wrong cycle, the slot is empty
 and the machine traps.
 
-Deciding the timetable is the compiler's job. A design like this is called
-_statically scheduled_. It follows the tensor streaming processors described
+Users write programs in Python or MLIR as operations on buffers, and may
+_pin_ individual operations to cycles. An untrusted compiler turns a program
+into per-slice timetables and a numeric _image_, while a Lean checker
+validates each compiled output against its source.
+
+```
+9-slice machine (1 slice/cycle on east & west streams):
+  ──east──▶ [0:mxm] [1:sxm] [2:mem] [3:mem] [4:vxm] [5:mem] [6:mem] [7:sxm] [8:mxm]
+  ◀─west──
+
+Flow:
+  kernel.py / kernel.mlir ─tauc─▶ source → ... → compiled → image
+                                    │                        │
+                                    └─────── tau-check ──────┘ & tau-sim
+```
+
+The machine, its programs, and what a compiler must deliver are described in
+`Tau/Docs/README.md` and its companion files (`Machine.md`, `Programs.md`,
+`Compiler.md`). This design follows the tensor streaming processors described
 by Abts and others at ISCA 2020 and ISCA 2022.
 
 # The tour
 
 Before learning any Lean, see the finished thing work. Do "Setup" in the
-repository's `README.md` first. Then, in a terminal in the repository
-folder:
+repository's `README.md` first. The example below runs a quantized linear
+layer `relu(requant(W * x + b))` on 2-lane words: with `x = [3, -2]`,
+`b = [10, -20]`, and `W` having columns `[1, 3]` and `[2, 4]`, `W * x + b`
+is `[9, -19]`, and `relu` leaves `[9, 0]`.
+
+In a terminal in the repository folder:
 
 ```
 compiler/build/bin/tauc examples/linear/kernel.mlir -o out --print-mlir
 ```
 
-This compiles a quantized linear layer. It prints the program after each of
-the compiler's eight passes and writes ten files into `out/`. Open
-`out/compiled.json` and read the `program` list. Each entry is one line of
-the timetable: a slice, a cycle, and an instruction.
+It prints the program after each of the compiler's eight passes and writes
+the stage files into `out/`. Compare `out/source.json` and
+`out/compiled.json`: `source.json` lists buffer sizes and operations
+(`load`, `matvec`, `add`, `requant`, `relu`, `store`) with no slices or
+cycles, while `compiled.json` assigns each instruction a slice, a cycle
+(`time`), and directional streams (`east` and `west`).
 
 ```
 lake exe tau-check out/source.json out/compiled.json
@@ -77,21 +96,27 @@ lake exe tau-check out/source.json out/compiled.json
 
 This prints `ACCEPT`. That one word is backed by a theorem: for every
 possible input, running that program on the machine gives what the program in
-`out/source.json` computes. Now open `out/compiled.json`, find the last instruction, add one to
-its `time`, and run the check again. It prints `REJECT` and says why.
+`out/source.json` computes. Now open `out/compiled.json`, find an
+intermediate instruction such as `"op": "bin"` on slice 4, add one to its
+`time` (`16` to `17`), and run the check again. It prints `REJECT` and
+reports a trap: slice 4 read a stream slot that held nothing. (Change the
+`time` back afterwards.)
 
 ```
 lake exe tau-sim out/compiled.json examples/linear/buffers.json
 ```
 
-This runs the program and prints the buffers. The last buffer is the result.
-The simulator is not a separate piece of software. It is the Lean
-specification of the machine, compiled.
+This runs the program and prints the buffers. The last buffer is `[[9, 0]]`,
+matching `relu([9, -19])`. The simulator is not a separate piece of software.
+It is the Lean specification of the machine, compiled.
 
-If you have not built the compiler, skip the first command and use the
-folder `examples/linear/stages/` in place of `out/`. It holds the same ten
-files. The chapters on kernels, on expressions and on the checker run the
-compiler again, and each names a `stages/` folder to read instead.
+If you have not built the compiler, skip the first command and copy
+`examples/linear/stages/` to `out/` (`cp -r examples/linear/stages out`)
+before inspecting or editing `out/compiled.json`. Six chapters run the
+compiler or inspect its output: start here, kernels, expressions, the
+checker, pins, and from Python to an image. The first four each name a
+`stages/` folder to read instead; the last two work without the compiler for
+their Lean examples and exercises.
 
 `lake exe` builds a tool if it needs to and then runs it. Like every `lake`
 command, it works only in the repository folder.
@@ -102,14 +127,20 @@ on the checker, and see how much more they say.
 
 # How each chapter works
 
-Every chapter has the same parts.
+The course moves through five phases: two introductory chapters, three warmup
+chapters where you read existing definitions and write short proofs yourself,
+"Writing a specification" setting out the method, ten specification chapters
+where you specify from prose or C++ before reading `Tau/`, and finally two
+proof-reading chapters plus "Extending the machine".
+
+When a chapter introduces new Lean code or exercises, it uses these parts:
 
 * *Terms to look up*. Look them up in the reading list.
 * *Source*: what you specify from. A section of a doc, such as
   `Tau/Docs/Machine.md`, or a C++ file of the compiler.
 * *Specify*: the file under `course/Specs/` in which you write your
   definition.
-* *Read*: the definition files of the repository. In the first three
+* *Read*: the definition files of the repository. In the three block warmup
   chapters you open them at once. From the chapter "Writing a specification"
   on, you open them after you have written your own.
 * *Proofs*: proof files. A few of their proofs are exercises. The rest are
@@ -120,8 +151,8 @@ Every chapter has the same parts.
 * *Hints*, to read only when stuck.
 * *Checkpoint*: how to tell you are done.
 
-The exercises come in three kinds, and every chapter after the fifth has all
-three.
+The exercises come in three main kinds (some chapters also omit `Prove` and
+use hand-written programs or proof reading instead):
 
 * *Specify.* You write a definition from the source, in a file under
   `course/Specs/`. Tests in the file say which rows of the source's table
@@ -136,9 +167,9 @@ three.
   `Tau/Proofs/`.
 
 Do every "Specify" and every "State". Do the "Prove" exercises of the first
-five chapters yourself. After that you may give them to an agent, as long as
-you review what comes back the way the chapter "Writing a specification"
-shows.
+three component chapters (through "Multiply-accumulate") yourself. After
+that you may give them to an agent, as long as you review what comes back
+the way the chapter "Writing a specification" shows.
 
 Some chapters add a *Challenge*, which is larger and optional.
 
@@ -174,12 +205,16 @@ times.
   You write each from its section of `Machine.md`.
 * Days 12 to 14: the slice-level machine. You specify its streams and some
   of its instructions, and program it by hand.
-* Days 15 to 17: kernels, and two compiler passes that you write in Lean
-  from their C++.
-* Days 18 to 20: the checker, three ways to specify a pass, and a rule for
-  schedules.
-* Day 21: the cell-level machine. You read the largest proof.
-* Day 22: the end-to-end theorem, and your claims table.
+* Days 15 to 17: kernels, loop unrolling, expressions and simplification.
+  You turn compiler passes in C++ into Lean.
+* Days 18 to 20: the checker, per-pass checks, three ways to specify a
+  pass, and a rule for schedules.
+* Days 21 to 22: pins and timelines. You specify what timing constraints
+  guarantee.
+* Days 23 to 24: from Python to an image. The frontend, calls, slicing,
+  folding and encoding.
+* Day 25: the cell-level machine. You read the largest proof.
+* Day 26: end to end, and your claims table.
 * After that: the chapter "Extending the machine" has as much homework as you
   want.
 

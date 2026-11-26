@@ -288,7 +288,8 @@ pins of a source program.
 for what it does not.
 
 *By hand.* In `examples/paced/kernel.py`, change the spacing from 4 to 2,
-then 1, then 0, and compile each. Write down first how many cycles you expect
+then 1, then 0, and compile each (work on a copy, or change it back
+afterwards). Write down first how many cycles you expect
 each to take. One of them does not compile: read the error, find in
 `Schedule.cpp` the line that prints it, and say what on the machine is asked to
 do two things at once. For the smallest spacing that works, say how many

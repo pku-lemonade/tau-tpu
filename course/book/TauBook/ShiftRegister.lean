@@ -26,7 +26,8 @@ and see how much less it says.
 
 Every piece of hardware in this course is a _block_: something that holds a
 state, and on each clock cycle reads an input, writes an output and moves to a
-new state. In Lean a block is a starting state and a function.
+new state. The previous chapter used `Block` briefly; `Tau/Blocks/Basic.lean`
+gives its full definitions, alongside `Signal`, `stateAt` and `outAt`:
 
 {docstring Tau.Block}
 
@@ -49,6 +50,10 @@ induction on the cycle.
 
 The first block is the shift register: a row of slots through which values
 move one slot per cycle.
+
+```
+inp ──▶ [ slot 0 ] ──▶ [ slot 1 ] ──▶ out   (depth 2)
+```
 
 {docstring Tau.shiftRegister}
 

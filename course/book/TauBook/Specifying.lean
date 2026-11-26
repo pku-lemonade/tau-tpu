@@ -35,7 +35,7 @@ judge whether a definition says the right thing.
 
 # The loop
 
-Every chapter from here on goes through the same seven steps.
+Every specification chapter from here on goes through the same seven steps.
 
 1. *Read the source.* For hardware it is a section of
    `Tau/Docs/Machine.md`. For a compiler pass it is a C++ file.
@@ -241,8 +241,8 @@ in `course/Work/Claims.md`.
 | read outside the memory gives nothing  | my decision. Not in the doc.                  |
 ```
 
-The last chapter compares your table with the one in the repository's
-`Tau/Docs/README.md`, section 4.
+The chapter "End to end" compares your table with the one in the
+repository's `Tau/Docs/README.md`, section 4.
 
 # How to work through it
 

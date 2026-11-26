@@ -91,6 +91,14 @@ bottom, and the abstraction function down both sides. The lemma says the two
 ways round the square agree. Everything else is induction on the number of
 cycles.
 
+```
+CellState ──CellState.step──▶ CellState'
+    │                             │
+   abs t                      abs (t+1)
+    ▼                             ▼
+  State ──────────step────────▶ State'
+```
+
 One thing the abstraction cannot forget for free is time. The simple machine
 has one cycle count, and looks up what is due by that count. The detailed
 machine has a repeater in every slice, each with its own registers. So the
@@ -168,7 +176,7 @@ sentence? In which lemma is the invariant used, and in which is it shown to
 hold again? Which lemmas would have to change if the pipe were built from
 something other than a shift register?
 
-*Questions.* Section 4 is four lines of a table. List what somebody building
+*Questions.* Section 4 is five rows of a table. List what somebody building
 the machine from it would have to ask. One to start you off: the simple machine
 has one cycle count, and section 4 gives each slice a repeater of its own.
 What keeps them in step?

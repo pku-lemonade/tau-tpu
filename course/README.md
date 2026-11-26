@@ -131,8 +131,9 @@ The course expects you to use one, in a particular division of work.
 
 - **You** write every definition and every statement. Deciding what a
   specification should say is the part that cannot be handed over.
-- **You** do the "Prove" exercises of the first five chapters yourself, so
-  that you can read a proof and a goal.
+- **You** do the "Prove" exercises of the first three component chapters
+  (through "Multiply-accumulate") yourself, so that you can read a proof
+  and a goal.
 - **The assistant** may write the other proofs. You review what comes back,
   as the chapter "Writing a specification" shows: the statement is the one
   you asked for, its hypotheses can be met, it is about your definition, it

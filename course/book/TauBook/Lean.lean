@@ -10,20 +10,21 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "Working in Lean" =>
-This chapter is a day of practice before the course proper. It shows the Lean
-you need to read the first files, takes you through two complete proofs one
-step at a time, and ends with what to do when you are stuck. Type everything
-in. Do not paste.
+This chapter is Day 0: a few hours to a day of practice before Day 1. It
+shows the Lean you need to write and read definitions, takes you through two
+complete proofs one step at a time, and ends with what to do when you are
+stuck. Type everything in. Do not paste.
 
 # Your working setup
 
 Open the repository folder in VS Code. Open the whole folder, not a single
 file, or `import Tau` will not be found. The folder `course/Work/` is for
-your own files. It already has a file `Scratch.lean`, which starts like
-this:
+your own files. It already has `Scratch.lean`, which sets up `import Tau`
+and `open Tau` after a short header comment:
 
 ```
 import Tau
+...
 open Tau
 ```
 
@@ -42,7 +43,7 @@ as you will see below.
 
 On the right is the _infoview_. It shows what Lean knows at the position of
 your cursor. Keep it open at all times. If it is not there, press
-`Ctrl+Shift+Enter`.
+`Ctrl+Shift+Enter` (`Cmd+Shift+Enter` on macOS).
 
 A file is correct when it has no red underlines. A yellow underline is a
 warning. The warning you will see most is `declaration uses 'sorry'`, which
@@ -79,16 +80,18 @@ value.
 ```
 
 A structure groups values. A function on a structure is usually put in the
-structure's namespace, so it can be called with a dot.
+structure's namespace, so it can be called with a dot. Adding `deriving Repr`
+tells Lean how to print values for `#eval`.
 
 ```lean
 structure Point where
   x : Nat
   y : Nat
+  deriving Repr
 
 def Point.swap (p : Point) : Point := { x := p.y, y := p.x }
 
-example : (Point.mk 1 2).swap = { x := 2, y := 1 } := rfl
+#eval (Point.mk 1 2).swap
 ```
 
 A function on a list or on a natural number is usually written by cases. The
@@ -100,31 +103,62 @@ def sumList : List Nat → Nat
   | [] => 0
   | x :: rest => x + sumList rest
 
-example : sumList [1, 2, 3] = 6 := rfl
+#eval sumList [1, 2, 3]
 ```
 
 `{ p with y := 5 }` is a copy of the structure `p` in which the field `y` has
 been replaced.
 
 ```lean
-example : ({ (Point.mk 1 2) with y := 5 }).x = 1 := rfl
+#eval ({ (Point.mk 1 2) with y := 5 }).x
 ```
 
+Hardware commands and instructions are written as _inductive types_, listing
+each case with `|`, and handled with `match`.
+
+```lean
+inductive Cmd where
+  | hold
+  | add (x : Nat)
+  | clear
+  deriving Repr
+
+def applyCmd (s : Nat) (c : Cmd) : Nat :=
+  match c with
+  | .hold => s
+  | .add x => s + x
+  | .clear => 0
+
+#eval applyCmd 10 (.add 5)
+```
+
+A dot in front of a name, as in `.add 5`, means "the constructor of that name
+of whatever type is expected here". `abbrev` gives an existing type a shorter
+name:
+
+```lean
+abbrev Words := List Nat
+```
+
+`if c then a else b` chooses `a` when the Boolean `c` is `true` and `b`
+otherwise. `a == b` compares values and returns a `Bool` (`true` or
+`false`), whereas `a = b` is a mathematical equation you can state and prove.
 `fun x => ...` is a function without a name. `Option α` is either `none` or
-`some x`. `(a, b)` is a pair, and `.1` and `.2` take it apart. A dot in front
-of a name, as in `.add 3`, means "the constructor of that name of whatever
-type is expected here".
+`some x`. `(a, b)` is a pair, and `.1` and `.2` take it apart.
 
 # Statements and proofs
 
 `example` states something and proves it, without giving it a name. `theorem`
 does the same and gives it a name, so that it can be used later.
 
-The simplest proof is `rfl`. It works when both sides compute to the same
-value.
+The simplest proof is `rfl` (for _reflexivity_). It asks Lean to unfold
+definitions and compute both sides; if they reduce to the exact same value,
+`rfl` closes the equation.
 
 ```lean
 example : double 2 = 4 := rfl
+example : sumList [1, 2, 3] = 6 := rfl
+example : (Point.mk 1 2).swap = { x := 2, y := 1 } := rfl
 ```
 
 Most proofs are written after the word `by`, as a list of _tactics_. Each
@@ -135,9 +169,22 @@ this for every proof you read in this course.
 
 # A first block, and a proof by computing
 
-Chapter 3 introduces `Block` properly. Here is enough to try one. A block is
-a starting state and a step function. The step takes the state and the input
-of one cycle and returns the next state and the output.
+Every hardware component in this course is a `Block`: a starting state and a
+`step` function that takes the current state and input and returns the next
+state and output. A `Signal` gives one input per cycle (`Nat → α`).
+
+{docstring Tau.Signal}
+
+{docstring Tau.Block}
+
+{docstring Tau.Block.stateAt}
+
+{docstring Tau.Block.outAt}
+
+In `Tau/Blocks/Basic.lean` (read in full in the next chapter), `stateAt`
+starts at `b.init` at cycle `0` and steps with `(b.step (b.stateAt inp t)
+(inp t)).1` at `t + 1`; `outAt` at cycle `t` is `(b.step (b.stateAt inp t)
+(inp t)).2`.
 
 This block outputs whatever it was given on the previous cycle.
 
@@ -169,9 +216,10 @@ theorem register_outAt_succ {α : Type} (reset : α) (inp : Signal α) (t : Nat)
 ```
 
 The comment shows the goal, as the infoview would. The symbol `⊢` separates
-what is known from what is to be proved. `rfl` closes it because `outAt` at
-cycle `t + 1` unfolds, by its definition, to the state after one more step,
-and for this block that state is the input `inp t`.
+what is known from what is to be proved. Unfolding `outAt` at `t + 1` gives
+the state of `register` at `t + 1` (because `step s x` returns `s` as `.2`),
+and unfolding `stateAt` at `t + 1` gives `inp t` (because `step s x` returns
+`x` as `.1`). Both sides compute to `inp t`, so `rfl` closes the goal.
 
 When `rfl` works, the theorem is true by definition. That is the best kind of
 proof and you should always try it first.
@@ -233,9 +281,11 @@ Read it with the goal in view.
   state at `t`. Then `ih` replaces the state at `t` by `countTrue inp t`.
   After a `rw`, look at the goal. It has changed exactly as the lemma says.
 * The goal now depends on whether the input at cycle `t` is `true`.
-  `by_cases h : inp t` splits into the two cases and names the fact `h`.
-* `simp [counter, countTrue, h]` simplifies the goal using the definitions of
-  `counter` and `countTrue` and the fact `h`. In each case that is enough.
+  `by_cases h : inp t` splits into the two cases and names the fact `h`
+  (`inp t = true` in the first branch, `¬inp t = true` in the second).
+* Each `·` focuses on one branch at a time. `simp [counter, countTrue, h]`
+  simplifies the goal using the definitions of `counter` and `countTrue` and
+  the fact `h`. In each case that is enough.
 
 The theorem about the output follows from the one about the state. No second
 induction is needed.
@@ -249,15 +299,15 @@ theorem counter_outAt (inp : Signal Bool) (t : Nat) :
   rfl
 ```
 
-This is the shape of every proof about a block in chapters 3 to 8.
+This is the shape of every proof about a block in the block chapters.
 
 1. Define, by recursion, the function the block is supposed to compute.
 2. Prove by induction on the cycle that the state is that function.
 3. Derive the statement about the output.
 
-Step 1 is the specification. If `countTrue` is wrong, the theorem is proved
-and useless. Check a specification the way you check a program: evaluate it
-on an input for which you know the answer.
+Step 1 is the reference function you want to prove the block matches. If
+`countTrue` is wrong, the theorem is proved and useless. Check it the way
+you check a program: evaluate it on an input for which you know the answer.
 
 ```lean
 example : countTrue (fun t => t % 2 == 0) 5 = 3 := by decide
@@ -315,7 +365,8 @@ Work down this list. Do not skip to the last item.
   The message shows what.
 * `type mismatch`: you gave a term of one type where another was expected.
   Compare the two types in the message character by character.
-* `omega could not prove the goal`: the arithmetic fact is false, or it
+* `omega could not prove the goal` (`omega` is introduced in the next chapter
+  for natural-number arithmetic): the arithmetic fact is false, or it
   involves multiplication of variables, or the hypothesis it needs is not in
   the context. Check the fact by hand first.
 * `simp made no progress`: none of the lemmas applied. Unfold a definition,
@@ -325,10 +376,8 @@ Work down this list. Do not skip to the last item.
 
 # Exercises
 
-*Prove.* None yet. The exercise files start in the next chapter.
-
-*Specify.* In `course/Work/Scratch.lean`, define a block that remembers the
-largest input it has seen so far:
+*Prove and state.* In `course/Work/Scratch.lean`, define a block that remembers
+the largest input it has seen so far:
 
 ```
 def runMax : Block Nat Nat Nat where
@@ -343,11 +392,16 @@ on an input for which you know the answer, and prove
 If you defined things the natural way, the step case needs only
 `rw [Block.stateAt_succ, ih]` and `rfl`.
 
-*Specify.* Change `counter` so that it counts down from a starting value and
-stops at zero. Write the function it should compute, test the function on
-two inputs, and prove the state theorem.
+*Specify from prose.* A saturating down-counter holds a `Nat` starting from
+`start`. On each cycle it takes a command: either tick down by 1 (stopping at
+0) or reload with a new value `n`. Its output is the current count. In
+`course/Work/Scratch.lean`, write an `inductive` command type and a `Block`
+from this description, run `#eval` on two input signals with `.trace`, and
+write in a comment one detail the description left open (for example, what a
+`reload` outputs in the cycle it arrives).
 
 # Checkpoint
 
-You can define a function and a block, run them, state a theorem about every
-cycle, and prove it by induction while watching the goal.
+You can define functions, structures, inductive types and blocks, run them
+with `#eval` and `decide`, state a theorem about every cycle, and prove it
+by `rfl` or by induction while watching the goal.

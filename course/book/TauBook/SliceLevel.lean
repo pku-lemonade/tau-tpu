@@ -32,7 +32,7 @@ then program the machine by hand.
 # Specify two parts of it first
 
 Read section 3 of `Machine.md`, all of it. Then read `Tau/Isa/Op.lean`,
-`Tau/Isa/Instr.lean`, and the first sixty lines of
+`Tau/Isa/Instr.lean`, and the first eighty lines of
 `Tau/SliceLevel/Machine.lean`, down to the definition of `State`. Those are
 the types: operations, instructions, traps, the state of a slice. Stop
 there.
@@ -90,6 +90,11 @@ specification: it says which programs the hardware gives no meaning to.
 Here is a machine with three slices: a memory, a vector slice, a memory. Each
 has a delay of one cycle and there is one stream in each direction.
 
+```
+──east──▶ [ 0: mem ] ──▶ [ 1: vxm ] ──▶ [ 2: mem ]
+◀─west──
+```
+
 ```lean
 def tinyMachine : Tau.Config where
   kinds := [.mem, .vxm, .mem]
@@ -118,7 +123,8 @@ Why cycle 4? Follow the word.
 * Cycle 3: it is at position 1.
 * Cycle 4: it is at position 2, where slice 2 is told to write it.
 
-That is the rule from the top of `Machine.lean`: a result computed at slice
+That is the timing rule from Machine 3.4 (also stated at the top of
+`Tau/SliceLevel/Machine.lean`): a result computed at slice
 `p` on cycle `t` can be read at slice `q` on cycle
 `t + delay + 1 + |q - p|`. Here that is 0 + 1 + 1 + 2 = 4.
 

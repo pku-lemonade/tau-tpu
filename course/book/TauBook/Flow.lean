@@ -251,7 +251,7 @@ the compiled program that `Image.decode` reads out of it.
 
 # How to work through it
 
-1. Read the top of `frontend/tau/__init__.py` and the three examples written
+1. Read the top of `frontend/tau/__init__.py` and the four examples written
    in Python. Record each and read its MLIR.
 2. Read `Tau/IR/Source.lean`. Redo the example of the two calls in your
    scratch file, with a third call.

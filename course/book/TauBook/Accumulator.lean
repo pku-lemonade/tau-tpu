@@ -92,7 +92,7 @@ specification, not the proof.
 
 # Lean you will need
 
-* `match c with` and the three constructors.
+* `match c with` and the four constructors.
 * `split`, which turns a goal containing a `match` into one goal per branch.
   Use it for `accumulator_outAt`, where every branch is then `rfl`.
 * `rw [ih]` followed by `rfl`. After rewriting with the induction hypothesis,

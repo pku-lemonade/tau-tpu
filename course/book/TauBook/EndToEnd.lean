@@ -33,7 +33,7 @@ example (lanes : Nat) (s : Source) (c : Compiled) (bufs : List (List (Word lanes
 
 In words. Take a source program and a compiled program that the checker
 accepts. Load any buffer contents into the machine and run the program on the
-machine built from shift registers, memories, sequencers and
+machine built from shift registers, memories, repeaters and
 multiply-accumulate cells. The machine does not trap, and what it leaves in
 memory is what the source program computes. And every word the source
 program pins to a cycle is issued on that cycle.

@@ -13,7 +13,8 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The checker" =>
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
-*Sources:* `compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
+*Sources:* `Tau/Docs/Compiler.md`, sections 2, 4, 5 and 7;
+`compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
 for their opening comments; `Tau/Docs/Machine.md`, section 3.4.
 
 *Specify:* `course/Specs/OnTime.lean`.
@@ -173,6 +174,13 @@ programs.
 Evaluating an expression, `Expr.denote`, is such a function. So the run on
 real words is the run on names, evaluated. Two runs that end with the same
 expressions therefore end with the same words, for every input.
+
+```
+Program ──run on names──▶ Exprs ──denote──▶ Real words
+                                               ▲
+                                               │ (same result)
+Program ───────────run on real words───────────┘
+```
 
 # The proofs
 
@@ -418,8 +426,9 @@ with `rw`.
 
 # Checkpoint
 
-`lake build Exercises.Check.Sound Exercises.Check.Passes` prints no `sorry`
-warning. Your rule agrees with the machine on the examples. You can say, in
+`lake build Exercises.Check.Sound Exercises.Check.Passes` prints only the
+three `sorry` warnings for `check_pins`, `checkKernels_pins` and
+`passes_pins`, which belong to the next chapter ("Pins"). Your rule agrees with the machine on the examples. You can say, in
 two sentences, why checking one run on names proves something about every
 input, and which property of the machine that relies on. You can say for a
 pass you have never seen which of the three ways you would specify it.

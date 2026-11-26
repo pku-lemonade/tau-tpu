@@ -13,7 +13,8 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* intermediate representation, SSA form, compiler pass,
 loop unrolling, MLIR.
 
-*Sources:* `compiler/include/tau/Dialect/TauOps.td`,
+*Sources:* `Tau/Docs/Programs.md`, sections 1 to 3;
+`compiler/include/tau/Dialect/TauOps.td`,
 `compiler/lib/Transforms/Unroll.cpp`.
 
 *Specify:* `course/Specs/Kernel.lean`, `course/Specs/Unroll.lean`.
@@ -35,7 +36,7 @@ C++.
 
 Code differs from a doc in two ways that matter to you.
 
-* *It says too much.* `Unroll.cpp` is about eighty lines, and most are about
+* *It says too much.* `Unroll.cpp` is about ninety lines, and most are about
   MLIR: values, regions, builders, a pass class. A handful say what the pass
   does to a kernel. Your first job is to find them.
 * *It never says why.* Code is exact about what it does and silent about
@@ -193,7 +194,7 @@ limit, and name the Lean definition that says the same. Then four questions
 about where the C++ and its copy differ. The file ends with what this
 exercise found in the compiler when it was first written.
 
-Afterwards answer in a comment: how many of the eighty lines are about the
+Afterwards answer in a comment: how many of the ninety lines are about the
 kernel? The C++ gives every copy of the loop body new values, and
 `Kernel.unroll` reuses the same numbers in every copy; why is that still the
 same pass, and why does `tau-check --unroll` have to compare "up to the

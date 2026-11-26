@@ -50,6 +50,13 @@ sum for row `i` is there. Nothing in the array checks this. If the
 coefficients are fed one cycle off, the array computes something else and
 does not complain.
 
+```
+       c[0]               c[1]
+        │                  │
+        ▼                  ▼
+  0 ──▶ [ cell 0: * x[0] ] ──▶ [ cell 1: * x[1] ] ──▶ out
+```
+
 This is the whole idea of tau-tpu at small scale.
 
 # Try it, slowly

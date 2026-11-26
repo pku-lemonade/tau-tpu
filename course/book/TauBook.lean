@@ -44,7 +44,7 @@ AI agent, and teaches you to read them and to judge what comes back.
 After two introductory chapters, three chapters take a small hardware
 component each, read its specification and prove what it does, so that you
 know what a proof is. One chapter sets out the method. From then on you
-write the specification first: four more components, the machine, the
+write the specification first: five more components, the machine, the
 compiler's input, two of its passes, a rule for its schedules, what it means
 to be on time, and how a program becomes numbers. Two chapters read the two
 large proofs of the development. One states the result, and one sets
