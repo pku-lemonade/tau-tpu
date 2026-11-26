@@ -32,6 +32,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
@@ -41,6 +42,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -92,8 +94,12 @@ int main(int argc, char **argv) {
 
   mlir::MLIRContext context;
   context.loadDialect<tau::TauDialect, mlir::func::FuncDialect>();
+  // Report each error with the line of the kernel it is about, and with its
+  // notes.
+  SourceMgr sourceMgr;
+  mlir::SourceMgrDiagnosticHandler diagnostics(sourceMgr, &context);
   mlir::OwningOpRef<mlir::ModuleOp> module =
-      mlir::parseSourceFile<mlir::ModuleOp>(inputFile, &context);
+      mlir::parseSourceFile<mlir::ModuleOp>(inputFile, sourceMgr, &context);
   if (!module)
     return 1;
 
