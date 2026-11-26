@@ -1,22 +1,24 @@
-# Architecture manual
+# The machine
 
-This is course material. It describes the tau-tpu chip in words and tables,
-the way an architect would hand it to someone who has to specify it, and the
-course has you write the specification from it.
+| | |
+|---|---|
+| Describes | The tau-tpu machine: its components, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
+| Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`README.md`](README.md) 5). |
+| Specified in | `Tau/Data/`, `Tau/Blocks/`, `Tau/Isa/`, `Tau/SliceLevel/`, `Tau/CellLevel/` |
+| Tables tested by | `tests/TauTest/Docs.lean`, with the rows in `course/Specs/Tables.lean` |
 
-It is not the specification, and it is not the documentation of this
-repository. The specification is the Lean code under `Tau/`, and where the
-two disagree the Lean code is right. For a description of the repository,
-read `docs/overview.md`. Like every manual, this one leaves things unsaid;
-where it is silent, the Lean code has decided. The course asks you to find
-those places.
+This doc describes the machine in words and tables, the way an architect
+hands it to someone who has to specify it. The Lean files named above are
+that specification; README 1 says how the two are kept together.
 
-Every table here is also a test. `course/Specs/Tables.lean` holds the same
-rows, and `tests/TauTest/Manual.lean` runs them on the definitions in `Tau/`.
+The machine is described twice. Section 3, the *slice-level machine*, treats
+a slice as one box that takes an instruction and gives a result some cycles
+later. Section 4, the *cell-level machine*, builds each box from the
+components of section 2. The two must behave the same.
 
 ## 1. Conventions
 
-The chip has one clock. Cycles are numbered from 0.
+The machine has one clock. Cycles are numbered from 0.
 
 A *component* has a state, takes one input in every cycle and gives one
 output in every cycle. The output during cycle `t` may depend on the input of
@@ -27,7 +29,7 @@ A table lists, for each cycle, the input and the output.
 
 A *lane* is a 32-bit value, read as a signed integer. Arithmetic on lanes
 wraps on overflow. A *word* is a fixed number of lanes side by side. The
-number of lanes is the same everywhere on a chip.
+number of lanes is the same everywhere on a machine.
 
 ## 2. Components
 
@@ -177,12 +179,12 @@ at cycle `i + j`. The product of row `i` with `x` comes out at cycle `i + n`.
 | Coefficient at cell 1 | 0 | 2 | 4 | 0 |
 | Output | 0 | 0 | 210 | 430 |
 
-## 3. The machine
+## 3. The slice-level machine
 
-### 3.1 The chip
+### 3.1 Slices
 
-A chip is a row of *slices*, numbered from position 0 in the west to the last
-position in the east. Each slice is of one of four kinds.
+A machine is a row of *slices*, numbered from position 0 in the west to the
+last position in the east. Each slice is of one of four kinds.
 
 | Kind | Name | What it does |
 |---|---|---|
@@ -191,10 +193,10 @@ position in the east. Each slice is of one of four kinds.
 | rearrangement | `sxm` | moves the lanes of a word around |
 | matrix | `mxm` | multiply-accumulate, for matrix times vector |
 
-A chip is described by the kind of slice at each position, the number of
+A machine is described by the kind of slice at each position, the number of
 streams in each direction, the number of columns a matrix slice can store,
-and one delay for each kind of slice. `chips/tau9.json` is a chip of nine
-slices: matrix, rearrangement, two memories, vector, two memories,
+and one delay for each kind of slice. `chips/tau9.json` describes a machine
+of nine slices: matrix, rearrangement, two memories, vector, two memories,
 rearrangement, matrix.
 
 ### 3.2 Streams
@@ -281,9 +283,9 @@ minimum, and, or, exclusive or, less-than (1 or 0 in each lane).
 
 ### 3.7 Traps
 
-A program that asks for something the chip cannot do makes the chip *trap*:
+A program that asks for something the machine cannot do makes it *trap*:
 it stops, and reports what went wrong, at which slice and on which cycle.
-The chip never guesses and never waits.
+The machine never guesses and never waits.
 
 | Trap | Cause |
 |---|---|
@@ -293,9 +295,9 @@ The chip never guesses and never waits.
 | wrong slice | an instruction was sent to a slice of the wrong kind |
 | two instructions | two instructions were due at one slice on one cycle |
 | no operand | a matrix slice was told to multiply before it was given a vector |
-| no slice | the program names a slice the chip does not have |
+| no slice | the program names a slice the machine does not have |
 
-### 3.8 Programs
+### 3.8 A program for the machine
 
 A program is a list of timed instructions. Each gives a slice, a cycle and an
 instruction. There are no branches and no loops.
@@ -306,10 +308,80 @@ next the address of a memory instruction, or the column of a matrix
 instruction, grows by the stride.
 
 To run a program, the memories are loaded with their starting contents, the
-chip runs for a given number of cycles, and the result is the contents of
+machine runs for a given number of cycles, and the result is the contents of
 the memories at the end.
 
-## 4. Inside a slice
+### 3.9 What a slice issues
+
+A slice *issues* a word on the cycle on which it runs an instruction that
+has a result, or one that writes a word to memory. The word is the result,
+or the word written. A matrix slice issues nothing when it loads, seeds,
+installs or multiplies; it issues its accumulator when it emits.
+
+The three slices of 3.4 again. The memory at position 0 reads address 0 on
+cycle 0 to a stream going east, the vector slice applies relu on cycle 3,
+and the memory at position 2 writes the result at address 0 on cycle 6:
+
+| Cycle | Slice | Issues |
+|---|---|---|
+| 0 | 0 | the word `a` that was at address 0 |
+| 3 | 1 | relu of `a` |
+| 6 | 2 | relu of `a`, written at address 0 |
+
+A word is issued when its instruction runs, not when it reaches a stream:
+the relu is issued on cycle 3 and is on its stream from cycle 5.
+
+### 3.10 The image
+
+A machine is not loaded with a list of instructions. Each slice is loaded with
+numbers, and reads its own entries out of them. The numbers for all the
+slices are the *image* of the program.
+
+The numbers of one slice are the count of its entries and then the entries,
+one after another. An entry does not say which slice it is for. It is
+
+    time, repeats, gap, stride, opcode, operands
+
+A stream is one number, and so is a signed integer:
+
+| Stream | Number | | Integer | Number |
+|---|---|---|---|---|
+| 0 going east | 0 | | 0 | 0 |
+| 0 going west | 1 | | 1 | 2 |
+| 3 going east | 6 | | -1 | 1 |
+| 3 going west | 7 | | 5 | 10 |
+| | | | -5 | 9 |
+
+| Opcode | Instruction | Operands |
+|---|---|---|
+| 0 | read | address, result stream |
+| 1 | write | source stream, address |
+| 2 | one-word operation | source stream, result stream, the operation |
+| 3 | two-word operation | the operation, stream `a`, stream `b`, result stream |
+| 4 | load | stream |
+| 5 | mac | column, stream |
+| 6 | emit | result stream |
+| 7 | constant | result stream, how many lanes, the lanes |
+| 8 | select | streams `m`, `a`, `b`, result stream |
+| 9 | seed | stream |
+| 10 | install | column, stream |
+| 11 | macw | column |
+
+A one-word operation is its number in the order of 3.6, from 0 for relu to
+11 for permute, and then what it takes: nothing, `k`, a signed constant, or a
+table as its length and its items. A two-word operation is its number in the
+order of 3.6, from 0 for add to 8 for less-than.
+
+| Entry | Numbers |
+|---|---|
+| on cycle 2, read address 0 to stream 0 going east | 2, 0, 0, 0, 0, 0, 0 |
+| the same, 3 more times, 3 idle cycles apart, the address growing by 1 | 2, 3, 3, 1, 0, 0, 0 |
+| on cycle 9, write stream 0 going west at address 4 | 9, 0, 0, 0, 1, 1, 4 |
+| on cycle 6, relu of stream 0 going east to stream 0 going west | 6, 0, 0, 0, 2, 0, 1, 0 |
+| on cycle 7, add 5 to every lane of stream 1 going east, to stream 1 going east | 7, 0, 0, 0, 2, 2, 2, 5, 10 |
+| on cycle 4, the constant with lanes 3 and -4 to stream 2 going west | 4, 0, 0, 0, 7, 5, 2, 6, 7 |
+
+## 4. The cell-level machine
 
 Section 3 treats a slice as one box with a delay. Inside, a slice is built
 from the components of section 2.
@@ -322,4 +394,4 @@ from the components of section 2.
 | the accumulator of a matrix slice | multiply-accumulate cells (2.3), one per lane |
 | the stored columns of a matrix slice | a second, small memory (2.5) |
 
-A chip built this way behaves exactly as section 3 says.
+A machine built this way behaves exactly as section 3 says.

@@ -20,7 +20,7 @@ Read after you have decided for yourself.
 
 4. **Do not accept.** The theorem is about a different accumulator. The file
    defines its own `accumulator` above the statement, and that one shows the
-   starting value in the cycle of the `clear` itself, which the manual says
+   starting value in the cycle of the `clear` itself, which the doc says
    it must not. `Asked` reads as if it were about `Tau.accumulator`; put the
    cursor on the name to see which one it is. A statement that names nothing
    but definitions under `Tau/` cannot be bent this way.

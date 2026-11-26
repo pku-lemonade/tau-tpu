@@ -1,8 +1,9 @@
 # The course
 
 A self-paced course in writing specifications in Lean 4, built on the
-tau-tpu development. You learn to turn an architecture manual and a compiler
-written in C++ into Lean definitions and statements. You prove a few short
+tau-tpu development. You learn to turn descriptions written in words, a compiler
+written in C++ and a frontend written in Python into Lean definitions and
+statements. You prove a few short
 things yourself, so that you know what a proof is, and learn to hand the
 long proofs to an AI agent and judge what comes back.
 
@@ -11,7 +12,7 @@ mathematics. It does not assume a course in digital design, computer
 architecture or compilers; where a term from those fields is needed, the
 chapter names it and the reading list says where to look it up.
 
-Plan for about 22 days of roughly six focused hours each. The day counts are
+Plan for about 26 days of roughly six focused hours each. The day counts are
 estimates; nobody has been timed. `Work/Log.md` is a table for your own
 times.
 
@@ -44,12 +45,13 @@ example in the book is checked when the book is built.
 
 | Place | What is in it | Who edits it |
 |---|---|---|
-| `course/architecture-manual.md` | The chip in words and tables, as an architect would write it. The source for the hardware chapters. It is not the specification and says less. | Nobody |
+| `Tau/Docs/` | The docs: the machine, programs and the compiler, in words and tables, as their designers would write them, and a README that maps them to the Lean. The source for most chapters, and what you specify from. They are not the specification and say less. | Nobody |
 | `compiler/` | The compiler in C++. The source for the compiler chapters. | Nobody |
+| `frontend/` | The frontend in Python. The source for one chapter. | Nobody |
 | `course/Specs/` | One file per thing you specify, with tests. | You write the definitions and the statements |
 | `course/Exercises/` | A few proof files with some proofs replaced by `sorry`. | You fill in the proofs |
 | `course/Work/` | Your own files: a scratch file, your questions for the architect, your claims table, your times. | You |
-| `Tau/` | The finished development. `Tau/Claims.lean` lists every main statement, and `Tau/Proofs/` holds every proof. | Nobody, except in the exercises that say to work on a branch |
+| `Tau/` | The finished development, beside its docs. `Tau/Docs/README.md` is its map, `Tau/Claims.lean` lists every main statement, and `Tau/Proofs/` holds every proof. | Nobody, except in the exercises that say to work on a branch |
 
 ## The three kinds of exercise
 
@@ -64,6 +66,9 @@ lake build Specs.Memory      # prints the same reports in a terminal
 ```
 
 There is one rule: write your definition before you open the one in `Tau/`.
+The docs are in `Tau/Docs/` and you read them first. It is the Lean
+files beside them, under `Tau/<Area>/`, that you leave closed until you have
+written your own.
 
 **State.** In the same file, under "State", write as a proposition what
 should be true of what you defined. Nothing checks a statement but your
@@ -82,15 +87,18 @@ lake build Exercises.Blocks.ShiftRegister
 The solution to `course/Exercises/X.lean` is `Tau/Proofs/X.lean`. When you
 are stuck, follow the list in the chapter "Working in Lean".
 
-Some chapters also have exercises "by hand" (writing a program for the chip)
+Some chapters also have exercises "by hand" (writing a program for the machine)
 and a larger, optional challenge.
 
 ## Without the C++ compiler
 
-Everything in Lean works without it. Four chapters run the compiler: start
-here, kernels, expressions, and the checker. Each one names a folder
-`examples/<name>/stages/` that holds what the compiler writes for that
-example, so you can read the output instead of producing it.
+Everything in Lean works without it. Six chapters run the compiler: start
+here, kernels, expressions, the checker, pins, and from Python to an image.
+The first four each name a folder `examples/<name>/stages/` that holds what
+the compiler writes for that example, so you can read the output instead of
+producing it. The last two are about what the compiler does with a pin and
+with the end of the flow, and are best read with the compiler built; their
+Lean examples and their exercises under `course/Specs/` work without it.
 
 ## Order
 
@@ -109,8 +117,10 @@ example, so you can read the output instead of producing it.
 | 15-16 | Kernels and loop unrolling | `Kernel`, `Unroll`, `ReadCpp` | `Passes/Unroll`, three proofs |
 | 17 | Expressions and simplification | `Simplify` | `Check/Simplify` |
 | 18-20 | The checker | `OnTime` | `Check/Sound`, `Check/Passes`, two proofs each |
-| 21 | The cell-level machine | a statement | none; you read the proof |
-| 22 | End to end | your claims table | `EndToEnd` |
+| 21-22 | Pins | `Pins` | `Check/Sound`, one proof; `Check/Passes`, two proofs |
+| 23-24 | From Python to an image | `Encode` | none; you read two proofs |
+| 25 | The cell-level machine | a statement | none; you read the proof |
+| 26 | End to end | your claims table | `EndToEnd` |
 | after | Extending the machine | you add features | |
 
 The book ends with a tactic reference and a reading list.
