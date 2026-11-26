@@ -15,7 +15,7 @@ overflow, SAT solver.
 
 *Read:* `Tau/Blocks/Mac.lean`, `Tau/Data/Word.lean`.
 
-*In the manual:* `course/architecture-manual.md`, sections 1 and 2.3.
+*In the doc:* `Tau/Docs/Machine.md`, sections 1 and 2.3.
 
 *Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Mac.lean`,
 `Tau/Proofs/Data/Lane.lean`.

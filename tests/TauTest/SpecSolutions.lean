@@ -27,6 +27,33 @@ open Tau Specs
 #guard passes (Tables.unroll Kernel.unroll)
 #guard passes (Tables.unrollDecisions Kernel.unroll)
 
+/-! ## Pins and the image -/
+
+/-- A solution to `course/Specs/Pins.lean`. -/
+def eventOf {V : Type} (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : Option (Event V) :=
+  let target := s.target i
+  (env.vars.lookup target.1).map fun w => ⟨t.eval i, target.2, w⟩
+
+#guard passes (Tables.pin eventOf)
+#guard passes (Tables.pinDecisions eventOf)
+
+/-- A solution to `course/Specs/Encode.lean`. -/
+def encodeEntry (e : Timed) : List Nat :=
+  match e.instr with
+  | .read addr dst => [e.time, e.repeats, e.gap, e.stride, 0, addr, dst.encode]
+  | .write src addr => [e.time, e.repeats, e.gap, e.stride, 1, src.encode, addr]
+  | i => e.time :: e.repeats :: e.gap :: e.stride :: i.encode
+
+#guard passes (Tables.numbers Track.encode encodeInt)
+#guard passes (Tables.numbersBack Track.decode decodeInt)
+#guard passes (Tables.entries encodeEntry)
+
+-- The two statements of `course/Specs/Encode.lean`, for streams.
+example (tr : Track) : Track.decode tr.encode = tr := Track.decode_encode tr
+example (n : Nat) : (Track.decode n).encode = n := by
+  simp only [Track.decode, Track.encode]
+  split <;> simp_all <;> omega
+
 /-! ## A copy of `tau-simplify` -/
 
 /-- What the pass knows while it walks a kernel: which values are now other
@@ -40,8 +67,21 @@ structure Known where
 /-- The value to use in place of `v`. -/
 def Known.use (k : Known) (v : Var) : Var := (k.alias.lookup v).getD v
 
+/-- A statement with every value it uses replaced by the value to use in its
+place. -/
+def Known.rename (k : Known) : Stmt → Stmt
+  | .load dst buf ix => .load dst buf ix
+  | .store src buf ix => .store (k.use src) buf ix
+  | .un dst op a => .un dst op (k.use a)
+  | .bin dst op a b => .bin dst op (k.use a) (k.use b)
+  | .matvec dst x buf ix n => .matvec dst (k.use x) buf ix n
+  | .affine dst x bias buf ix n => .affine dst (k.use x) (k.use bias) buf ix n
+  | .const dst xs => .const dst xs
+  | .sel dst m a b => .sel dst (k.use m) (k.use a) (k.use b)
+  | .pin t s => .pin t (k.rename s)
+
 /-- Simplify one statement. Returns what is known afterwards and the
-statement to keep, if any. -/
+statement to keep, if any. A pinned statement is always kept. -/
 def simplifyStmt (k : Known) : Stmt → Known × Option Stmt
   | .load dst buf ix => (k, some (.load dst buf ix))
   | .store src buf ix => (k, some (.store (k.use src) buf ix))
@@ -59,6 +99,11 @@ def simplifyStmt (k : Known) : Stmt → Known × Option Stmt
   | .affine dst x bias buf ix n => (k, some (.affine dst (k.use x) (k.use bias) buf ix n))
   | .const dst xs => (k, some (.const dst xs))
   | .sel dst m a b => (k, some (.sel dst (k.use m) (k.use a) (k.use b)))
+  | .pin t s =>
+    let k' := match s with
+      | .un dst .relu _ => { k with relus := dst :: k.relus }
+      | _ => k
+    (k', some (.pin t (k.rename s)))
 
 /-- Simplify a list of statements. -/
 def simplifyStmts (k : Known) : List Stmt → Known × List Stmt
@@ -89,7 +134,7 @@ def simplify (k : Kernel) : Kernel := simplifyFrom ⟨[], []⟩ k
 /-! ## The timing rule on programs -/
 
 /-- Whether the word that `(p, t, i)` computes is at the slice at `q` on cycle
-`u`, on the stream `tr`: section 3.4 of the manual. -/
+`u`, on the stream `tr`: Machine 3.4. -/
 def arrives (cfg : Config) (tr : Track) (q u : Nat) : Nat × Nat × Instr → Bool
   | (p, t, i) =>
     Tables.result i == some tr &&
@@ -123,7 +168,7 @@ def expect (rows : IO (List Row)) : IO Unit := do
 /-! ## Candidates
 
 `course/Specs/Candidates.lean` gives three definitions of each of three
-components. All pass the manual's table. The lines below say which one is
+components. All pass the doc's table. The lines below say which one is
 right and show an input that gives the other two away. -/
 
 section Candidates
@@ -147,26 +192,26 @@ def agree {σ τ ι ο : Type} [BEq ο] (a : Block σ ι ο) (b : Block τ ι ο
 #guard passes (Tables.mac Mac.candidateC)
 
 -- Shift register: B is right.
--- A treats depth 0 as depth 1; the manual does not say what depth 0 is.
--- C starts its slots at 0 whatever the reset value; the manual says they
+-- A treats depth 0 as depth 1; the doc does not say what depth 0 is.
+-- C starts its slots at 0 whatever the reset value; the doc says they
 -- hold the reset value.
 #guard passes (Tables.shiftRegisterDecisions ShiftRegister.candidateB)
 #guard !agree (ShiftRegister.candidateA 0 9) (shiftRegister 0 9) [5, 6, 7] 0
 #guard !agree (ShiftRegister.candidateC 2 9) (shiftRegister 2 9) [5, 6, 7] 0
 
 -- Accumulator: C is right.
--- A clears to 0, not to the starting value; the manual says the starting
+-- A clears to 0, not to the starting value; the doc says the starting
 -- value.
--- B shows a loaded value in the cycle of the load; the manual says the
+-- B shows a loaded value in the cycle of the load; the doc says the
 -- output is the total before the command takes effect.
 #guard passes (Tables.accumulatorDecisions Accumulator.candidateC)
 #guard !agree (Accumulator.candidateA 100) (accumulator 100) [.add 1, .clear, .hold] .hold
 #guard !agree (Accumulator.candidateB 0) (accumulator 0) [.add 4, .load 7, .hold] .hold
 
 -- MAC: A is right.
--- B adds the size of the product and loses its sign; the manual says it
+-- B adds the size of the product and loses its sign; the doc says it
 -- adds the product.
--- C loads the first value of a pair, not the product; the manual says the
+-- C loads the first value of a pair, not the product; the doc says the
 -- commands carry a pair and is silent on what load does with it.
 #guard passes (Tables.macDecisions Mac.candidateA)
 #guard !agree (Mac.candidateB 0) (mac 0) [.add (2, -3), .hold] .hold
@@ -247,7 +292,7 @@ open Specs.Tables
 
 #guard passes (readUnroll ⟨.mlir, ""⟩ ⟨.kernel, "Idx.inst"⟩ ⟨.kernel, "Stmt.inst"⟩ ⟨.mlir, ""⟩
   ⟨.limit, "Item"⟩ ⟨.kernel, "unrollLoop"⟩ ⟨.mlir, ""⟩ ⟨.kernel, "Item.unroll"⟩ ⟨.mlir, ""⟩)
-#guard passes (readDifferences (some true) (some false) (some true) 72)
+#guard passes (readDifferences (some true) (some false) (some true) 83)
 
 -- The names the answers give exist.
 #check @Idx.inst

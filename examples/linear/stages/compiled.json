@@ -54,29 +54,6 @@
   ],
   "program": [
     {
-      "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "gap": 0,
-      "op": "read",
-      "repeats": 1,
-      "slice": 5,
-      "stride": 1,
-      "time": 0
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 2,
-      "time": 2
-    },
-    {
       "op": "load",
       "slice": 0,
       "src": {
@@ -106,6 +83,16 @@
       "op": "emit",
       "slice": 0,
       "time": 9
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 2
     },
     {
       "addr": 0,
@@ -163,6 +150,19 @@
         "id": 0
       },
       "time": 20
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "gap": 0,
+      "op": "read",
+      "repeats": 1,
+      "slice": 5,
+      "stride": 1,
+      "time": 0
     },
     {
       "addr": 0,

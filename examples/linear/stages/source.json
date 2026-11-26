@@ -1,0 +1,66 @@
+{
+  "body": [
+    {
+      "base": 0,
+      "buf": 0,
+      "dst": 0,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "base": 0,
+      "buf": 2,
+      "dst": 1,
+      "n": 2,
+      "op": "matvec",
+      "stride": 0,
+      "x": 0
+    },
+    {
+      "base": 0,
+      "buf": 1,
+      "dst": 2,
+      "op": "load",
+      "stride": 0
+    },
+    {
+      "a": 1,
+      "b": 2,
+      "dst": 3,
+      "fn": "add",
+      "op": "bin"
+    },
+    {
+      "a": 3,
+      "dst": 4,
+      "fn": "requant",
+      "k": 0,
+      "op": "un"
+    },
+    {
+      "a": 4,
+      "dst": 5,
+      "fn": "relu",
+      "op": "un"
+    },
+    {
+      "a": 5,
+      "dst": 6,
+      "fn": "relu",
+      "op": "un"
+    },
+    {
+      "base": 0,
+      "buf": 3,
+      "op": "store",
+      "src": 6,
+      "stride": 0
+    }
+  ],
+  "buffers": [
+    1,
+    1,
+    2,
+    1
+  ]
+}

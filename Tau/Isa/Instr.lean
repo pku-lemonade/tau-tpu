@@ -4,7 +4,7 @@ import Tau.Blocks.Repeater
 /-!
 # Instructions and programs
 
-A tau-tpu chip is a row of slices. Between them run *streams*: tracks that
+A tau-tpu machine is a row of slices. Between them run *streams*: tracks that
 carry words east or west, one slice per cycle. An instruction tells one slice
 what to do on one cycle: which stream slots to read, what to compute, and which
 stream to put the result on.
@@ -18,6 +18,8 @@ amount. What an entry issues at each cycle is given by `Entry.dueAt` in
 `Tau/Blocks/Repeater.lean`.
 
 Terms to look up: *instruction set architecture*, *static scheduling*.
+
+Docs: Machine 3.2, 3.5 and 3.8 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -103,18 +105,23 @@ def Timed.once (slice time : Nat) (instr : Instr) : Timed := { slice, time, inst
 def Timed.entry (e : Timed) : Entry Instr :=
   ⟨e.time, e.repeats, e.gap, e.instr, Instr.bump e.stride⟩
 
-/-- A program: every instruction the chip will execute. -/
+/-- A program: every instruction the machine will execute. -/
 abbrev Program := List Timed
 
-/-- The entries of the program that are for slice `p`. -/
+/-- The instructions of the program that are for slice `p`. -/
+def Program.entriesOf (prog : Program) (p : Nat) : Program :=
+  prog.filter fun e => e.slice == p
+
+/-- The entries of the program that are for slice `p`, as its repeater takes
+them. -/
 def Program.entriesFor (prog : Program) (p : Nat) : List (Entry Instr) :=
-  (prog.filter fun e => e.slice == p).map Timed.entry
+  (prog.entriesOf p).map Timed.entry
 
 /-- The instructions that slice `p` must execute at cycle `t`. -/
 def Program.dueAt (prog : Program) (p t : Nat) : List Instr :=
   (prog.entriesFor p).filterMap fun e => e.dueAt t
 
-/-- The shape of a chip. -/
+/-- The shape of a machine. -/
 structure Config where
   /-- The kind of slice at each position, from west to east. -/
   kinds : List Kind

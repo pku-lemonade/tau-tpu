@@ -13,17 +13,27 @@
 //
 // So the instructions connected by values form *groups* whose times are all
 // fixed relative to each other. The pass works out the relative times of each
-// group and then lays the groups out one after another, in the order
-// `tau-place` emitted them. A group does not start until the previous one has
-// issued its last instruction, so everything a group reads from memory was
-// written before it starts.
+// group and then decides when each group starts.
+//
+//   * A group with a pinned instruction starts where the pin puts it. If the
+//     group has several pins they have to agree.
+//   * A group with no pin starts when every group before it, in the order
+//     `tau-place` emitted them, has issued its last instruction.
+//
+// Without pins the groups therefore run one after another, and everything a
+// group reads from memory was written before it starts. A pin can move a
+// group in front of that, so that groups overlap. The pass then makes sure
+// that what `tau-place` put in order stays in order where it matters: a word
+// of memory is read after the write before it, and written after the reads
+// and writes before it; and a matrix slice runs its instructions in the order
+// given.
 //
 // The pass fails if two instructions would be issued at one slice on one
-// cycle. `tau-place` builds groups for which that cannot happen.
+// cycle, if a pin cannot be met, or if a pin breaks that order.
 //
-// Nothing here is proved. `tau-check kernel.json scheduled.json` decides
-// whether the timed instructions compute what the kernel computes when every
-// word has a stream to itself.
+// Nothing here is proved. `tau-check placed.json scheduled.json` decides
+// whether the timed instructions compute what the placed program computes
+// and meet its pins, when every word has a stream to itself.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,6 +45,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 #include <cstdlib>
+#include <map>
 #include <set>
 
 using namespace llvm;
@@ -107,19 +118,80 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
           unusedResult |= result.use_empty();
       }
 
-      // Lay the group out to start now.
+      // Where the group starts: where its pin puts it, or now.
+      int64_t start = now;
+      Operation *pinnedBy = nullptr;
       for (Operation *op : group) {
-        int64_t time = relative[op] - first + now;
+        std::optional<int64_t> pin = tau::optIntAttr(*op, "pin");
+        if (!pin)
+          continue;
+        int64_t offset = relative[op] - first;
+        if (*pin < offset) {
+          op->emitError("pinned to cycle ")
+              << *pin << ", but it cannot be issued before cycle " << offset;
+          return signalPassFailure();
+        }
+        if (pinnedBy && start != *pin - offset) {
+          op->emitError("pinned to cycle ")
+              << *pin << ", but another pin in its group puts it on cycle "
+              << start + offset;
+          return signalPassFailure();
+        }
+        start = *pin - offset;
+        pinnedBy = op;
+      }
+
+      for (Operation *op : group) {
+        int64_t time = relative[op] - first + start;
         tau::setIntAttr(*op, "time", time);
         if (!busy.insert({tau::intAttr(*op, "slice"), time}).second) {
           op->emitError("two instructions at one slice on cycle ") << time;
           return signalPassFailure();
         }
       }
-      now += last - first + 1;
+      int64_t end = start + last - first + 1;
       // A result nobody reads is still inside its slice; let it leave.
       if (unusedResult)
-        now += chip->maxDelay() + 1;
+        end += chip->maxDelay() + 1;
+      now = std::max(now, end);
+    }
+
+    // What `tau-place` put in order must stay in order where it matters.
+    // For each word of memory: the cycle of the last write so far and of the
+    // last read or write so far. For each matrix slice: the cycle of its
+    // last instruction so far.
+    std::map<std::pair<int64_t, int64_t>, int64_t> lastWrite, lastUse;
+    std::map<int64_t, int64_t> lastMatrix;
+    for (Operation *op : instrs) {
+      int64_t slice = tau::intAttr(*op, "slice");
+      int64_t time = tau::intAttr(*op, "time");
+      StringRef name = tau::instrName(*op);
+      if (name == "read" || name == "write") {
+        std::pair<int64_t, int64_t> cell{slice, tau::intAttr(*op, "addr")};
+        const auto &before = name == "read" ? lastWrite : lastUse;
+        auto found = before.find(cell);
+        if (found != before.end() && found->second >= time) {
+          op->emitError("issued on cycle ")
+              << time << ", but the word of memory it uses is not ready "
+              << "until after cycle " << found->second
+              << "; a pin puts it too early";
+          return signalPassFailure();
+        }
+        if (name == "write")
+          lastWrite[cell] = time;
+        int64_t &use = lastUse.try_emplace(cell, time).first->second;
+        use = std::max(use, time);
+      } else if (chip->kinds[slice] == "mxm") {
+        auto found = lastMatrix.find(slice);
+        if (found != lastMatrix.end() && found->second >= time) {
+          op->emitError("issued on cycle ")
+              << time << ", but its matrix slice is busy with an earlier "
+              << "product until after cycle " << found->second
+              << "; a pin puts it too early";
+          return signalPassFailure();
+        }
+        lastMatrix[slice] = time;
+      }
     }
 
     func->setAttr("tau.cycles",

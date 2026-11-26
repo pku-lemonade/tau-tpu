@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The systolic array" =>
 *Terms to look up:* systolic array, matrix-vector product.
 
-*Source:* `course/architecture-manual.md`, section 2.8.
+*Source:* `Tau/Docs/Machine.md`, section 2.8.
 
 *Specify:* `course/Specs/SystolicArray.lean`.
 
@@ -24,7 +24,7 @@ set_option verso.code.warnLineLength 100
 
 # Specify it first
 
-Stop reading here. Open section 2.8 of the manual and
+Stop reading here. Open section 2.8 of `Machine.md` and
 `course/Specs/SystolicArray.lean`, and follow the steps at the top of the
 file. Come back when the report says that all rows agree.
 
@@ -130,7 +130,7 @@ The assumption `hc` is a timetable.
 
 # How to work through it
 
-1. Specify the array from the manual, as above.
+1. Specify the array from the doc, as above.
 2. Read the definition and redo the table above for a 3 by 3 matrix of your
    choice.
 3. Compare your statement with `systolicArray_matvec`. Its hypothesis `hc`
@@ -171,7 +171,7 @@ chapter: what it is, and how it stands.
 
 *Challenge.* A two-dimensional systolic array multiplies two matrices. Each
 cell holds a running total, passes its left input to the right and its top
-input downward, and adds their product. Write its page of the manual first:
+input downward, and adds their product. Write its section of `Machine.md` first:
 a paragraph and a table. Then define it as a block whose state is a grid,
 work out on which cycle each entry of each matrix must enter, and state that
 the totals are the matrix product.

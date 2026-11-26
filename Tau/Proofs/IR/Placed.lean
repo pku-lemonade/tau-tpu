@@ -1,6 +1,7 @@
 import Tau.IR.Placed
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
+import Tau.Proofs.IR.MemMap
 
 /-!
 # A placed program does not look at its values
@@ -22,6 +23,7 @@ variable {V W : Type}
 def PState.map (f : V → W) (st : PState V) : PState W where
   vars := st.vars.map (Prod.map id f)
   slices := st.slices.map (Slice.map f)
+  issues := st.issues.map (Issue.map f)
 
 theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (kind : Kind)
     (vars : List (Var × V)) (sl : Slice V) (i : PInstr) :
@@ -29,8 +31,12 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
       (i.exec S kind vars sl).map fun r => (r.1.map (Prod.map id f), r.2.map f) := by
   -- One case per instruction, as in `exec_map` for the machine: unfold, move
   -- the map out of each lookup (`lookup_map`), split on each check and on
-  -- what each lookup found.
-  cases i with
+  -- what each lookup found. A pinned instruction does what the instruction
+  -- inside it does.
+  induction i with
+  | pin t i ih =>
+    simp only [PInstr.exec]
+    exact ih
   | read dst addr =>
     simp only [PInstr.exec, Slice.map, List.getElem?_map]
     split
@@ -96,6 +102,17 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
     · rfl
     · cases sl.x <;> cases sl.weights[j]? <;> simp [h.mac]
 
+theorem PInstr.issues_map (f : V → W) (p : Nat) (i : PInstr) (vars : List (Var × V)) :
+    i.issues p (vars.map (Prod.map id f)) = (i.issues p vars).map (Issue.map f) := by
+  unfold PInstr.issues
+  cases i.target with
+  | none => rfl
+  | some va =>
+    simp only [lookup_map]
+    cases vars.lookup va.1 with
+    | none => rfl
+    | some w => simp [Issue.map, List.map_map, Function.comp_def]
+
 theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (st : PState V) (p : Nat) (i : PInstr) :
     (st.map f).step T cfg p i = (st.step S cfg p i).map (PState.map f) := by
@@ -112,7 +129,7 @@ theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (c
       simp only [Option.map_some, PInstr.exec_map S T f h]
       cases i.exec S kind st.vars sl with
       | none => rfl
-      | some r => simp [PState.map, List.map_set]
+      | some r => simp [PState.map, List.map_set, PInstr.issues_map]
 
 theorem PState.run_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (st : PState V) (instrs : List (Nat × PInstr)) :
@@ -133,13 +150,29 @@ theorem Placed.execute_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f)
     pl.execute T (image.map (List.map f)) =
       (pl.execute S image).map (List.map (List.map f)) := by
   unfold Placed.execute
-  have hinit : (⟨[], (State.init T pl.cfg (image.map (List.map f))).slices⟩ : PState W) =
-      (⟨[], (State.init S pl.cfg image).slices⟩ : PState V).map f := by
+  have hinit : (⟨[], (State.init T pl.cfg (image.map (List.map f))).slices, []⟩ : PState W) =
+      (⟨[], (State.init S pl.cfg image).slices, []⟩ : PState V).map f := by
     rw [State.init_map S T f h]
     rfl
   rw [hinit, PState.run_map S T f h]
-  cases PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices⟩ pl.instrs with
+  cases PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices, []⟩ pl.instrs with
   | none => rfl
   | some st => simp [PState.map, Slice.map, List.map_map]
+
+/-- The timeline of a placed program on a mapped memory image is the mapped
+timeline. -/
+theorem Placed.timelineFrom_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f)
+    (pl : Placed) (image : List (List V)) :
+    pl.timelineFrom T (image.map (List.map f)) =
+      (pl.timelineFrom S image).map (Event.map f) := by
+  unfold Placed.timelineFrom
+  have hinit : (⟨[], (State.init T pl.cfg (image.map (List.map f))).slices, []⟩ : PState W) =
+      (⟨[], (State.init S pl.cfg image).slices, []⟩ : PState V).map f := by
+    rw [State.init_map S T f h]
+    rfl
+  rw [hinit, PState.run_map S T f h]
+  cases PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices, []⟩ pl.instrs with
+  | none => rfl
+  | some st => exact filterMap_event_map f pl.map st.issues
 
 end Tau

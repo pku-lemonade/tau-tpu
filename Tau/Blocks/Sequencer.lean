@@ -11,6 +11,8 @@ the time of every instruction is fixed in the program, not decided while the
 machine runs.
 
 Terms to look up: *program counter*, *static scheduling*.
+
+Docs: Machine 2.6 (`Tau/Docs/`).
 -/
 
 namespace Tau

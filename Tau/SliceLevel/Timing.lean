@@ -11,6 +11,8 @@ slice places on a stream in a cycle". They are defined here.
 
 Nothing here changes what the machine does. The rule itself is stated in
 `Tau/Claims.lean` and proved in `Tau/Proofs/SliceLevel/Timing.lean`.
+
+Docs: Machine 3.4 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -22,7 +24,7 @@ at the start of cycle `u`. -/
 def IsRun (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat) : Prop :=
   ∀ u, u < n → step S cfg prog (st u) = .ok (st (u + 1))
 
-/-- A state has the shape of the chip: the right number of streams, every
+/-- A state has the shape of the machine: the right number of streams, every
 stream as long as the row of slices, one slice state per position, and in
 every slice a pipe as long as the delay of its kind. -/
 structure State.Shaped (cfg : Config) (s : State V) : Prop where

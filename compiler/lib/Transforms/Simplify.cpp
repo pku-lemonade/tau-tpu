@@ -6,6 +6,9 @@
 //   max(a, a)    -> a
 //   min(a, a)    -> a
 //
+// A pinned operation is never removed: its word has to be issued on its
+// cycle, so there has to be an operation to issue it.
+//
 // Tau/Check/Simplify.lean applies the same rewrites to expressions, and
 // Tau/Proofs/Check/Simplify.lean proves they keep values. This C++ code is
 // not proved. Its output is checked on every compile by tau-check.
@@ -30,7 +33,7 @@ struct ReluOfRelu : OpRewritePattern<tau::ReluOp> {
   LogicalResult matchAndRewrite(tau::ReluOp op,
                                 PatternRewriter &rewriter) const override {
     auto inner = op.getA().getDefiningOp<tau::ReluOp>();
-    if (!inner)
+    if (!inner || op.getAt())
       return failure();
     rewriter.replaceOp(op, inner.getResult());
     return success();
@@ -43,7 +46,7 @@ struct SameOperands : OpRewritePattern<OpT> {
 
   LogicalResult matchAndRewrite(OpT op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getA() != op.getB())
+    if (op.getA() != op.getB() || op.getAt())
       return failure();
     rewriter.replaceOp(op, op.getA());
     return success();

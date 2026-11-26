@@ -33,6 +33,17 @@
 // When the second condition fails for a single operation, operands are first
 // copied to scratch words in other slices.
 //
+// Pins. A pinned operation hands its pin to the instruction that issues its
+// word: the read of a load, the write of a store, the `emit` of a matrix
+// product, and otherwise the one instruction the operation becomes. The
+// instructions of a group have fixed distances in time, given by the timing
+// rule, so the pins of a group have to agree with those distances. The pass
+// works the distances out as it builds a group. A pinned operation joins a
+// group only if its pin agrees with the pins already in it. If it does not,
+// the value between the two waits in memory, which is the only place a word
+// can wait: a pinned load is read on its cycle into a scratch word, and a
+// chain ends before a pinned operation that disagrees.
+//
 // The pass records the chip, the memory map and the memory sizes on the
 // function. It does not choose cycles or streams.
 //
@@ -97,6 +108,10 @@ struct Node {
   int buf = -1;
   int64_t base = 0;
   int64_t n = 0;
+  /// The cycle the operation's word must be issued on, if it is pinned.
+  std::optional<int64_t> pin;
+  /// Where the operation is in the user's file, for error messages.
+  std::optional<Location> loc;
 };
 
 /// How a matrix-vector product gets its columns.
@@ -144,6 +159,25 @@ private:
   std::vector<bool> done;
   /// The matrix whose columns each matrix slice currently stores.
   std::map<int, Matrix> installed;
+  /// The location given to new instructions: that of the operation being
+  /// placed.
+  std::optional<Location> here;
+  /// For each value, the pin of the load that made it, until the read that
+  /// issues its word has been emitted.
+  std::vector<std::optional<int64_t>> loadPin;
+
+  /// The pin of a load, for the read that issues its word. A pin is handed
+  /// out once.
+  std::optional<int64_t> takePin(int value) {
+    std::optional<int64_t> pin = loadPin[value];
+    loadPin[value].reset();
+    return pin;
+  }
+  /// The timing rule: how many cycles after an instruction at `from` the
+  /// instruction at `to` that uses its word is issued.
+  int64_t lag(int from, int to) const {
+    return chip.delayAt(from) + 1 + std::abs(to - from);
+  }
 
   Error read();
   static int nearest(const std::vector<int> &candidates, int from);
@@ -164,8 +198,13 @@ private:
   NamedAttribute attr(StringRef name, int64_t value) {
     return builder.getNamedAttr(name, builder.getI64IntegerAttr(value));
   }
-  Value emitRead(Loc loc);
-  void emitWrite(Value value, Loc loc);
+  void setPin(Operation *op, std::optional<int64_t> pin) {
+    if (pin)
+      tau::setIntAttr(*op, "pin", *pin);
+  }
+  Value emitRead(Loc loc, std::optional<int64_t> pin = std::nullopt);
+  void emitWrite(Value value, Loc loc,
+                 std::optional<int64_t> pin = std::nullopt);
   void emitCopy(Loc from, Loc to) { emitWrite(emitRead(from), to); }
 };
 
@@ -240,10 +279,15 @@ Error Placer::read() {
       node.dst = define(op.getResult(0));
     } else if (isa<tau::ForOp>(op)) {
       return createStringError("run tau-unroll before tau-place");
+    } else if (isa<tau::CallOp>(op)) {
+      return createStringError("run tau-inline before tau-place");
     } else {
       return createStringError("cannot place operation '" +
                                op.getName().getStringRef() + "'");
     }
+    if (auto at = op.getAttrOfType<IntegerAttr>("at"))
+      node.pin = at.getInt();
+    node.loc = op.getLoc();
     nodes.push_back(std::move(node));
   }
 
@@ -253,11 +297,13 @@ Error Placer::read() {
       uses[arg].push_back(i);
 
   // A load is virtual if no store to its buffer lies between it and any use.
+  // A pinned load has one read to pin, so it is virtual only if it has one
+  // use.
   isVirtual.assign(nodes.size(), false);
   for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i) {
     if (nodes[i].kind != Node::Load)
       continue;
-    bool safe = true;
+    bool safe = !nodes[i].pin || uses[nodes[i].dst].size() == 1;
     for (int use : uses[nodes[i].dst])
       for (int j = i + 1; j < use; ++j)
         if (nodes[j].kind == Node::Store && nodes[j].buf == nodes[i].buf)
@@ -266,6 +312,7 @@ Error Placer::read() {
   }
 
   valueLoc.assign(values.size(), std::nullopt);
+  loadPin.assign(values.size(), std::nullopt);
   done.assign(nodes.size(), false);
   return Error::success();
 }
@@ -388,22 +435,24 @@ void Placer::forget(int buf) {
 Operation *Placer::make(StringRef name, ArrayRef<Value> operands,
                         ArrayRef<Type> results,
                         ArrayRef<NamedAttribute> attrs) {
-  OperationState state(func.getLoc(), name);
+  OperationState state(here ? *here : func.getLoc(), name);
   state.addOperands(operands);
   state.addTypes(results);
   state.addAttributes(attrs);
   return builder.create(state);
 }
 
-Value Placer::emitRead(Loc loc) {
-  return make("tau.i.read", {}, {word},
-              {attr("slice", loc.slice), attr("addr", loc.addr)})
-      ->getResult(0);
+Value Placer::emitRead(Loc loc, std::optional<int64_t> pin) {
+  Operation *op = make("tau.i.read", {}, {word},
+                       {attr("slice", loc.slice), attr("addr", loc.addr)});
+  setPin(op, pin);
+  return op->getResult(0);
 }
 
-void Placer::emitWrite(Value value, Loc loc) {
-  make("tau.i.write", {value}, {},
-       {attr("slice", loc.slice), attr("addr", loc.addr)});
+void Placer::emitWrite(Value value, Loc loc, std::optional<int64_t> pin) {
+  setPin(make("tau.i.write", {value}, {},
+              {attr("slice", loc.slice), attr("addr", loc.addr)}),
+         pin);
 }
 
 Error Placer::placeComputed(int index) {
@@ -433,6 +482,8 @@ Error Placer::placeComputed(int index) {
   // memory slice, copy all but one to scratch words in other slices.
   const Node &head = nodes[index];
   Member first = place(index, origin(head));
+  if (first.slice < 0)
+    return createStringError("the chip has no slice for an operation");
   std::set<int> readSlices;
   for (int attempt = 0; !admit(head, -1, first.mode, readSlices); ++attempt) {
     if (attempt >= 3)
@@ -458,24 +509,106 @@ Error Placer::placeComputed(int index) {
     if (to.slice < 0)
       return createStringError(
           "an operation needs more memory slices than the chip has");
-    emitCopy(*valueLoc[victim], to);
+    emitWrite(emitRead(*valueLoc[victim], takePin(victim)), to);
     valueLoc[victim] = to;
     readSlices.clear();
   }
   accept(first);
 
-  // Grow the chain while each result feeds the next operation directly.
+  // The cycles of the chain, counted from the first instruction of the head
+  // that takes an operand. `start` is the cycle the pins so far put that
+  // instruction on, once there is a pin.
+  std::optional<int64_t> start;
+  // The cycle on which a member's first instruction is issued, and the
+  // cycle of the instruction that issues its result. `use` is the cycle on
+  // which the word arriving from the member before it is taken. A matrix
+  // product loads its vector, takes its bias on the next cycle if it has
+  // one, then one column per cycle, and emits.
+  struct Clock {
+    int64_t first;
+    int64_t result;
+  };
+  auto clockOf = [&](const Node &node, int flight, int64_t use) -> Clock {
+    if (node.kind != Node::MatVec)
+      return {use, use};
+    bool bias = node.args.size() > 1;
+    int64_t load =
+        bias && flight == node.args[1] && flight != node.args[0] ? use - 1 : use;
+    return {load, load + (bias ? 1 : 0) + node.n + 1};
+  };
+  // The cycle on which the member takes its operand number `k`.
+  auto takes = [&](const Node &node, size_t k, Clock clock) {
+    if (node.kind != Node::MatVec)
+      return clock.result;
+    return k == 0 ? clock.first : clock.first + 1;
+  };
+  // The cycle of the read that brings a pinned load to a member.
+  auto readCycle = [&](const Member &member, size_t k, Clock clock) {
+    const Node &node = nodes[member.index];
+    return takes(node, k, clock) -
+           lag(valueLoc[node.args[k]]->slice, member.slice);
+  };
+
+  // The head. Its own pin comes first. A pinned load among its operands
+  // whose pin disagrees is read on its own cycle into a scratch word.
+  Clock clock = clockOf(head, -1, 0);
+  if (head.pin)
+    start = *head.pin - clock.result;
+  for (size_t k = 0; k < head.args.size(); ++k) {
+    int arg = head.args[k];
+    if (!loadPin[arg])
+      continue;
+    int64_t wanted = *loadPin[arg] - readCycle(first, k, clock);
+    if (!start || *start == wanted) {
+      start = wanted;
+      continue;
+    }
+    std::set<int> avoid = readSlices;
+    for (int other : head.args)
+      avoid.insert(valueLoc[other]->slice);
+    Loc to = newScratch(avoid);
+    if (to.slice < 0)
+      return createStringError(
+          "a pinned load needs more memory slices than the chip has");
+    emitWrite(emitRead(*valueLoc[arg], takePin(arg)), to);
+    valueLoc[arg] = to;
+    readSlices.insert(to.slice);
+  }
+
+  // Grow the chain while each result feeds the next operation directly, and
+  // the pins of the next operation agree with the pins so far.
   std::vector<Member> chain{first};
   while (true) {
     int next = chainNext(chain.back().index);
     if (next < 0 || nodes[next].kind == Node::Store)
       break;
+    const Node &node = nodes[next];
+    int flight = nodes[chain.back().index].dst;
     Member member = place(next, chain.back().slice);
-    if (!admit(nodes[next], nodes[chain.back().index].dst, member.mode,
-               readSlices))
+    if (member.slice < 0)
+      break;
+    Clock nextClock = clockOf(
+        node, flight, clock.result + lag(chain.back().slice, member.slice));
+    std::optional<int64_t> wanted = start;
+    bool agree = true;
+    auto pinAt = [&](int64_t pin, int64_t cycle) {
+      if (wanted && *wanted != pin - cycle)
+        agree = false;
+      wanted = pin - cycle;
+    };
+    if (node.pin)
+      pinAt(*node.pin, nextClock.result);
+    for (size_t k = 0; k < node.args.size(); ++k)
+      if (node.args[k] != flight && loadPin[node.args[k]])
+        pinAt(*loadPin[node.args[k]], readCycle(member, k, nextClock));
+    if (!agree)
+      break;
+    if (!admit(node, flight, member.mode, readSlices))
       break;
     accept(member);
     chain.push_back(member);
+    clock = nextClock;
+    start = wanted;
   }
 
   for (const Member &member : chain)
@@ -506,6 +639,7 @@ Error Placer::placeComputed(int index) {
   int flightValue = -1;
   for (const Member &member : chain) {
     const Node &node = nodes[member.index];
+    here = node.loc;
     int slice = member.slice;
     // A word needed twice by one operation is read once.
     std::map<Loc, Value> reads;
@@ -516,7 +650,7 @@ Error Placer::placeComputed(int index) {
       auto found = reads.find(loc);
       if (found != reads.end())
         return found->second;
-      return reads[loc] = emitRead(loc);
+      return reads[loc] = emitRead(loc, takePin(value));
     };
 
     if (node.kind == Node::Un) {
@@ -578,6 +712,7 @@ Error Placer::placeComputed(int index) {
           make("tau.i.emit", {state}, {word}, {attr("slice", slice)})
               ->getResult(0);
     }
+    setPin(flight.getDefiningOp(), node.pin);
     flightValue = node.dst;
     done[member.index] = true;
   }
@@ -586,10 +721,19 @@ Error Placer::placeComputed(int index) {
   // scratch word if it is needed later, or nowhere.
   int last = chain.back().index;
   int next = chainNext(last);
-  if (next >= 0 && nodes[next].kind == Node::Store) {
-    Loc target = bufLoc[nodes[next].buf];
+  Loc target;
+  bool direct = next >= 0 && nodes[next].kind == Node::Store;
+  if (direct) {
+    target = bufLoc[nodes[next].buf];
     target.addr += nodes[next].base;
-    emitWrite(flight, target);
+    // A pinned store takes the result directly only if its pin agrees.
+    int64_t written = clock.result + lag(chain.back().slice, target.slice);
+    if (nodes[next].pin && start && *start != *nodes[next].pin - written)
+      direct = false;
+  }
+  if (direct) {
+    here = nodes[next].loc;
+    emitWrite(flight, target, nodes[next].pin);
     forget(nodes[next].buf);
     done[next] = true;
   } else if (!uses[flightValue].empty()) {
@@ -628,12 +772,13 @@ Error Placer::run() {
   }
 
   // A virtual load needs no instruction of its own: its word is read from
-  // the buffer wherever its value is used.
+  // the buffer wherever its value is used, and that read takes its pin.
   for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i)
     if (nodes[i].kind == Node::Load && isVirtual[i]) {
       Loc cell = bufLoc[nodes[i].buf];
       cell.addr += nodes[i].base;
       valueLoc[nodes[i].dst] = cell;
+      loadPin[nodes[i].dst] = nodes[i].pin;
     }
 
   // New instructions go in front of the old operations, which are removed
@@ -651,20 +796,31 @@ Error Placer::run() {
     if (done[i])
       continue;
     const Node &node = nodes[i];
+    here = node.loc;
     Loc cell = node.buf >= 0 ? bufLoc[node.buf] : Loc{};
     cell.addr += node.base;
 
     if (node.kind == Node::Load) {
       if (!isVirtual[i]) {
-        // A later store would overwrite the word, so take a copy now.
+        // A later store would overwrite the word, or the load is pinned to
+        // this cycle: take a copy now.
         Loc scratch = newScratch({});
-        emitCopy(cell, scratch);
+        emitWrite(emitRead(cell, node.pin), scratch);
         valueLoc[node.dst] = scratch;
       }
     } else if (node.kind == Node::Store) {
-      if (!valueLoc[node.args[0]])
+      int arg = node.args[0];
+      if (!valueLoc[arg])
         return createStringError("a stored value was never computed");
-      emitCopy(*valueLoc[node.args[0]], cell);
+      // A pinned load stored by a pinned store: one read and one write, a
+      // fixed distance apart. If the two pins disagree, the word waits.
+      if (loadPin[arg] && node.pin &&
+          *node.pin - *loadPin[arg] != lag(valueLoc[arg]->slice, cell.slice)) {
+        Loc scratch = newScratch({});
+        emitWrite(emitRead(*valueLoc[arg], takePin(arg)), scratch);
+        valueLoc[arg] = scratch;
+      }
+      emitWrite(emitRead(*valueLoc[arg], takePin(arg)), cell, node.pin);
       forget(node.buf);
     } else if (Error e = placeComputed(i)) {
       return e;

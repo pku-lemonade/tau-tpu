@@ -7,7 +7,7 @@ import Tau.CellLevel.Machine
 /-!
 # Test: a quantized linear layer, scheduled by hand
 
-Computes `y = relu (requant (W * x + b))` with two lanes on a nine-slice chip.
+Computes `y = relu (requant (W * x + b))` with two lanes on a nine-slice machine.
 The schedule below was worked out by hand from the timing rule in
 `Tau/SliceLevel/Machine.lean`.
 -/
@@ -95,10 +95,10 @@ def compiled (prog : Program) : Compiled where
   cycles := 22
 
 -- The hand-written schedule is accepted.
-#guard check kernel sizes (compiled prog)
+#guard check (Source.ofKernel kernel) sizes (compiled prog)
 
 -- The schedule with the add one cycle early is rejected.
-#guard !check kernel sizes (compiled early)
+#guard !check (Source.ofKernel kernel) sizes (compiled early)
 
 -- A schedule that feeds the columns of W in the wrong order runs without a
 -- trap but computes something else, and is rejected.
@@ -109,7 +109,7 @@ def swapped : Program :=
     else i
 
 #guard (result swapped).isSome
-#guard !check kernel sizes (compiled swapped)
+#guard !check (Source.ofKernel kernel) sizes (compiled swapped)
 
 -- The kernel run directly on real words gives the same answer as the machine.
 #guard (kernel.run (wordSem 2)

@@ -1,20 +1,24 @@
 import Lean.Data.Json
 import Tau.Check.Passes
+import Tau.Isa.Encode
 
 /-!
 # Reading and writing JSON
 
-The compiler and the Lean tools exchange four kinds of file.
+The compiler, the frontend and the Lean tools exchange five kinds of file.
 
-* A *kernel* file: the buffer sizes and the statements of a kernel.
-* A *placed* file: the chip, the memory map and the instructions in order.
-* A *compiled* file: the chip, the memory map and the timed program.
+* A *source* file: the buffer sizes and the body of a source program. With
+  no calls in it, it is a *kernel* file.
+* A *placed* file: the machine, the memory map and the instructions in order.
+* A *compiled* file: the machine, the memory map and the timed program.
+* An *image* file: a compiled file with the program as numbers.
 * A *buffers* file: the number of lanes and the contents of every buffer, as
   signed integers.
 
-`docs/formats.md` describes the files. This module is not covered by any
-proof: a mistake here shows up as a wrong file being read, not as an unsound
-theorem.
+This module is not covered by any proof: a mistake here shows up as a wrong
+file being read, not as an unsound theorem.
+
+Docs: README 5 (`Tau/Docs/`).
 -/
 
 namespace Tau.Json
@@ -147,6 +151,10 @@ def pinstr (j : Json) : Except String (Nat × PInstr) := do
     | "install" => pure (PInstr.install (← nat j "j") (← nat j "src"))
     | "macw" => pure (PInstr.macw (← nat j "j"))
     | s => throw s!"unknown instruction '{s}'"
+  -- A pinned instruction has the cycle it must be issued on.
+  let i := match (nat j "pin").toOption with
+    | some t => PInstr.pin t i
+    | none => i
   pure (← nat j "slice", i)
 
 def placed (j : Json) : Except String Placed := do
@@ -159,7 +167,8 @@ def placed (j : Json) : Except String Placed := do
 def idx (j : Json) : Except String Idx := do
   pure ⟨← nat j "base", ← nat j "stride"⟩
 
-def stmt (j : Json) : Except String Stmt := do
+/-- A statement without its pin. -/
+def bareStmt (j : Json) : Except String Stmt := do
   match ← str j "op" with
   | "load" => pure (.load (← nat j "dst") (← nat j "buf") (← idx j))
   | "store" => pure (.store (← nat j "src") (← nat j "buf") (← idx j))
@@ -174,6 +183,14 @@ def stmt (j : Json) : Except String Stmt := do
   | "sel" => pure (.sel (← nat j "dst") (← nat j "m") (← nat j "a") (← nat j "b"))
   | s => throw s!"unknown statement '{s}'"
 
+/-- A statement. A pinned one has `at`, the cycle its word is issued on, and
+may have `every`, how far that cycle moves on each iteration of a loop. -/
+def stmt (j : Json) : Except String Stmt := do
+  let s ← bareStmt j
+  match (nat j "at").toOption with
+  | some t => pure (.pin ⟨t, natOr j "every" 0⟩ s)
+  | none => pure s
+
 def item (j : Json) : Except String Item := do
   match ← str j "op" with
   | "loop" => pure (.loop (← nat j "n") (← (← arr j "body").mapM stmt))
@@ -185,26 +202,69 @@ def kernel (j : Json) : Except String (List Nat × Kernel) := do
   let body ← (← arr j "body").mapM item
   pure (sizes, body)
 
-/-- The output of one compiler stage. A kernel comes with the sizes of its
-buffers. -/
+/-- The body of a source program: items and calls. A call has the caller's
+buffers it passes (`args`), the cycle its pins count from (`at`, 0 if left
+out), and the body of the kernel it calls. -/
+partial def sourceBody : List Json → Except String Source
+  | [] => pure .done
+  | j :: rest => do
+    let more ← sourceBody rest
+    match ← str j "op" with
+    | "call" =>
+      let callee ← sourceBody (← arr j "body")
+      pure (.call callee (← nats j "args") (natOr j "at" 0) more)
+    | _ => pure (.item (← item j) more)
+
+/-- A source file: the buffer sizes and the source program. -/
+def source (j : Json) : Except String (List Nat × Source) := do
+  let sizes ← (← arr j "buffers").mapM fun n => n.getNat?
+  pure (sizes, ← sourceBody (← arr j "body"))
+
+/-- An image file: a compiled file whose program is numbers, one list per
+slice. Returns the compiled program with nothing in it yet, and the image. -/
+def imageFile (j : Json) : Except String (Compiled × Image) := do
+  let img ← (← arr j "image").mapM fun ws => do
+    (← ws.getArr?).toList.mapM fun n => n.getNat?
+  pure ({
+    cfg := ← config (← j.getObjVal? "config")
+    memSizes := ← (← arr j "memSizes").mapM fun n => n.getNat?
+    map := ← (← arr j "map").mapM placement
+    prog := []
+    cycles := ← nat j "cycles" }, img)
+
+/-- The output of one compiler stage. A source program or a kernel comes with
+the sizes of its buffers. -/
 inductive Stage where
+  | source (sizes : List Nat) (s : Source)
   | kernel (sizes : List Nat) (k : Kernel)
   | placed (p : Placed)
   | compiled (c : Compiled)
 
-/-- Read a stage file. The kind of file is told from its fields: a kernel has
-`body`, a placed program has `instructions`, a compiled program has
-`program`. -/
+/-- Read a stage file. The kind of file is told from its fields: a source
+program or a kernel has `body`, a placed program has `instructions`, a
+compiled program has `program`, and an image has `image`. A body with a call
+in it is a source program; without one it is a kernel. An image is decoded
+(`Image.decode`) and is from then on a compiled program. -/
 def stage (j : Json) : Except String Stage := do
   if (j.getObjVal? "body").toOption.isSome then
-    let (sizes, k) ← kernel j
-    pure (.kernel sizes k)
+    let hasCall := (← arr j "body").any fun it => (str it "op").toOption == some "call"
+    if hasCall then
+      let (sizes, s) ← source j
+      pure (.source sizes s)
+    else
+      let (sizes, k) ← kernel j
+      pure (.kernel sizes k)
   else if (j.getObjVal? "instructions").toOption.isSome then
     pure (.placed (← placed j))
   else if (j.getObjVal? "program").toOption.isSome then
     pure (.compiled (← compiled j))
+  else if (j.getObjVal? "image").toOption.isSome then
+    let (c, img) ← imageFile j
+    match img.decode with
+    | some prog => pure (.compiled { c with prog := prog })
+    | none => throw "the image is not well formed"
   else
-    throw "not a kernel, placed or compiled file"
+    throw "not a source, kernel, placed, compiled or image file"
 
 /-- A buffers file: the number of lanes and, for every buffer, its words as
 lists of signed integers. -/
@@ -219,6 +279,15 @@ def ofBuffers (lanes : Nat) (bufs : List (List (List Int))) : Json :=
   Json.mkObj [
     ("lanes", Lean.toJson lanes),
     ("buffers", Lean.toJson bufs) ]
+
+/-- A timeline as JSON: for each event its cycle, its word, and for a store
+the buffer and the position. -/
+def ofTimeline (events : List (Event (List Int))) : Json :=
+  Lean.Json.arr (events.map fun e =>
+    Json.mkObj ([("time", Lean.toJson e.time), ("word", Lean.toJson e.word)] ++
+      match e.store with
+      | some (b, k) => [("buf", Lean.toJson b), ("pos", Lean.toJson k)]
+      | none => [])).toArray
 
 /-- Read and parse a JSON file. -/
 def readFile (path : String) : IO Json := do

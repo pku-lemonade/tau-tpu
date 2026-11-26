@@ -5,7 +5,9 @@ import Tau.Passes.Unroll
 
 The main result is `Kernel.exec_unroll`: running the unrolled statements does
 exactly what running the kernel does. It holds for every `Sem`, every starting
-environment, and includes the cases where the kernel fails.
+environment, and includes the cases where the kernel fails. The environment
+holds the events of the pinned statements as well as the buffers, so the
+unrolled kernel also keeps every pin: `Kernel.timeline_unroll`.
 -/
 
 namespace Tau
@@ -16,11 +18,20 @@ variable {V : Type}
 theorem Idx.eval_inst (k i : Nat) (ix : Idx) : (ix.inst k).eval i = ix.eval k := by
   simp [Idx.inst, Idx.eval]
 
+/-- A statement with its loop index fixed to `k` issues, on any iteration,
+the word the original issues on iteration `k`. -/
+theorem Stmt.target_inst (k i : Nat) (s : Stmt) : (s.inst k).target i = s.target k := by
+  induction s with
+  | pin t s ih => simpa [Stmt.inst, Stmt.target] using ih
+  | _ => simp [Stmt.inst, Stmt.target, Idx.eval_inst]
+
 /-- A statement with its loop index fixed to `k` does, on any iteration, what
 the original does on iteration `k`. -/
 theorem Stmt.exec_inst (S : Sem V) (k i : Nat) (env : Env V) (s : Stmt) :
     (s.inst k).exec S i env = s.exec S k env := by
-  cases s <;> simp [Stmt.inst, Stmt.exec, Idx.eval_inst]
+  induction s generalizing env with
+  | pin t s ih => simp [Stmt.inst, Stmt.exec, Idx.eval_inst, Stmt.target_inst, ih]
+  | _ => simp [Stmt.inst, Stmt.exec, Idx.eval_inst]
 
 /-- Running two lists of statements one after the other. -/
 theorem execStmts_append (S : Sem V) (i : Nat) (env : Env V) (a b : List Stmt) :
@@ -91,6 +102,13 @@ theorem Kernel.exec_stmts (S : Sem V) (env : Env V) (l : List Stmt) :
 theorem Kernel.run_unroll (S : Sem V) (k : Kernel) (bufs : List (List V)) :
     Kernel.run S (k.unroll.map Item.stmt) bufs = k.run S bufs := by
   unfold Kernel.run
+  rw [Kernel.exec_stmts, Kernel.exec_unroll]
+
+/-- The unrolled kernel has the same timeline as the original: every pinned
+word, on the same cycle. -/
+theorem Kernel.timeline_unroll (S : Sem V) (k : Kernel) (bufs : List (List V)) :
+    Kernel.timeline S (k.unroll.map Item.stmt) bufs = k.timeline S bufs := by
+  unfold Kernel.timeline
   rw [Kernel.exec_stmts, Kernel.exec_unroll]
 
 end Tau

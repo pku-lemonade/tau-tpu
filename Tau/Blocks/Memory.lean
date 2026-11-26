@@ -10,6 +10,8 @@ the word in the same cycle. A write takes effect from the next cycle.
 In tau-tpu a memory slice is a memory followed by a pipeline.
 
 Terms to look up: *random-access memory*, *address*, *read port*, *write port*.
+
+Docs: Machine 2.5 (`Tau/Docs/`).
 -/
 
 namespace Tau

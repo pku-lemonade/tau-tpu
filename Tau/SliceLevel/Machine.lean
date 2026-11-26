@@ -21,6 +21,8 @@ cycle `t + delay + 1 + |q - p|`, and on no other cycle. A program that reads a
 slot on the wrong cycle finds it empty, and the machine traps.
 
 The machine is written for an arbitrary type `V` of values. See `Tau/Isa/Op.lean`.
+
+Docs: Machine 3.3, 3.5 and 3.7 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -269,7 +271,7 @@ def State.memory (s : State V) : List (List V) := s.slices.map (·.words)
 memory contents. -/
 def execute (S : Sem V) (cfg : Config) (prog : Program) (n : Nat)
     (image : List (List V)) : Except Trap (List (List V)) :=
-  -- An instruction for a slice the chip does not have is a trap before the
+  -- An instruction for a slice the machine does not have is a trap before the
   -- first cycle.
   match prog.find? fun e => cfg.kinds.length ≤ e.slice with
   | some e => .error ⟨.noSlice, e.slice, e.time⟩

@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: the systolic array
 
-Source: `course/architecture-manual.md`, section 2.8.
+Source: `Tau/Docs/Machine.md`, section 2.8.
 
 The steps, which are the same in every file of this folder:
 
@@ -33,7 +33,7 @@ def systolicArray (x : List Int) : Block State (List Int) Int := todo
 
 #eval report "the systolic array" (Tables.systolicArray systolicArray)
 
--- #eval report "the systolic array, what the manual leaves open" (Tables.systolicArrayDecisions systolicArray)
+-- #eval report "the systolic array, what the doc leaves open" (Tables.systolicArrayDecisions systolicArray)
 
 /-! ## State -/
 

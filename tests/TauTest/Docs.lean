@@ -2,23 +2,23 @@ import Tau
 import Specs.Tables
 
 /-!
-# Test: the manual's tables hold of the specification
+# Test: the tables of the docs hold of the specification
 
-`course/architecture-manual.md` describes every component in words and with a table of
-outputs per cycle. `course/Specs/Tables.lean` has the same tables as tests.
+`Tau/Docs/` describes every component in words and with a table of outputs
+per cycle, and programs and pins with tables of results. `course/Specs/Tables.lean` has the same tables as tests.
 This file runs them on the definitions in `Tau/`. If the specification, the
-tables or the manual change apart, the build fails here.
+tables or the docs change apart, the build fails here.
 -/
 
-namespace TauTest.Manual
+namespace TauTest.Docs
 
 open Tau Specs
 
-/-- The memory of the manual's tables: its words given as a list. -/
+/-- The memory of the tables: its words given as a list. -/
 def memoryOf (words : List Int) : Block (Vector Int words.length) (MemIn Int) (Option Int) :=
   memory words.length ⟨words.toArray, by simp⟩
 
-/-- The systolic array of the manual's tables: vector and coefficients given
+/-- The systolic array of the tables: vector and coefficients given
 as lists. A missing coefficient counts as 0. -/
 def systolicOf (x : List Int) : Block (Vector Int x.length) (List Int) Int :=
   (systolicArray (0 : Int) (⟨x.toArray, by simp⟩ : Vector Int x.length)).mapIn
@@ -54,4 +54,23 @@ def streamOf (d : Dir) (placed : Nat → Option Int) (row : List (Option Int)) :
 #guard passes (Tables.exec exec)
 #guard passes (Tables.execDecisions exec)
 
-end TauTest.Manual
+/-- The event of a pinned statement, as Programs 5 has it: the statement has
+run and `env` is what it left. -/
+def eventOf (i : Nat) (t : Idx) (s : Stmt) (env : Env Expr) : Option (Event Expr) :=
+  (env.issue (t.eval i) (s.target i)).events.head?
+
+#guard passes (Tables.pin eventOf)
+#guard passes (Tables.pinDecisions eventOf)
+
+/-- A source program run on names: its final buffers and its pinned words. -/
+def runSource (s : Source) (bufs : List (List Expr)) :
+    Option (List (List Expr) × List (Event Expr)) :=
+  (s.exec exprSem ⟨[], bufs, []⟩).map fun env => (env.bufs, env.events)
+
+#guard passes (Tables.calls runSource)
+#guard passes (Tables.issued (issues exprSem))
+#guard passes (Tables.numbers Track.encode encodeInt)
+#guard passes (Tables.numbersBack Track.decode decodeInt)
+#guard passes (Tables.entries Timed.encode)
+
+end TauTest.Docs

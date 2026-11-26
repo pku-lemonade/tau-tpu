@@ -1,16 +1,21 @@
+import Tau.Isa.Event
+
 /-!
 # The memory map
 
-A kernel names its buffers by number. On the chip, a buffer is a run of words
+A kernel names its buffers by number. On the machine, a buffer is a run of words
 in the memory of one slice. The memory map says, for every buffer, which
 slice and which addresses. `tau-place` decides it, and every later form of
 the program carries it (`Tau/IR/Placed.lean`, `Tau/IR/Compiled.lean`).
 
 `image` turns buffer contents into the starting contents of every memory, and
 `extract` reads the buffers back out at the end. Every theorem that says a
-program computes a kernel is stated with these two.
+program computes a kernel is stated with these two. `Issue.event` says which
+buffer word a write at an address is a store to.
 
 The theorems about them are in `Tau/Proofs/IR/MemMap.lean`.
+
+Docs: Compiler 3 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -52,5 +57,16 @@ def image (map : MemMap) (memSizes : List Nat) (word : Nat → Nat → V) (fill 
 def extract (map : MemMap) (mem : List (List V)) (fill : V) : List (List V) :=
   map.map fun pl =>
     (List.range pl.size).map fun k => (mem[pl.slice]?.getD [])[pl.base + k]?.getD fill
+
+/-- The event an issue makes. A write to a buffer word is a store to that
+buffer. A write to scratch memory, which belongs to no buffer, makes no
+event. -/
+def Issue.event (map : MemMap) (x : Issue V) : Option (Event V) :=
+  match x.addr with
+  | none => some ⟨x.time, none, x.word⟩
+  | some a =>
+    match MemMap.findFrom x.slice a 0 map with
+    | some bk => some ⟨x.time, some bk, x.word⟩
+    | none => none
 
 end Tau

@@ -213,7 +213,7 @@ theorem advanceRow_length (outs : List (Option (Track × V))) (d : Dir) (id : Na
     (row : List (Option V)) : (advanceRow outs d id row).length = row.length := by
   simp [advanceRow]
 
-/-- The starting state has the shape of the chip. -/
+/-- The starting state has the shape of the machine. -/
 theorem State.init_shaped (S : Sem V) (cfg : Config) (image : List (List V)) :
     (State.init S cfg image).Shaped cfg where
   east := by simp [State.init]
@@ -291,7 +291,7 @@ theorem IsRun.shaped (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → S
   | zero => exact h0
   | succ u ih => exact (ih (by omega)).step S cfg prog _ _ (hrun u (by omega))
 
-/-- A position that has a kind is a position of the chip. -/
+/-- A position that has a kind is a position of the machine. -/
 theorem Config.kindAt_lt (cfg : Config) (p : Nat) (kind : Kind)
     (hk : cfg.kindAt p = some kind) : p < cfg.kinds.length := by
   unfold Config.kindAt at hk
@@ -299,7 +299,7 @@ theorem Config.kindAt_lt (cfg : Config) (p : Nat) (kind : Kind)
   | inl h => exact h
   | inr h => simp [List.getElem?_eq_none h] at hk
 
-/-- A shaped state has a slice state at every position of the chip. -/
+/-- A shaped state has a slice state at every position of the machine. -/
 theorem State.Shaped.slice (cfg : Config) (s : State V) (hs : s.Shaped cfg) (p : Nat)
     (kind : Kind) (hk : cfg.kindAt p = some kind) : ∃ sl, s.slices[p]? = some sl := by
   have hlt : p < s.slices.length := by

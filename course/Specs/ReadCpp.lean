@@ -31,48 +31,49 @@ namespace Specs.ReadCpp
 
 open Tau Specs Specs.Tables
 
-/-- Lines 15 to 23: the `#include` lines and `using namespace mlir`. -/
-def lines15to23 : Answer := todo
+/-- Lines 16 to 24: the `#include` lines and `using namespace mlir`. -/
+def lines16to24 : Answer := todo
 
-/-- Lines 28 to 32: `instantiate(OpT op, uint64_t k)`, which sets the base to
+/-- Lines 29 to 33: `instantiate(OpT op, uint64_t k)`, which sets the base to
 `base + stride * k` and the stride to 0. -/
-def lines28to32 : Answer := todo
+def lines29to33 : Answer := todo
 
-/-- Lines 34 to 43: `instantiate(Operation *op, uint64_t k)`, which picks out
-the four operations that have a position. -/
-def lines34to43 : Answer := todo
+/-- Lines 35 to 52: `instantiate(Operation *op, uint64_t k)`, which fills the
+iteration into a pin and picks out the four operations that have a
+position. -/
+def lines35to52 : Answer := todo
 
-/-- Lines 45 to 51: `struct UnrollPass`, its name and its description. -/
-def lines45to51 : Answer := todo
+/-- Lines 54 to 60: `struct UnrollPass`, its name and its description. -/
+def lines54to60 : Answer := todo
 
-/-- Lines 58 to 61: a `tau.for` inside a `tau.for` is an error. Lines 66 to
-69 say the same for the body. -/
-def lines58to61 : Answer := todo
+/-- Lines 67 to 70: a `tau.for` inside a `tau.for` is an error. Lines 75 to
+78 say the same for the body. -/
+def lines67to70 : Answer := todo
 
-/-- Lines 63, 65 and 70: for every `k` below `n`, for every operation of the
+/-- Lines 72, 74 and 79: for every `k` below `n`, for every operation of the
 body, make a copy and fill in `k`. -/
-def lines63and65and70 : Answer := todo
+def lines72and74and79 : Answer := todo
 
-/-- Line 64, and the argument `mapping` on line 70: an `IRMapping`, new for
+/-- Line 73, and the argument `mapping` on line 79: an `IRMapping`, new for
 every copy. -/
-def line64 : Answer := todo
-
-/-- Line 73: `loop.erase()`. -/
 def line73 : Answer := todo
 
-/-- Lines 80 to 82: `tau::createUnrollPass`. -/
-def lines80to82 : Answer := todo
+/-- Line 82: `loop.erase()`. -/
+def line82 : Answer := todo
+
+/-- Lines 89 to 91: `tau::createUnrollPass`. -/
+def lines89to91 : Answer := todo
 
 #eval report "Unroll.cpp, group by group"
-  (readUnroll lines15to23 lines28to32 lines34to43 lines45to51 lines58to61
-    lines63and65and70 line64 line73 lines80to82)
+  (readUnroll lines16to24 lines29to33 lines35to52 lines54to60 lines67to70
+    lines72and74and79 line73 line82 lines89to91)
 
 /-! ## Where the two differ
 
 Answer `some true` or `some false`. -/
 
 /-- The C++ gives the statements of each copy of the body new value names,
-and the Lean copy keeps the names. (What is line 64 for?) -/
+and the Lean copy keeps the names. (What is line 73 for?) -/
 def newNames : Option Bool := todo
 
 /-- Both the C++ and the Lean copy can be given a loop inside a loop. (Look
@@ -84,7 +85,7 @@ alone by the C++. (What does `Item.unroll` do with `.stmt s`?) -/
 def outside : Option Bool := todo
 
 /-- The scheduler is not copied in Lean. But one line of
-`compiler/lib/Target/Schedule.cpp` is the timing rule of the manual. Its
+`compiler/lib/Target/Schedule.cpp` is the timing rule of the doc. Its
 line number: -/
 def timingRuleLine : Nat := todo
 
@@ -92,7 +93,7 @@ def timingRuleLine : Nat := todo
 
 /-! ## After the reports agree
 
-The second group of lines, 34 to 43, names four operations. Until this
+The third group of lines, 35 to 52, names four operations. Until this
 exercise was written it named three, and the Lean copy named four. The one
 missing was `tau.affine`: inside a loop it kept the same position in every
 copy. The checker rejected every such program, so no wrong answer ever came

@@ -10,6 +10,8 @@ cycle.
 In tau-tpu the matrix slice has one accumulator per lane.
 
 Terms to look up: *accumulator*, *register with enable*.
+
+Docs: Machine 2.2 (`Tau/Docs/`).
 -/
 
 namespace Tau

@@ -14,12 +14,14 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
 *Sources:* `compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
-for their opening comments; `course/architecture-manual.md`, section 3.4.
+for their opening comments; `Tau/Docs/Machine.md`, section 3.4.
 
 *Specify:* `course/Specs/OnTime.lean`.
 
 *Read:* `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean`,
 `Tau/Check/Checker.lean`, `Tau/IR/Placed.lean`, `Tau/Check/Passes.lean`.
+Leave out what these files say about pins, events and timelines: the next
+chapter is about them.
 
 *Proofs:* `Tau/Proofs/Check/Sound.lean` and `Tau/Proofs/Check/Passes.lean`:
 four short ones are exercises. `Tau/Proofs/SliceLevel/Map.lean`,
@@ -30,15 +32,17 @@ four short ones are exercises. `Tau/Proofs/SliceLevel/Map.lean`,
 
 # The problem
 
-The compiler has five passes. `tau-simplify` and `tau-unroll` rewrite the
-kernel. You have seen a Lean copy of `tau-unroll`, and the rewrites that
-`tau-simplify` makes. The other three are the back
-end: `tau-place` decides where every buffer lives and which slice runs each
-operation, `tau-schedule` decides the cycle of every instruction, and
-`tau-route` decides on which stream each word travels. Read
-the comment at the top of each file in `compiler/lib/Target/`. Together they
-are a few hundred lines of heuristics, and they will change. Proving them
-correct would be a large project that had to be redone with every change.
+The compiler has eight passes. `tau-inline`, `tau-simplify` and `tau-unroll`
+rewrite the kernel. You have seen a Lean copy of `tau-unroll`, and the
+rewrites that `tau-simplify` makes; `tau-inline` comes two chapters on. The
+next three are the back end: `tau-place` decides where every buffer lives and
+which slice runs each operation, `tau-schedule` decides the cycle of every
+instruction, and `tau-route` decides on which stream each word travels. The
+last two, `tau-slice` and `tau-fold`, put the result in the shape the machine is
+loaded with. Read the comment at the top of each file in
+`compiler/lib/Target/`. Together they are several hundred lines of
+heuristics, and they will change. Proving them correct would be a large
+project that had to be redone with every change.
 
 There is another way. Do not prove the compiler. Check each program it
 produces, and prove the checker. This is called _translation validation_.
@@ -49,14 +53,22 @@ produces, and prove the checker. This is called _translation validation_.
 
 {docstring Tau.check}
 
-The checker runs the machine on the compiled program and runs the kernel,
-both on names. Each run ends with an expression for every word of every
-buffer. If the expressions agree after simplification, the program is
+The checker runs the machine on the compiled program and runs the source
+program, both on names. Each run ends with an expression for every word of
+every buffer. If the expressions agree after simplification, the program is
 accepted.
+
+A _source program_ is a kernel that may call other kernels. Until the chapter
+"From Python to an image" every program here is a plain kernel, and
+`Source.ofKernel` makes a source program of it.
+
+Each run also gives a timeline, and `check` compares the two. A program with
+no pins has an empty timeline, so in this chapter that half of the check is
+always satisfied. The next chapter is about it.
 
 # On the smallest example
 
-Take `tinyChip`, `copyProgram` and `lateProgram` from the chapter on the
+Take `tinyMachine`, `copyProgram` and `lateProgram` from the chapter on the
 slice-level machine, and `reluKernel` from the chapter on kernels. To follow
 along, put those definitions and the ones below in one file under
 `course/Work/`.
@@ -75,7 +87,7 @@ and buffer 1 at slice 2, each one word long.
 
 ```lean
 def tinyCompiled (prog : Program) (cycles : Nat) : Compiled where
-  cfg := tinyChip
+  cfg := tinyMachine
   memSizes := [1, 0, 1]
   map := [⟨0, 0, 1⟩, ⟨2, 0, 1⟩]
   prog := prog
@@ -100,7 +112,7 @@ Both say: buffer 0 ends as it started, and buffer 1 ends holding the word
 that started in buffer 0. They agree, so:
 
 ```lean
-example : check copyKernel [1, 1] (tinyCompiled copyProgram 5) = true := by
+example : check (Source.ofKernel copyKernel) [1, 1] (tinyCompiled copyProgram 5) = true := by
   rfl
 ```
 
@@ -110,7 +122,7 @@ The late program traps, so its run produces nothing and it is rejected:
 example : machineExprs (tinyCompiled lateProgram 6) = none := by
   rfl
 
-example : check copyKernel [1, 1] (tinyCompiled lateProgram 6) = false := by
+example : check (Source.ofKernel copyKernel) [1, 1] (tinyCompiled lateProgram 6) = false := by
   rfl
 ```
 
@@ -119,7 +131,7 @@ that applies `relu`, the copy program is rejected, because the expressions
 differ:
 
 ```lean
-example : check reluKernel [1, 1] (tinyCompiled copyProgram 5) = false := by
+example : check (Source.ofKernel reluKernel) [1, 1] (tinyCompiled copyProgram 5) = false := by
   rfl
 ```
 
@@ -132,18 +144,18 @@ whatever the machine does with a program, the checker sees.
 The checker ran the machine once, on names. The theorem is about all inputs:
 
 ```lean
-example (k : Kernel) (c : Compiled) (bufs : List (List (Word 4)))
-    (h : check k (bufs.map List.length) c = true) :
+example (s : Source) (c : Compiled) (bufs : List (List (Word 4)))
+    (h : check s (bufs.map List.length) c = true) :
     ∃ mem out,
       execute (wordSem 4) c.cfg c.prog c.cycles (c.image bufs Word.zero) = .ok mem ∧
-      k.run (wordSem 4) bufs = some out ∧
+      s.run (wordSem 4) bufs = some out ∧
       extract c.map mem Word.zero = out :=
-  check_sound (wordSem 4) (wordSem_lawful 4) k c bufs Word.zero h
+  check_sound (wordSem 4) (wordSem_lawful 4) s c bufs Word.zero h
 ```
 
 Read the conclusion in three parts. The machine, started from memory that
 holds the buffers `bufs`, finishes with some memory `mem` and no trap. The
-kernel on the same buffers finishes with some `out`. And the buffers read
+source program on the same buffers finishes with some `out`. And the buffers read
 back out of `mem` are `out`.
 
 What bridges one run and all inputs is the observation from the chapter on
@@ -155,7 +167,8 @@ respects the operations.
 
 Then running the machine and applying `f` to the result is the same as
 applying `f` first and running the machine. That is `execute_map`, and
-`Kernel.run_map` says the same of kernels.
+`Kernel.run_map` and `Source.run_map` say the same of kernels and of source
+programs.
 
 Evaluating an expression, `Expr.denote`, is such a function. So the run on
 real words is the run on names, evaluated. Two runs that end with the same
@@ -170,8 +183,8 @@ function commutes with `f`. Most are a case split followed by `simp`. Proofs
 about real systems often look like this: long, shallow, and shaped exactly
 like the code.
 
-`Tau/Proofs/Check/Sound.lean` then assembles the theorem, in three lemmas of a
-few lines each and one that puts them together.
+`Tau/Proofs/Check/Sound.lean` then assembles the theorem, in a few lemmas of
+a few lines each and one that puts them together.
 
 You are not asked to write `execute_map`. It is the kind of proof an agent
 does well: no idea in it is new after the first case, and Lean checks every
@@ -182,7 +195,7 @@ wrong from that day on.
 
 # Checking each pass on its own
 
-`check` compares the finished program with the kernel. That covers all five
+`check` compares the finished program with the source. That covers all eight
 passes at once, so when it rejects it does not say which pass was wrong. And
 it is not the usual way to say what a pass must do. The usual specification
 of a compiler pass is: the output computes what the input computes.
@@ -192,16 +205,23 @@ So the compiler writes a file after every pass, and
 output of the pass with its input, in the same way as `check`: run both sides
 on names and compare the expressions.
 
-A program takes three forms on the way. A kernel you know. `tau-place`
+A program takes four forms on the way. A source program is a kernel with
+calls, and `tau-inline` makes a kernel of it. A kernel you know. `tau-place`
 produces instructions in order, with slices and addresses but no cycles and
 no streams; this form and its meaning are in `Tau/IR/Placed.lean`:
 
 {docstring Tau.Placed}
 
-`tau-schedule` and `tau-route` both produce a `Compiled` program. The first
-gives every word a stream to itself, on a chip with as many streams as that
-takes, so that the schedule can be checked before any stream is shared. The
-second fits the words onto the streams the chip has.
+`tau-schedule` and the three passes after it all produce a `Compiled`
+program. `tau-schedule` gives every word a stream to itself, on a machine with
+as many streams as that takes, so that the schedule can be checked before any
+stream is shared. `tau-route` fits the words onto the streams the machine has.
+`tau-slice` and `tau-fold` change how the same program is written down, and
+the chapter "From Python to an image" says how.
+
+`tau-inline`, source program to kernel:
+
+{docstring Tau.checkInlined}
 
 `tau-simplify` and `tau-unroll`, kernel to kernel:
 
@@ -215,7 +235,8 @@ second fits the words onto the streams the chip has.
 
 {docstring Tau.checkScheduled}
 
-`tau-route`, compiled program to compiled program:
+`tau-route`, `tau-slice` and `tau-fold`, compiled program to compiled
+program:
 
 {docstring Tau.checkRouted}
 
@@ -235,20 +256,24 @@ example (pl : Placed) (c : Compiled) (bufs : List (List (Word 4)))
 In words: the placed program can be carried out, the machine runs the timed
 program without a trap, and the two end with the same buffers.
 
-`passes_sound` chains the five theorems. If every pass is accepted, the
-finished program computes the kernel, which is the conclusion of
+`passes_sound` chains the eight theorems. If every pass is accepted, the
+finished program computes the source, which is the conclusion of
 `check_sound`.
 
-Run the compiler on an example and check the five passes in order. `tau-check`
-takes the input of a pass and its output. Each line prints `ACCEPT`.
+Run the compiler on an example and check the eight passes in order.
+`tau-check` takes the input of a pass and its output. Each line prints
+`ACCEPT`.
 
 ```
 compiler/build/bin/tauc examples/residual/kernel.mlir -o out
+lake exe tau-check out/source.json out/kernel.json
 lake exe tau-check out/kernel.json out/simplified.json
 lake exe tau-check out/simplified.json out/unrolled.json
 lake exe tau-check out/unrolled.json out/placed.json
 lake exe tau-check out/placed.json out/scheduled.json
-lake exe tau-check out/scheduled.json out/compiled.json
+lake exe tau-check out/scheduled.json out/routed.json
+lake exe tau-check out/routed.json out/sliced.json
+lake exe tau-check out/sliced.json out/compiled.json
 ```
 
 Without the compiler, use `examples/residual/stages` in place of `out`.
@@ -277,7 +302,7 @@ compiler, once for every pass.
   What gets proved: an output that meets the rule computes what the input
   computes. What it costs: the proof is hard, and the rule must be complete.
 
-tau-tpu has a copy of one pass, `tau-unroll`, and a check for all five. It
+tau-tpu has a copy of one pass, `tau-unroll`, and a check for all eight. It
 has no rule. A copy fits a pass that is small, has one right output, and
 rarely changes. A check fits a pass whose output is one of many right
 answers, chosen by heuristics that will change: the check does not care how
@@ -296,27 +321,29 @@ it against the machine.
 2. Read the statements of `execute_map` and `Kernel.run_map`, and the proof
    of one case of `exec_map`, in `Tau/Proofs/SliceLevel/Map.lean`. Every
    other case is the same.
-3. In `Exercises/Check/Sound.lean`, read the statements of the three lemmas
-   that are given: `Kernel.run_of_exprs`, `execute_of_exprs` and
-   `denote_of_sameExprs`. Then prove `check_sound` from them, and
-   `check_safe`.
+3. In `Exercises/Check/Sound.lean`, read the statements of the four lemmas
+   that are given: `agree_exprs`, `Source.run_of_exprs`, `execute_of_exprs`
+   and `denote_of_sameExprs`. Then prove `check_sound` from them, and
+   `check_safe`. Leave `check_pins` for the next chapter.
 4. Read `Tau/IR/Placed.lean` and `Tau/Check/Passes.lean`. In
    `Exercises/Check/Passes.lean`, prove `checkKernels_sound` and
    `passes_sound`.
-5. Run the five per-pass commands above on an example.
+5. Run the eight per-pass commands above on an example.
 6. Read the opening comments of `Place.cpp`, `Schedule.cpp` and `Route.cpp`,
-   and section 3.4 of the manual. Specify the rule in
+   and section 3.4 of `Machine.md`. Specify the rule in
    `course/Specs/OnTime.lean`.
 7. Do the exercise "Choose".
 
 # Lean you will need
 
 * `unfold check at h` unfolds in the hypothesis `h`, not in the goal.
-* `cases hx : e with` splits on `e` and records which case you are in as
-  `hx`. When a check accepted, both of its runs succeeded; the cases in which
-  one failed are closed by `simp [hx] at h`.
-* `obtain ⟨mem, hrun, hx⟩ := lemma ...` takes apart what a lemma of the form
-  "there is a `mem` such that ..." gives.
+* `simp only [Bool.and_eq_true] at h` turns a hypothesis that says
+  `(a && b) = true` into one that says `a = true ∧ b = true`. Its two parts
+  are then `h.1` and `h.2`.
+* `obtain ⟨a, b, ha, hb, hab⟩ := agree_exprs h` takes apart what a lemma of
+  the form "there are `a` and `b` such that ..." gives. When a check
+  accepted, both of its runs succeeded, and `agree_exprs` hands you the two
+  tables and the fact that they are the same after simplifying.
 * `refine ⟨mem, _, hrun, hker, ?_⟩` supplies a five-part answer in which the
   second part is to be worked out by Lean and the last is left as the new
   goal.
@@ -331,16 +358,18 @@ prove it. Then answer: which of the other six traps does your rule not
 exclude, and what does a program that passes your rule still have to satisfy
 to compute what the placed program computes?
 
-*Choose.* For each of the five passes of tau-tpu, say which of the three ways
-you would use if you were starting again, and why. Then do the same for five
-passes tau-tpu does not have: constant folding, removal of stores that are
-never read, a register allocator, a scheduler that calls an integer-program
-solver, and an encoder that turns instructions into bits. For the encoder,
-what is the property, and is it about one pass or about two? Then read
+*Choose.* For each of the eight passes of tau-tpu, say which of the three
+ways you would use if you were starting again, and why. Then do the same for
+four passes tau-tpu does not have, constant folding, removal of stores that
+are never read, a register allocator, a scheduler that calls an
+integer-program solver, and for one step it has and a later chapter covers:
+the encoder that turns the finished program into numbers. For the encoder,
+what is the property, and is it about one function or about two? Then read
 `course/Specs/ChooseAnswers.md` and note where you disagree.
 
 *Prove.* `check_sound` and `check_safe` in `Exercises/Check/Sound.lean`;
-`checkKernels_sound` and `passes_sound` in `Exercises/Check/Passes.lean`.
+`checkKernels_sound` and `passes_sound` in `Exercises/Check/Passes.lean`. The
+three proofs about pins in those files belong to the next chapter.
 
 *Claims.* Add to `course/Work/Claims.md` a row for your rule and a row for what
 it does not cover.
@@ -374,13 +403,14 @@ machine.
 
 # Hints
 
-For `check_sound`: follow the outline. After the two `cases`, the three given
-lemmas supply the machine's run, the kernel's run, and the equation between
-the two tables.
+For `check_sound`: follow the outline. `agree_exprs`, applied to the second
+half of `h`, gives the two tables. The other three given lemmas supply the
+machine's run, the source program's run, and the equation between the two
+tables.
 
 For `checkKernels_sound`: the same with a kernel on both sides.
 
-For `passes_sound`: `obtain` the conclusion of each of the five theorems.
+For `passes_sound`: `obtain` the conclusion of each of the eight theorems.
 Two neighbouring theorems speak about the same run in the middle, so their
 results are equal: `Option.some.inj (h.symm.trans h')` for a run that gives
 `some`, `Except.ok.inj` for one that gives `.ok`. Then chain the equations

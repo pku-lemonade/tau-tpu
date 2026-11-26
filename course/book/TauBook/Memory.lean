@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Memory" =>
 *Terms to look up:* random-access memory, address, read port, write port.
 
-*Source:* `course/architecture-manual.md`, section 2.5.
+*Source:* `Tau/Docs/Machine.md`, section 2.5.
 
 *Specify:* `course/Specs/Memory.lean`.
 
@@ -24,7 +24,7 @@ set_option verso.code.warnLineLength 100
 
 # Specify it first
 
-Stop reading here. Open section 2.5 of the manual and
+Stop reading here. Open section 2.5 of `Machine.md` and
 `course/Specs/Memory.lean`, and follow the steps at the top of the file.
 Come back when the report says that all rows agree.
 
@@ -92,7 +92,7 @@ there.
 
 # How to work through it
 
-1. Specify the memory from the manual, as above.
+1. Specify the memory from the doc, as above.
 2. Read `Tau/Blocks/Memory.lean`. Evaluate `lastWrite` on a signal of your
    own, including one with no write to the address.
 3. Compare your statement with `memory_outAt_read`. Did you need a function
@@ -113,7 +113,7 @@ reads come back one cycle later, by putting a pipeline of depth one behind
 this one. You will need a way to chain two blocks; write it for this one
 case. State its read theorem. Then say, in a comment, what a read returns if
 the same address is written on the cycle in between, and check your claim by
-running your definition. The manual would have to say this too.
+running your definition. The doc would have to say this too.
 
 *Prove.* `memory_outAt_read` in `Exercises/Blocks/Memory.lean`.
 

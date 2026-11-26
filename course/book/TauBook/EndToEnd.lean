@@ -10,9 +10,8 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "End to end" =>
-*Read:* `Tau/Claims.lean`; `tests/TauTest/Axioms.lean`; `docs/overview.md`;
-the table under "What is proved" in the repository's `README.md`, after you
-have finished your own.
+*Read:* `Tau/Claims.lean`; `tests/TauTest/Axioms.lean`; `Tau/Docs/README.md`,
+sections 3 and 4, after you have finished your own.
 
 *Proofs:* `Tau/Proofs/EndToEnd.lean`. All of them are exercises, and each is
 a few lines.
@@ -22,24 +21,27 @@ a few lines.
 # The theorem
 
 ```lean
-example (lanes : Nat) (k : Kernel) (c : Compiled) (bufs : List (List (Word lanes)))
-    (h : check k (bufs.map List.length) c = true) :
+example (lanes : Nat) (s : Source) (c : Compiled) (bufs : List (List (Word lanes)))
+    (h : check s (bufs.map List.length) c = true) :
     ∃ mem out,
       cellExecute c.cfg c.prog c.cycles (c.image bufs Word.zero) = .ok mem ∧
-      k.run (wordSem lanes) bufs = some out ∧
-      extract c.map mem Word.zero = out :=
-  end_to_end lanes k c bufs h
+      s.run (wordSem lanes) bufs = some out ∧
+      extract c.map mem Word.zero = out ∧
+      s.timeline (wordSem lanes) bufs ⊆ c.timeline (wordSem lanes) bufs Word.zero :=
+  end_to_end lanes s c bufs h
 ```
 
-In words. Take a kernel and a compiled program that the checker accepts. Load
-any buffer contents into the chip and run the program on the machine built
-from shift registers, memories, sequencers and multiply-accumulate cells. The
-machine does not trap, and what it leaves in memory is what the kernel
-computes.
+In words. Take a source program and a compiled program that the checker
+accepts. Load any buffer contents into the machine and run the program on the
+machine built from shift registers, memories, sequencers and
+multiply-accumulate cells. The machine does not trap, and what it leaves in
+memory is what the source program computes. And every word the source
+program pins to a cycle is issued on that cycle.
 
-The proof is three lines. Each layer did its part: the checker is sound for
-the slice-level machine, the cell-level machine equals the slice-level
-machine, and real words obey the simplifier's laws.
+The proof is a few lines. Each layer did its part: the checker is sound for
+the slice-level machine, in what is computed and in when; the cell-level
+machine equals the slice-level machine; and real words obey the simplifier's
+laws.
 
 # How to work through it
 
@@ -63,10 +65,18 @@ Being exact about the limits of a theorem is part of the skill.
 
 * It says nothing about the C++ compiler. If the compiler is wrong, its
   output is rejected. The theorem is about accepted programs only.
+* It says nothing about Python. The source program is what the frontend
+  recorded on one run. That the record is what the author of the Python file
+  meant is tested on examples and not stated anywhere.
+* Its last line is about the slice-level machine. The cell-level machine is
+  proved to end with the same memory. That it issues the same words on the
+  same cycles is not stated.
+* A pin names a word and a cycle. The theorem does not say which slice
+  issues the word.
 * It trusts the code that reads JSON files into Lean values. If that code
   misreads a file, the checker checks the wrong program.
-* It trusts the statement. `Kernel.run`, `cellExecute`, `extract` and
-  `Compiled.image` are definitions somebody wrote. Read them and decide
+* It trusts the statement. `Source.run`, `Source.timeline`, `cellExecute`,
+  `extract` and `Compiled.image` are definitions somebody wrote. Read them and decide
   whether they mean what the sentence above claims.
 * It trusts the operations. `Lane.requant` is whatever
   `Tau/Data/Word.lean` says it is. Nothing checks that against an intention.
@@ -84,9 +94,9 @@ Being exact about the limits of a theorem is part of the skill.
 *Claims.* Bring `course/Work/Claims.md` up to date: one row for everything
 you defined, stated, had proved, tested or decided in this course. Then
 compare it with `Tau/Claims.lean`, which has every main statement of the
-development as a named proposition, and with the table under "What is
-proved" in `README.md`, which also says what is not claimed. Which rows of
-that table did you not think of? The row about `kernel.json` is one that
+development as a named proposition, and with the table in section 4 of `Tau/Docs/README.md`,
+which also says what is not claimed. Which rows of
+that table did you not think of? The row about `source.json` is one that
 most people miss.
 
 *State.* Write one page, for someone who has not taken this course, that says

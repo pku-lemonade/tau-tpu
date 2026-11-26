@@ -47,3 +47,12 @@ import Tau.Blocks.Repeater
 import Tau.Proofs.Blocks.Repeater
 import Tau.Claims
 import Tau.Proofs.Claims
+import Tau.Isa.Event
+import Tau.Isa.Encode
+import Tau.SliceLevel.Issues
+import Tau.IR.Source
+import Tau.Proofs.Data.List
+import Tau.Proofs.SliceLevel.Issues
+import Tau.Proofs.IR.Source
+import Tau.Proofs.IR.Compiled
+import Tau.Proofs.Isa.Encode

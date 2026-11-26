@@ -72,16 +72,19 @@ bool isBinaryKernelOp(mlir::Operation &op);
 bool isRearrangement(llvm::StringRef name);
 
 //===----------------------------------------------------------------------===//
-// Files for the Lean tools (docs/formats.md)
+// Files for the Lean tools (Tau/Docs/README.md, section 5)
 //===----------------------------------------------------------------------===//
 
-/// A kernel file. Valid on a function before `tau-place`.
+/// A source or kernel file. Valid on a function before `tau-place`. With a
+/// `tau.call` in the function the file is a source file; the kernels it
+/// calls are looked up in the function's module.
 llvm::Expected<llvm::json::Value> emitKernel(mlir::func::FuncOp func);
 
 /// A placed file. Valid after `tau-place`.
 llvm::Expected<llvm::json::Value> emitPlaced(mlir::func::FuncOp func);
 
-/// A compiled file. Valid after `tau-schedule`.
+/// A compiled file. Valid after `tau-schedule`, and after `tau-slice`, when
+/// it is written from the entries.
 ///
 /// With `idealRouting`, the streams chosen by `tau-route` are ignored (they
 /// need not exist yet): every travelling word gets a stream of its own and
@@ -89,6 +92,10 @@ llvm::Expected<llvm::json::Value> emitPlaced(mlir::func::FuncOp func);
 /// the schedule without testing the routing.
 llvm::Expected<llvm::json::Value> emitCompiled(mlir::func::FuncOp func,
                                                bool idealRouting);
+
+/// An image file: the entries of every slice as numbers. Valid after
+/// `tau-slice`.
+llvm::Expected<llvm::json::Value> emitImage(mlir::func::FuncOp func);
 
 } // namespace tau
 

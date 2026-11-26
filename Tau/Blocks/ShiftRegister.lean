@@ -12,6 +12,8 @@ slice `n` hops away exactly `n` cycles later. That fact is
 `shiftRegister_outAt` in `Tau/Proofs/Blocks/ShiftRegister.lean`.
 
 Terms to look up: *flip-flop*, *register*, *shift register*.
+
+Docs: Machine 2.1 (`Tau/Docs/`).
 -/
 
 namespace Tau

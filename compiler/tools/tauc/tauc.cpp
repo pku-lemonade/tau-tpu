@@ -5,16 +5,23 @@
 // Runs the passes in order and writes what each one produced, so that each
 // can be checked on its own:
 //
-//   kernel.json      the kernel as the user wrote it
+//   source.json      the program as written, calls and all
+//   kernel.json      after tau-inline     (a kernel)
 //   simplified.json  after tau-simplify   (a kernel)
 //   unrolled.json    after tau-unroll     (a kernel)
 //   placed.json      after tau-place      (instructions in order)
 //   scheduled.json   after tau-schedule   (timed; one stream per word)
-//   compiled.json    after tau-route      (the finished program)
+//   routed.json      after tau-route      (timed, on the chip's streams)
+//   sliced.json      after tau-slice      (entries, slice by slice)
+//   compiled.json    after tau-fold       (the finished program)
+//   image.json       the finished program as numbers
 //
-// Check any of them against the kernel:
+// The program is the last function of the file. The functions before it are
+// kernels it may call.
 //
-//   tau-check out/kernel.json out/placed.json
+// Check any of them against the one before, or against the source:
+//
+//   tau-check out/source.json out/image.json
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,15 +96,27 @@ int main(int argc, char **argv) {
   if (!module)
     return 1;
 
-  auto funcs = module->getOps<mlir::func::FuncOp>();
-  if (funcs.empty() || std::next(funcs.begin()) != funcs.end())
-    return fail("expected exactly one function");
-  mlir::func::FuncOp func = *funcs.begin();
+  // The program is the last function.
+  auto program = [&]() -> mlir::func::FuncOp {
+    mlir::func::FuncOp last;
+    for (mlir::func::FuncOp func : module->getOps<mlir::func::FuncOp>())
+      last = func;
+    return last;
+  };
+  if (!program())
+    return fail("expected at least one function");
 
   if (std::error_code ec = sys::fs::create_directories(outputDir))
     return fail("cannot create " + outputDir + ": " + ec.message());
 
   // Run one pass and show the result if asked.
+  auto show = [&](StringRef name) {
+    if (printMLIR) {
+      outs() << "// after " << name << "\n";
+      module->print(outs());
+      outs() << "\n";
+    }
+  };
   auto run = [&](StringRef name, std::unique_ptr<mlir::Pass> pass) {
     mlir::PassManager manager(&context);
     manager.addNestedPass<mlir::func::FuncOp>(std::move(pass));
@@ -105,14 +124,24 @@ int main(int argc, char **argv) {
       errs() << "tauc: " << name << " failed\n";
       return false;
     }
-    if (printMLIR) {
-      outs() << "// after " << name << "\n";
-      module->print(outs());
-      outs() << "\n";
-    }
+    show(name);
     return true;
   };
 
+  if (!write("source.json", tau::emitKernel(program())))
+    return 1;
+
+  // tau-inline is a pass on the module: it removes the kernels it copies in.
+  {
+    mlir::PassManager manager(&context);
+    manager.addPass(tau::createInlinePass());
+    if (mlir::failed(manager.run(*module))) {
+      errs() << "tauc: tau-inline failed\n";
+      return 1;
+    }
+    show("tau-inline");
+  }
+  mlir::func::FuncOp func = program();
   if (!write("kernel.json", tau::emitKernel(func)))
     return 1;
 
@@ -134,7 +163,16 @@ int main(int argc, char **argv) {
     return 1;
 
   if (!run("tau-route", tau::createRoutePass()) ||
-      !write("compiled.json", tau::emitCompiled(func, /*idealRouting=*/false)))
+      !write("routed.json", tau::emitCompiled(func, /*idealRouting=*/false)))
+    return 1;
+
+  if (!run("tau-slice", tau::createSlicePass()) ||
+      !write("sliced.json", tau::emitCompiled(func, /*idealRouting=*/false)))
+    return 1;
+
+  if (!run("tau-fold", tau::createFoldPass()) ||
+      !write("compiled.json", tau::emitCompiled(func, /*idealRouting=*/false)) ||
+      !write("image.json", tau::emitImage(func)))
     return 1;
   return 0;
 }

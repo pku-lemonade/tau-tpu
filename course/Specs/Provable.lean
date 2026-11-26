@@ -43,7 +43,7 @@ wrong on some input. -/
 /-! ## 2. Make sizes parameters
 
 `shiftRegisterButOne n reset` behaves as a shift register of depth `n` at
-every depth but one. The manual's table, at depths 1 and 2, will not find
+every depth but one. The doc's table, at depths 1 and 2, will not find
 it. Give the depth at which it is wrong. -/
 
 /-- The depth at which `shiftRegisterButOne` is not a shift register. -/
@@ -53,7 +53,7 @@ def badDepth : Nat := todo
 for every `n`. A theorem for every size has to meet every size, including
 the one nobody tested. A table has the sizes somebody thought of. That is why
 every size in `Tau/` is a parameter: the depth of a shift register, the
-number of lanes in a word, the number of slices on a chip. -/
+number of lanes in a word, the number of slices on a machine. -/
 
 /-! ## 3. Make failure a result
 

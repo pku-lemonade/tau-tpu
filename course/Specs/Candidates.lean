@@ -4,18 +4,18 @@ import Specs.Tables
 # Three candidates, one right
 
 For each of the first three components there are three definitions here. One
-of them is what the manual describes. The other two are wrong, and all three
-give every row of the manual's table.
+of them is what the doc describes. The other two are wrong, and all three
+give every row of the doc's table.
 
 For each component:
 
 1. Put the cursor on the three `#eval report` lines. All agree with the
    table.
-2. Read section 2.1, 2.2 or 2.3 of `course/architecture-manual.md` again, the words this
+2. Read section 2.1, 2.2 or 2.3 of `Tau/Docs/Machine.md` again, the words this
    time. Find an input on which the candidates differ, with
    `#eval (candidateA ...).trace ... n`. Decide which one the words describe.
 3. For each wrong candidate, say whether it contradicts a sentence of the
-   manual or settles something the manual does not say.
+   doc or settles something the doc does not say.
 4. Write a statement, as in the chapter, that the right candidate satisfies
    and a wrong one does not. A table could not tell them apart. A statement
    about every input can.

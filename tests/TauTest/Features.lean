@@ -39,7 +39,7 @@ def bin (op : BinOp) (xs ys : List Int) : List Int :=
           (Word.ofInts [1, 2, 3, 4])).toInts == [10, 2, 30, 4]
 #guard ((wordSem 4).const [7, -7]).toInts == [7, -7, 0, 0]
 
-/-! ## A chip for the programs below -/
+/-! ## A machine for the programs below -/
 
 def cfg : Config where
   kinds := [.mxm, .mem, .vxm, .mem]

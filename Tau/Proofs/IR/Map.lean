@@ -18,6 +18,7 @@ variable {V W : Type}
 def Env.map (f : V → W) (env : Env V) : Env W where
   vars := env.vars.map (Prod.map id f)
   bufs := env.bufs.map (List.map f)
+  events := env.events.map (Event.map f)
 
 theorem lookup_map (f : V → W) (v : Var) (l : List (Var × V)) :
     (l.map (Prod.map id f)).lookup v = (l.lookup v).map f := by
@@ -32,6 +33,13 @@ theorem lookup_map (f : V → W) (v : Var) (l : List (Var × V)) :
 
 theorem Env.bind_map (f : V → W) (env : Env V) (v : Var) (x : V) :
     (env.map f).bind v (f x) = (env.bind v x).map f := rfl
+
+theorem Env.issue_map (f : V → W) (env : Env V) (t : Nat) (target : Var × Option (Nat × Nat)) :
+    (env.map f).issue t target = (env.issue t target).map f := by
+  unfold Env.issue
+  have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
+  rw [hv, lookup_map]
+  cases env.vars.lookup target.1 <;> rfl
 
 theorem bufGet_map (f : V → W) (bufs : List (List V)) (b k : Nat) :
     ((bufs.map (List.map f))[b]?.getD [])[k]? = ((bufs[b]?.getD [])[k]?).map f := by
@@ -55,8 +63,14 @@ theorem Stmt.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i :
     s.exec T i (env.map f) = (s.exec S i env).map (Env.map f) := by
   -- One case per statement. Rewrite the fields of the mapped environment as
   -- maps (`hb`, `hv`), move the map out of each lookup, and split on what
-  -- the lookups found.
-  cases s with
+  -- the lookups found. A pinned statement is the statement inside it, then
+  -- `Env.issue_map`.
+  induction s generalizing env with
+  | pin t s ih =>
+    simp only [Stmt.exec, ih]
+    cases s.exec S i env with
+    | none => rfl
+    | some env' => simp only [Option.map_some, Env.issue_map]
   | load dst buf ix =>
     simp only [Stmt.exec]
     have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
@@ -148,17 +162,19 @@ theorem execLoop_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f)
     | none => rfl
     | some env' => exact execStmts_map S T f h n env' body
 
+theorem Item.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (env : Env V)
+    (it : Item) : it.exec T (env.map f) = (it.exec S env).map (Env.map f) := by
+  cases it with
+  | stmt s => exact Stmt.exec_map S T f h 0 env s
+  | loop n body => exact execLoop_map S T f h body n env
+
 theorem Kernel.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f)
     (env : Env V) (k : Kernel) :
     Kernel.exec T (env.map f) k = (Kernel.exec S env k).map (Env.map f) := by
   induction k generalizing env with
   | nil => rfl
   | cons it rest ih =>
-    have hit : it.exec T (env.map f) = (it.exec S env).map (Env.map f) := by
-      cases it with
-      | stmt s => exact Stmt.exec_map S T f h 0 env s
-      | loop n body => exact execLoop_map S T f h body n env
-    simp only [Kernel.exec, hit]
+    simp only [Kernel.exec, Item.exec_map S T f h]
     cases it.exec S env with
     | none => rfl
     | some env' => exact ih env'
@@ -169,8 +185,17 @@ theorem Kernel.run_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k 
     (bufs : List (List V)) :
     k.run T (bufs.map (List.map f)) = (k.run S bufs).map (List.map (List.map f)) := by
   unfold Kernel.run
-  have he : (⟨[], bufs.map (List.map f)⟩ : Env W) = (⟨[], bufs⟩ : Env V).map f := rfl
+  have he : (⟨[], bufs.map (List.map f), []⟩ : Env W) = (⟨[], bufs, []⟩ : Env V).map f := rfl
   rw [he, Kernel.exec_map S T f h]
-  cases Kernel.exec S ⟨[], bufs⟩ k <;> rfl
+  cases Kernel.exec S ⟨[], bufs, []⟩ k <;> rfl
+
+/-- The timeline of a kernel on mapped buffers is the mapped timeline. -/
+theorem Kernel.timeline_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k : Kernel)
+    (bufs : List (List V)) :
+    k.timeline T (bufs.map (List.map f)) = (k.timeline S bufs).map (Event.map f) := by
+  unfold Kernel.timeline
+  have he : (⟨[], bufs.map (List.map f), []⟩ : Env W) = (⟨[], bufs, []⟩ : Env V).map f := rfl
+  rw [he, Kernel.exec_map S T f h]
+  cases Kernel.exec S ⟨[], bufs, []⟩ k <;> rfl
 
 end Tau

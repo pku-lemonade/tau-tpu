@@ -12,17 +12,17 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Start here" =>
 This course teaches you to write specifications in Lean 4. It takes you
 through one real development from the bottom up. The development is tau-tpu:
-a small tensor processor, a compiler for it, and proofs that connect the two.
+a small machine for tensor programs, a compiler for it, and proofs that connect the two.
 
 A specification is a definition, in Lean, of what something does. The
-hardware is described in a manual and the compiler is written in C++. Neither
+hardware is described in words and the compiler is written in C++. Neither
 is precise enough to prove anything about. By the end you will have turned
 both into Lean yourself: the components, the machine, the compiler's input,
 two of its passes. You will have stated what each should satisfy. And you
 will have read a theorem that says a compiled program computes what its
 source says, on hardware built from the components you specified.
 
-You will write few proofs. In real work on a chip or a compiler the proofs
+You will write few proofs. In real work on a machine or a compiler the proofs
 are long, and an AI agent writes most of them. What cannot be handed to an
 agent is deciding what the definitions and the statements should say. That is
 what the course is about. The first chapters still have you prove things, so
@@ -42,15 +42,15 @@ each one up. Ten minutes per term is enough.
 
 # What tau-tpu is
 
-A tau-tpu chip is a row of _slices_. Each slice does one kind of job: store
+A tau-tpu machine is a row of _slices_. Each slice does one kind of job: store
 words, do arithmetic on them, rearrange them, or multiply by a matrix. Between
 the slices run _streams_, which carry words east or west, one slice per cycle.
 
-A program for the chip is a timetable. It lists every instruction together
-with the slice that executes it and the cycle on which it does so. The chip
+A program for the machine is a timetable. It lists every instruction together
+with the slice that executes it and the cycle on which it does so. The machine
 has no branches, no queues, and nothing that waits. If an instruction looks
 for its operand on a stream one cycle too early, the operand is not there yet
-and the chip traps.
+and the machine traps.
 
 Deciding the timetable is the compiler's job. A design like this is called
 _statically scheduled_. It follows the tensor streaming processors described
@@ -67,17 +67,17 @@ compiler/build/bin/tauc examples/linear/kernel.mlir -o out --print-mlir
 ```
 
 This compiles a quantized linear layer. It prints the program after each of
-the compiler's five passes and writes six files into `out/`. Open
+the compiler's eight passes and writes ten files into `out/`. Open
 `out/compiled.json` and read the `program` list. Each entry is one line of
 the timetable: a slice, a cycle, and an instruction.
 
 ```
-lake exe tau-check out/kernel.json out/compiled.json
+lake exe tau-check out/source.json out/compiled.json
 ```
 
 This prints `ACCEPT`. That one word is backed by a theorem: for every
-possible input, running that program on the chip gives what the kernel
-computes. Now open `out/compiled.json`, find the last instruction, add one to
+possible input, running that program on the machine gives what the program in
+`out/source.json` computes. Now open `out/compiled.json`, find the last instruction, add one to
 its `time`, and run the check again. It prints `REJECT` and says why.
 
 ```
@@ -86,10 +86,10 @@ lake exe tau-sim out/compiled.json examples/linear/buffers.json
 
 This runs the program and prints the buffers. The last buffer is the result.
 The simulator is not a separate piece of software. It is the Lean
-specification of the chip, compiled.
+specification of the machine, compiled.
 
 If you have not built the compiler, skip the first command and use the
-folder `examples/linear/stages/` in place of `out/`. It holds the same six
+folder `examples/linear/stages/` in place of `out/`. It holds the same ten
 files. The chapters on kernels, on expressions and on the checker run the
 compiler again, and each names a `stages/` folder to read instead.
 
@@ -105,8 +105,8 @@ on the checker, and see how much more they say.
 Every chapter has the same parts.
 
 * *Terms to look up*. Look them up in the reading list.
-* *Source*: what you specify from. A section of the manual,
-  `course/architecture-manual.md`, or a C++ file of the compiler.
+* *Source*: what you specify from. A section of a doc, such as
+  `Tau/Docs/Machine.md`, or a C++ file of the compiler.
 * *Specify*: the file under `course/Specs/` in which you write your
   definition.
 * *Read*: the definition files of the repository. In the first three
@@ -155,9 +155,10 @@ outside `Tau/Proofs/`. What is inside it, Lean checks, and an agent can
 write. Every proof of the development is there, for the whole machine and
 the whole compiler, whether or not the course asks you for it.
 
-`docs/overview.md` says in two pages what the parts are and names the
-definition and the theorem for each. `course/architecture-manual.md` is the architecture
-manual that the hardware chapters specify from.
+`Tau/Docs/README.md` says in a few pages what the parts are and names the
+doc section, the definition and the theorem for each. Beside it are the
+docs that the chapters specify from: `Machine.md` for the hardware chapters,
+`Programs.md` and `Compiler.md` for the later ones.
 
 # A plan
 
@@ -170,7 +171,7 @@ times.
   cell. You read a specification and prove what it does.
 * Day 5: "Writing a specification". The method for everything after it.
 * Days 6 to 11: pipeline and sequencer, memory, repeater, systolic array.
-  You write each from its page of the manual.
+  You write each from its section of `Machine.md`.
 * Days 12 to 14: the slice-level machine. You specify its streams and some
   of its instructions, and program it by hand.
 * Days 15 to 17: kernels, and two compiler passes that you write in Lean

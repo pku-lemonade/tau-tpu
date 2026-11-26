@@ -29,11 +29,11 @@ loop unrolling, MLIR.
 
 # The source is code now
 
-Until here the source was a manual. For the compiler it is code: the
+Until here the source was a doc. For the compiler it is code: the
 definition of the compiler's input language in `TauOps.td`, and a pass in
 C++.
 
-Code differs from a manual in two ways that matter to you.
+Code differs from a doc in two ways that matter to you.
 
 * *It says too much.* `Unroll.cpp` is about eighty lines, and most are about
   MLIR: values, regions, builders, a pass class. A handful say what the pass
@@ -65,6 +65,10 @@ The pass replaced the loop by four copies of its body, with positions
 `[0, 0]`, `[1, 0]`, `[2, 0]` and `[3, 0]`. Without the compiler, compare
 `examples/elementwise/stages/kernel.json` with `unrolled.json` in the same
 folder: the same kernel before and after the pass, written as JSON.
+
+The last constructor of `Stmt` below, `pin`, and the third field of `Env`,
+`events`, are for saying when a statement happens. No kernel in this chapter
+uses them. The chapter "Pins" is about them.
 
 The Lean type `Kernel` says in Lean what that dialect says in MLIR.
 

@@ -10,6 +10,8 @@ In tau-tpu every slice is a pipeline: an instruction issued at cycle `t`
 produces its result at cycle `t + d`, where `d` depends only on the slice.
 
 Terms to look up: *pipelining*, *latency*.
+
+Docs: Machine 2.4 (`Tau/Docs/`).
 -/
 
 namespace Tau

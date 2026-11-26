@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The cell-level machine" =>
 *Terms to look up:* refinement, simulation relation, abstraction function.
 
-*Source:* `course/architecture-manual.md`, section 4.
+*Source:* `Tau/Docs/Machine.md`, section 4.
 
 *Read:* `Tau/CellLevel/Machine.lean`.
 
@@ -23,13 +23,13 @@ proof of the development.
 
 # State it first
 
-Section 4 of the manual ends with the sentence "A chip built this way
+Section 4 of `Machine.md` ends with the sentence "A machine built this way
 behaves exactly as section 3 says."
 
 Before you read on, write that sentence as a Lean proposition, in
 `course/Work/`. `cellExecute` in `Tau/CellLevel/Machine.lean` runs the
 machine built from blocks, and `execute` runs the one you know. Decide what
-"exactly" means: for which chips, which programs, how many cycles, which
+"exactly" means: for which machines, which programs, how many cycles, which
 starting memory? And what should hold when the simple machine traps?
 
 # The idea
@@ -46,7 +46,7 @@ and compare `cellExec` with `exec`, and `cellStep` with `stepSlice`. They
 have the same shape. The differences are these.
 
 * Instructions are issued by a `repeater`, which counts down to each one in
-  its own registers. No cycle count is shared by the whole chip.
+  its own registers. No cycle count is shared by the whole machine.
 * Memory is a `memory` block holding a vector, not a list.
 * Results wait in a `shiftRegister`.
 * The matrix slice has one `mac` cell per lane, and a second small `memory`
@@ -58,15 +58,15 @@ On the small copy program the two machines give the same answer:
 
 ```lean
 example :
-    cellExecute tinyChip copyProgram 5 [[Word.ofInts [7, -3]], [], [Word.zero]]
-      = execute (wordSem 2) tinyChip copyProgram 5
+    cellExecute tinyMachine copyProgram 5 [[Word.ofInts [7, -3]], [], [Word.zero]]
+      = execute (wordSem 2) tinyMachine copyProgram 5
           [[Word.ofInts [7, -3]], [], [Word.zero]] := by
   rfl
 ```
 
 # The statement
 
-That the two machines cannot be told apart, on any chip, program, number of
+That the two machines cannot be told apart, on any machine, program, number of
 cycles and starting memory:
 
 ```lean
@@ -121,7 +121,7 @@ replaced by a different implementation with the same step behaviour.
 
 # How to work through it
 
-1. Read section 4 of the manual and state its last sentence, as above.
+1. Read section 4 of `Machine.md` and state its last sentence, as above.
 2. Read `Tau/CellLevel/Machine.lean` beside the slice-level machine. Every
    field of `Cell` is the state of a block you specified.
 3. Compare your statement with `cellExecute_eq`.
@@ -169,7 +169,7 @@ hold again? Which lemmas would have to change if the pipe were built from
 something other than a shift register?
 
 *Questions.* Section 4 is four lines of a table. List what somebody building
-the chip from it would have to ask. One to start you off: the simple machine
+the machine from it would have to ask. One to start you off: the simple machine
 has one cycle count, and section 4 gives each slice a repeater of its own.
 What keeps them in step?
 

@@ -10,8 +10,8 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "Writing a specification" =>
-*Read:* `course/architecture-manual.md`, sections 1 and 2.1 to 2.3; `docs/overview.md`, "The
-words".
+*Read:* `Tau/Docs/Machine.md`, sections 1 and 2.1 to 2.3; `Tau/Docs/README.md`,
+section 2.4, "The words".
 
 *Work in:* `course/Specs/Candidates.lean`, `course/Specs/Review.lean`,
 `course/Specs/Repair.lean`, `course/Specs/Provable.lean`.
@@ -25,10 +25,10 @@ From here on it is the other way round. You are given a _source_ that is not
 Lean, and you write the definition and the statement. The proof is mostly
 somebody else's work: an AI agent's, checked by Lean.
 
-This is the order in which the work is done on a real chip and a real
+This is the order in which the work is done on a real machine and a real
 compiler. Somebody hands you an architecture manual and a few thousand lines
 of C++. Nothing in them is precise enough to prove anything about. Your job
-is to say, in Lean, what the manual and the C++ mean. Once that is said,
+is to say, in Lean, what the description and the C++ mean. Once that is said,
 proving things about it is work that can be handed over. Saying it cannot be
 handed over, because only a person who knows what the hardware is for can
 judge whether a definition says the right thing.
@@ -37,8 +37,8 @@ judge whether a definition says the right thing.
 
 Every chapter from here on goes through the same seven steps.
 
-1. *Read the source.* For hardware it is a section of the manual,
-   `course/architecture-manual.md`. For a compiler pass it is a C++ file.
+1. *Read the source.* For hardware it is a section of
+   `Tau/Docs/Machine.md`. For a compiler pass it is a C++ file.
 2. *Write the definition.* In a file under `course/Specs/`, in place of a
    `todo`.
 3. *Run the tests.* Each file has `#eval report` lines that compare your
@@ -54,7 +54,7 @@ Steps 2, 4 and 5 are the ones that need you.
 
 # The source
 
-`course/architecture-manual.md` describes the chip the way an architect would: a paragraph
+`Tau/Docs/Machine.md` describes the machine the way an architect would: a paragraph
 per component, and a table of what goes in and what comes out on each cycle.
 Read section 2.2 now. It is the accumulator you already know.
 
@@ -65,7 +65,7 @@ does to the output in the cycle it arrives.
 
 # The definition, and choosing the state
 
-A block is a state, a starting value for it, and a step. The manual tells
+A block is a state, a starting value for it, and a step. The doc tells
 you the inputs and the outputs. It does not tell you the state. That is
 yours to choose.
 
@@ -88,7 +88,7 @@ with different state and the same behaviour.
 
 # The tests, and what they cannot tell you
 
-A test compares your outputs with the rows of the manual's table.
+A test compares your outputs with the rows of the doc's table.
 
 ```
 #eval report "the memory" (Tables.memory memory)
@@ -100,12 +100,12 @@ that do not.
 A table is a handful of inputs. A definition can give every row and still be
 wrong. `course/Specs/Candidates.lean` shows this on the three components you
 know. For each it has three definitions. All three give every row of the
-manual's table, and two of them are wrong.
+doc's table, and two of them are wrong.
 
 # What the source does not say
 
 Take the memory of section 2.5. It says a read gives "the word at address
-`a`". What if the memory has two words and `a` is 5? The manual does not say.
+`a`". What if the memory has two words and `a` is 5? The doc does not say.
 A definition must say something: Lean will not accept a function that has no
 answer.
 
@@ -238,16 +238,16 @@ in `course/Work/Claims.md`.
 | my memory                              | a definition. Tested on 4 rows. Nothing proves   |
 |                                        | it right.                                        |
 | ReadsLastWrite                         | a statement. Proved by an agent, reviewed by me. |
-| read outside the memory gives nothing  | my decision. Not in the manual.                  |
+| read outside the memory gives nothing  | my decision. Not in the doc.                  |
 ```
 
 The last chapter compares your table with the one in the repository's
-`README.md`.
+`Tau/Docs/README.md`, section 4.
 
 # How to work through it
 
-1. Read `docs/overview.md`, "The words", and sections 1 and 2.1 to 2.3 of
-   the manual.
+1. Read `Tau/Docs/README.md`, section 2.4, "The words", and sections 1
+   and 2.1 to 2.3 of `Machine.md`.
 2. Do `course/Specs/Candidates.lean`.
 3. Do `course/Specs/Review.lean`. Then read
    `course/Specs/ReviewAnswers.md`.
@@ -263,8 +263,8 @@ The last chapter compares your table with the one in the repository's
 
 *Specify.* `course/Specs/Candidates.lean`. For each of the three components,
 find the right candidate and an input that gives each wrong one away. For
-each wrong candidate, say whether it contradicts a sentence of the manual or
-settles something the manual does not say. Those are different kinds of
+each wrong candidate, say whether it contradicts a sentence of the doc or
+settles something the doc does not say. Those are different kinds of
 mistake: the first is a bug, the second is a question nobody asked.
 
 *State.* For one component in `Candidates.lean`, write a statement that the
@@ -283,7 +283,7 @@ breaks one rule of "What makes a specification provable". For each, give the
 input on which it goes wrong, and find the place in `Tau/` that the task
 names.
 
-*Questions.* Read sections 2.1 to 2.3 of the manual once more and write down
+*Questions.* Read sections 2.1 to 2.3 of `Machine.md` once more and write down
 everything they leave open. There are at least six such things across the
 three sections. The rows of the three `Decisions` tables in
 `course/Specs/Tables.lean` are some of them.

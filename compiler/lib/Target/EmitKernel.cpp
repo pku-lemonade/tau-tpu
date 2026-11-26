@@ -1,14 +1,19 @@
-//===- EmitKernel.cpp - write a function as a kernel file -----------------===//
+//===- EmitKernel.cpp - write a function as a source or kernel file -------===//
 //
-// Writes the function the user wrote in the JSON form that the Lean tools
+// Writes a function of kernel operations in the JSON form that the Lean tools
 // read (Tau/Sim/Json.lean). Buffers are numbered by argument position and
 // values in order of definition.
+//
+// A `tau.call` is written with the body of the kernel it calls inside it,
+// numbered on its own: the file is then a source file (Tau/IR/Source.lean).
+// With no call in it, the file is a kernel file.
 //
 //===----------------------------------------------------------------------===//
 
 #include "tau/Dialect/TauDialect.h"
 #include "tau/Target/Target.h"
 
+#include "mlir/IR/SymbolTable.h"
 #include "llvm/ADT/DenseMap.h"
 
 using namespace llvm;
@@ -27,7 +32,24 @@ struct Numbering {
   }
 };
 
+Expected<json::Value> emitBare(Operation &op, Numbering &num);
+
+/// One statement, with its pin if it has one.
 Expected<json::Value> emitStmt(Operation &op, Numbering &num) {
+  Expected<json::Value> stmt = emitBare(op, num);
+  if (!stmt)
+    return stmt;
+  if (auto at = op.getAttrOfType<IntegerAttr>("at")) {
+    json::Object &object = *stmt->getAsObject();
+    object["at"] = at.getInt();
+    if (auto every = op.getAttrOfType<IntegerAttr>("every"))
+      if (every.getInt() != 0)
+        object["every"] = every.getInt();
+  }
+  return stmt;
+}
+
+Expected<json::Value> emitBare(Operation &op, Numbering &num) {
   if (auto load = dyn_cast<tau::LoadOp>(op))
     return json::Object{{"op", "load"},
                         {"dst", num.define(load.getResult())},
@@ -101,10 +123,8 @@ Expected<json::Value> emitStmt(Operation &op, Numbering &num) {
                            op.getName().getStringRef() + "'");
 }
 
-} // namespace
-
-Expected<json::Value> tau::emitKernel(func::FuncOp func) {
-  Numbering num;
+/// The buffers of `func`, numbered, with their sizes.
+Expected<json::Array> readBuffers(func::FuncOp func, Numbering &num) {
   json::Array sizes;
   for (BlockArgument arg : func.getArguments()) {
     auto buf = dyn_cast<tau::BufType>(arg.getType());
@@ -113,7 +133,11 @@ Expected<json::Value> tau::emitKernel(func::FuncOp func) {
     num.buffers[arg] = static_cast<int64_t>(sizes.size());
     sizes.push_back(static_cast<int64_t>(buf.getSize()));
   }
+  return std::move(sizes);
+}
 
+/// The body of `func`: statements, loops and calls.
+Expected<json::Array> emitBody(func::FuncOp func, Numbering &num) {
   json::Array body;
   for (Operation &op : func.getBody().front()) {
     if (isa<func::ReturnOp>(op))
@@ -123,6 +147,8 @@ Expected<json::Value> tau::emitKernel(func::FuncOp func) {
       for (Operation &nested : loop.getBody().front()) {
         if (isa<tau::ForOp>(nested))
           return createStringError("tau.for must not be nested");
+        if (isa<tau::CallOp>(nested))
+          return createStringError("tau.call must not be inside a tau.for");
         Expected<json::Value> stmt = emitStmt(nested, num);
         if (!stmt)
           return stmt.takeError();
@@ -133,11 +159,47 @@ Expected<json::Value> tau::emitKernel(func::FuncOp func) {
                                   {"body", std::move(inner)}});
       continue;
     }
+    if (auto call = dyn_cast<tau::CallOp>(op)) {
+      auto callee = dyn_cast_or_null<func::FuncOp>(
+          SymbolTable::lookupNearestSymbolFrom(func, call.getCalleeAttr()));
+      if (!callee)
+        return createStringError("tau.call of a kernel that is not defined");
+      // The called kernel has its own buffers and its own values.
+      Numbering inner;
+      Expected<json::Array> params = readBuffers(callee, inner);
+      if (!params)
+        return params.takeError();
+      Expected<json::Array> calleeBody = emitBody(callee, inner);
+      if (!calleeBody)
+        return calleeBody.takeError();
+      json::Array args;
+      for (Value arg : call.getArgs())
+        args.push_back(num.buffers.lookup(arg));
+      body.push_back(
+          json::Object{{"op", "call"},
+                       {"args", std::move(args)},
+                       {"at", static_cast<int64_t>(call.getAt().value_or(0))},
+                       {"body", std::move(*calleeBody)}});
+      continue;
+    }
     Expected<json::Value> stmt = emitStmt(op, num);
     if (!stmt)
       return stmt.takeError();
     body.push_back(std::move(*stmt));
   }
-  return json::Object{{"buffers", std::move(sizes)},
-                      {"body", std::move(body)}};
+  return std::move(body);
+}
+
+} // namespace
+
+Expected<json::Value> tau::emitKernel(func::FuncOp func) {
+  Numbering num;
+  Expected<json::Array> sizes = readBuffers(func, num);
+  if (!sizes)
+    return sizes.takeError();
+  Expected<json::Array> body = emitBody(func, num);
+  if (!body)
+    return body.takeError();
+  return json::Object{{"buffers", std::move(*sizes)},
+                      {"body", std::move(*body)}};
 }

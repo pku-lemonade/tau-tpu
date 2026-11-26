@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: the sequencer
 
-Source: `course/architecture-manual.md`, section 2.6.
+Source: `Tau/Docs/Machine.md`, section 2.6.
 
 The steps, which are the same in every file of this folder:
 
@@ -32,7 +32,7 @@ def sequencer (prog : List (Nat × String)) : Block State Unit (List String) := 
 
 #eval report "the sequencer" (Tables.sequencer sequencer)
 
--- #eval report "the sequencer, what the manual leaves open" (Tables.sequencerDecisions sequencer)
+-- #eval report "the sequencer, what the doc leaves open" (Tables.sequencerDecisions sequencer)
 
 /-! ## State -/
 

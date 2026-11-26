@@ -20,6 +20,8 @@ right cycles. This is static scheduling in its smallest form.
 In tau-tpu the matrix slice has the same shape of timing problem.
 
 Terms to look up: *systolic array*, *matrix-vector product*.
+
+Docs: Machine 2.8 (`Tau/Docs/`).
 -/
 
 namespace Tau

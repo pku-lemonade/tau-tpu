@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: the memory
 
-Source: `course/architecture-manual.md`, section 2.5.
+Source: `Tau/Docs/Machine.md`, section 2.5.
 
 The steps, which are the same in every file of this folder:
 
@@ -33,7 +33,7 @@ def memory (words : List Int) : Block State (MemIn Int) (Option Int) := todo
 
 #eval report "the memory" (Tables.memory memory)
 
--- #eval report "the memory, what the manual leaves open" (Tables.memoryDecisions memory)
+-- #eval report "the memory, what the doc leaves open" (Tables.memoryDecisions memory)
 
 /-! ## State -/
 

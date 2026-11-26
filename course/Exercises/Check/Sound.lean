@@ -11,32 +11,42 @@ Build this file alone with:
 import Tau.Check.Checker
 import Tau.Proofs.SliceLevel.Map
 import Tau.Proofs.IR.Map
+import Tau.Proofs.IR.Source
+import Tau.Proofs.IR.Compiled
 import Tau.Proofs.IR.MemMap
 import Tau.Proofs.Check.Simplify
 
 /-!
 # The checker is sound
 
-The main result is `check_sound`. If the checker accepts a compiled program for
-a kernel, then for every choice of buffer contents:
+The main results are `check_sound` and `check_pins`. If the checker accepts
+a compiled program for a source program, then for every choice of buffer
+contents:
 
-* the machine runs the program to the end without a trap, and
-* the buffers it ends with are exactly the buffers the kernel computes.
+* the machine runs the program to the end without a trap,
+* the buffers it ends with are exactly the buffers the source program
+  computes (`check_sound`), and
+* every word the source program pins to a cycle is issued by the machine on
+  that cycle (`check_pins`).
 
-The checker ran the machine and the kernel once, on expressions. The proof
-turns that single run into a statement about all real inputs. It needs three
-facts, each proved elsewhere:
+The checker ran the machine and the source program once, on expressions. The
+proof turns that single run into a statement about all real inputs. It needs
+three facts, each proved elsewhere:
 
-* the machine does not look at its values (`execute_map`),
-* a kernel does not look at its values (`Kernel.run_map`),
+* the machine does not look at its values (`execute_map`, `issues_map`),
+* a source program does not look at its values (`Source.run_map`,
+  `Source.timeline_map`),
 * simplifying an expression does not change its value (`Expr.denote_simp`).
 
 Evaluating an expression (`Expr.denote`) is a function that respects the
-operations, so the first two facts apply to it. That gives one lemma for each
-side: `Kernel.run_of_exprs` and `execute_of_exprs` say that a run on real
-buffers is the run on expressions, evaluated. `denote_of_sameExprs` says that
-two tables the checker found equal have equal values. `check_sound` puts the
-three together, and so does every theorem in `Tau/Proofs/Check/Passes.lean`.
+operations, so the first two facts apply to it. That gives two lemmas for
+each side. `Source.run_of_exprs` and `execute_of_exprs` say that a run on real
+buffers is the run on expressions, evaluated; `Source.timeline_of_events` and
+`timeline_of_events` say the same of the timelines. `denote_of_sameExprs` says
+that two tables the checker found equal have equal values, and
+`covers_denote` that a timeline the checker found inside another is inside it
+after evaluating. The theorems here and in `Tau/Proofs/Check/Passes.lean` put
+these together.
 -/
 
 namespace Tau
@@ -121,6 +131,101 @@ theorem denote_of_sameExprs (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (
     exact Expr.denote_simp S hS bufs fill e
   rw [← hsimp a, h, hsimp]
 
+/-- What `agree` says about the final expressions: both runs finished, and
+their tables are the same after simplifying. -/
+theorem agree_exprs {a b : Option (List (List Expr))} {ea eb : List (Event Expr)}
+    (h : agree a b ea eb = true) : ∃ x y, a = some x ∧ b = some y ∧ sameExprs x y = true := by
+  unfold agree at h
+  simp only [Bool.and_eq_true] at h
+  obtain ⟨h, -⟩ := h
+  cases a with
+  | none => simp at h
+  | some x =>
+    cases b with
+    | none => simp at h
+    | some y => exact ⟨x, y, rfl, rfl, h⟩
+
+/-- What `agree` says about the timelines. -/
+theorem agree_events {a b : Option (List (List Expr))} {ea eb : List (Event Expr)}
+    (h : agree a b ea eb = true) : covers ea eb = true := by
+  unfold agree at h
+  simp only [Bool.and_eq_true] at h
+  exact h.2
+
+/-- Simplifying the word of an event does not change its value. -/
+theorem Event.map_denote_simp (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fill : V)
+    (e : Event Expr) :
+    (e.map Expr.simp).map (Expr.denote S bufs fill) = e.map (Expr.denote S bufs fill) := by
+  simp only [Event.map, Expr.denote_simp S hS]
+
+/-- A timeline that the checker found inside another is inside it after
+evaluating. -/
+theorem covers_denote (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fill : V)
+    (a b : List (Event Expr)) (h : covers a b = true) :
+    a.map (Event.map (Expr.denote S bufs fill)) ⊆
+      b.map (Event.map (Expr.denote S bufs fill)) := by
+  -- Take an event of `a`. Simplified, it is in `b` simplified, so it is the
+  -- simplified form of some event of `b`. The two have the same value
+  -- (`Event.map_denote_simp`).
+  intro e he
+  obtain ⟨x, hx, rfl⟩ := List.mem_map.mp he
+  unfold covers at h
+  have hin := List.all_eq_true.mp h (x.map Expr.simp) (List.mem_map.mpr ⟨x, hx, rfl⟩)
+  obtain ⟨y, hy, hxy⟩ := List.mem_map.mp (List.contains_iff_mem.mp hin)
+  refine List.mem_map.mpr ⟨y, hy, ?_⟩
+  rw [← Event.map_denote_simp S hS bufs fill y, hxy, Event.map_denote_simp S hS]
+
+/-- If a source program run on expressions ends with `e`, then run on real
+buffers it ends with `e` evaluated. -/
+theorem Source.run_of_exprs (S : Sem V) (s : Source) (bufs : List (List V)) (fill : V)
+    (e : List (List Expr)) (h : sourceExprs s (bufs.map List.length) = some e) :
+    s.run S bufs = some (e.map (List.map (Expr.denote S bufs fill))) := by
+  have hb := symBufs_denote S bufs fill
+  have hrun := Source.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) s
+    (symBufs (bufs.map List.length))
+  unfold sourceExprs at h
+  rw [hb, h] at hrun
+  exact hrun
+
+/-- The timeline of a source program on real buffers is its timeline on
+expressions, evaluated. -/
+theorem Source.timeline_of_events (S : Sem V) (s : Source) (bufs : List (List V)) (fill : V) :
+    s.timeline S bufs =
+      (sourceEvents s (bufs.map List.length)).map (Event.map (Expr.denote S bufs fill)) := by
+  have hb := symBufs_denote S bufs fill
+  have ht := Source.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) s
+    (symBufs (bufs.map List.length))
+  rw [hb] at ht
+  exact ht
+
+/-- The timeline of a kernel on real buffers is its timeline on expressions,
+evaluated. -/
+theorem Kernel.timeline_of_events (S : Sem V) (k : Kernel) (bufs : List (List V)) (fill : V) :
+    k.timeline S bufs =
+      (kernelEvents k (bufs.map List.length)).map (Event.map (Expr.denote S bufs fill)) := by
+  have hb := symBufs_denote S bufs fill
+  have ht := Kernel.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) k
+    (symBufs (bufs.map List.length))
+  rw [hb] at ht
+  exact ht
+
+/-- The memory image for real buffers is the image on expressions,
+evaluated. -/
+theorem image_denote (S : Sem V) (map : MemMap) (memSizes : List Nat) (bufs : List (List V))
+    (fill : V) :
+    image map memSizes (bufWord bufs fill) fill =
+      (image map memSizes Expr.init .fill).map (List.map (Expr.denote S bufs fill)) := by
+  rw [image_map]
+  rfl
+
+/-- The timeline of the machine on real buffers is its timeline on
+expressions, evaluated. -/
+theorem timeline_of_events (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill : V) :
+    c.timeline S bufs fill =
+      (machineEvents c).map (Event.map (Expr.denote S bufs fill)) := by
+  unfold Compiled.timeline machineEvents Compiled.image
+  rw [image_denote S, Compiled.timelineFrom_map exprSem S _ (denote_hom S bufs fill)]
+
 /-- If the machine run on expressions ends with the table `m`, then run on
 real buffers it does not trap, and the buffers it ends with are `m`
 evaluated. -/
@@ -153,28 +258,41 @@ theorem execute_of_exprs (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill
       exact hext
 
 /-- **Soundness of the checker.** If `check` accepts the compiled program `c`
-for the kernel `k`, then on any buffer contents the machine runs `c` without a
-trap and ends with the buffers that `k` computes. -/
-theorem check_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (c : Compiled)
+for the source program `s`, then on any buffer contents the machine runs `c`
+without a trap and ends with the buffers that `s` computes. -/
+theorem check_sound (S : Sem V) (hS : S.Lawful) (s : Source) (c : Compiled)
     (bufs : List (List V)) (fill : V)
-    (h : check k (bufs.map List.length) c = true) :
+    (h : check s (bufs.map List.length) c = true) :
     ∃ mem out,
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
-      k.run S bufs = some out ∧
+      s.run S bufs = some out ∧
       extract c.map mem fill = out := by
   -- Outline of one proof:
-  -- Unfold `check` and split on the two symbolic runs; if either failed,
-  -- `h` is false.
-  -- The kernel on real buffers is its symbolic run, evaluated
-  -- (`Kernel.run_of_exprs`), and so is the machine (`execute_of_exprs`).
+  -- `check` says both symbolic runs finished with tables that are the same
+  -- after simplifying (`agree_exprs`).
+  -- The source program on real buffers is its symbolic run, evaluated
+  -- (`Source.run_of_exprs`), and so is the machine (`execute_of_exprs`).
   -- The two tables are the same after simplifying, so they are the same
   -- after evaluating (`denote_of_sameExprs`).
   sorry
 
-/-- **Safety.** A program the checker accepts never traps. -/
-theorem check_safe (S : Sem V) (hS : S.Lawful) (k : Kernel) (c : Compiled)
+/-- **The checker and time.** If `check` accepts the compiled program `c` for
+the source program `s`, then on any buffer contents every word that `s` pins
+to a cycle is issued by the machine on that cycle. -/
+theorem check_pins (S : Sem V) (hS : S.Lawful) (s : Source) (c : Compiled)
     (bufs : List (List V)) (fill : V)
-    (h : check k (bufs.map List.length) c = true) :
+    (h : check s (bufs.map List.length) c = true) :
+    s.timeline S bufs ⊆ c.timeline S bufs fill := by
+  -- Outline of one proof:
+  -- Each timeline on real buffers is the timeline on expressions, evaluated
+  -- (`Source.timeline_of_events`, `timeline_of_events`). `check` found the
+  -- first inside the second, and that survives evaluating (`covers_denote`).
+  sorry
+
+/-- **Safety.** A program the checker accepts never traps. -/
+theorem check_safe (S : Sem V) (hS : S.Lawful) (s : Source) (c : Compiled)
+    (bufs : List (List V)) (fill : V)
+    (h : check s (bufs.map List.length) c = true) :
     ∃ mem, execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem := by
   sorry
 

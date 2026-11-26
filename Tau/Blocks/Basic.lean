@@ -14,6 +14,8 @@ Cycle numbering: cycles are numbered from 0. During cycle `t` a block
 * reads the input `inp t`,
 * produces the output `outAt inp t`, and
 * ends in the state `stateAt inp (t + 1)`.
+
+Docs: Machine 1 (`Tau/Docs/`).
 -/
 
 namespace Tau

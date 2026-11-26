@@ -11,8 +11,13 @@ namespace tau {
 
 struct Chip;
 
+/// Replaces every `tau.call` by the body of the kernel it calls and removes
+/// every function but the last. A pass on the module.
+/// Lean model of its input: Tau/IR/Source.lean.
+std::unique_ptr<mlir::Pass> createInlinePass();
+
 /// Rewrites `relu(relu a)` to `relu a`, and `max(a, a)` and `min(a, a)` to
-/// `a`. Lean model: Tau/Passes/Simplify.lean.
+/// `a`. The same rewrites on expressions: Tau/Check/Simplify.lean.
 std::unique_ptr<mlir::Pass> createSimplifyPass();
 
 /// Replaces every `tau.for` by one copy of its body per iteration.
@@ -30,8 +35,16 @@ std::unique_ptr<mlir::Pass> createSchedulePass();
 /// Gives every travelling word a stream (`east`, `stream`).
 std::unique_ptr<mlir::Pass> createRoutePass();
 
-/// Makes the passes available to `tau-opt` as `--tau-simplify`,
-/// `--tau-unroll`, `--tau-place`, `--tau-schedule` and `--tau-route`.
+/// Replaces the instructions by one list of entries per slice (`tau.slice`,
+/// `tau.entry`), which name streams and not the words on them.
+std::unique_ptr<mlir::Pass> createSlicePass();
+
+/// Merges entries of a slice into repeating entries.
+std::unique_ptr<mlir::Pass> createFoldPass();
+
+/// Makes the passes available to `tau-opt` as `--tau-inline`,
+/// `--tau-simplify`, `--tau-unroll`, `--tau-place`, `--tau-schedule`,
+/// `--tau-route`, `--tau-slice` and `--tau-fold`.
 void registerPasses();
 
 } // namespace tau

@@ -4,7 +4,7 @@ import Tau
 # What the specification exercises share
 
 The files in `course/Specs/` ask you to write a definition from a source: a
-section of the manual (`course/architecture-manual.md`) or a file of the C++ compiler. This
+section of the doc (`Tau/Docs/Machine.md`) or a file of the C++ compiler. This
 file gives them three things.
 
 * `todo` stands where your definition goes. It has a value, so the file
@@ -29,6 +29,8 @@ instance {σ ι ο : Type} [Inhabited σ] [Inhabited ο] : Inhabited (Block σ �
   ⟨⟨default, fun s _ => (s, default)⟩⟩
 
 instance : Inhabited TrapKind := ⟨.wrongSlice⟩
+
+instance : Inhabited Track := ⟨⟨.east, 0⟩⟩
 
 /-- One row of a table: what it is about, and whether your definition agrees
 with the source. -/

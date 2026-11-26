@@ -2,7 +2,8 @@
 //
 // Replaces every `tau.for` by one copy of its body per iteration, with the
 // iteration filled into each position: `[base, stride]` becomes
-// `[base + stride * k, 0]` in copy number k.
+// `[base + stride * k, 0]` in copy number k. A pin is filled in the same way:
+// `at t every d` becomes `at t + d * k`.
 //
 // Tau/Passes/Unroll.lean is a copy of this pass in Lean, and
 // Tau/Proofs/Passes/Unroll.lean proves the copy keeps what a kernel
@@ -32,6 +33,14 @@ static void instantiate(OpT op, uint64_t k) {
 }
 
 static void instantiate(Operation *op, uint64_t k) {
+  if (auto at = op->getAttrOfType<IntegerAttr>("at")) {
+    int64_t every = 0;
+    if (auto step = op->getAttrOfType<IntegerAttr>("every"))
+      every = step.getInt();
+    op->setAttr("at", IntegerAttr::get(at.getType(),
+                                       at.getInt() + every * int64_t(k)));
+    op->removeAttr("every");
+  }
   if (auto load = dyn_cast<tau::LoadOp>(op))
     instantiate(load, k);
   else if (auto store = dyn_cast<tau::StoreOp>(op))

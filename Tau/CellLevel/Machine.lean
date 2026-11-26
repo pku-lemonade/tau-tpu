@@ -18,7 +18,7 @@ built from the blocks in `Tau/Blocks/`:
 * one **multiply-accumulate cell** per lane, for the matrix slice,
 * a second small **memory** for the columns a matrix slice stores.
 
-There is no clock shared by the whole chip. Every slice counts for itself, in
+There is no clock shared by the whole machine. Every slice counts for itself, in
 the registers of its repeater, and the slices agree only because they all
 start together and all advance on every cycle. (Each slice also keeps a cycle
 count, used only to report where a trap happened.)
@@ -29,6 +29,8 @@ same as at the slice level.
 `Tau/Proofs/CellLevel/Refine.lean` proves that this machine and the
 slice-level machine cannot be told apart: on every program they trap on the
 same cycle for the same reason, or end with the same memory contents.
+
+Docs: Machine 4 (`Tau/Docs/`).
 -/
 
 namespace Tau

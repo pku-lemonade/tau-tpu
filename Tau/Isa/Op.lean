@@ -11,6 +11,8 @@ and the compiler's intermediate representation are both written against an
 arbitrary `Sem`, so the same definitions can run on real words (`wordSem`) or
 on symbolic expressions (`Tau/IR/Expr.lean`). The schedule checker depends on
 this.
+
+Docs: Machine 3.1 and 3.6 (`Tau/Docs/`).
 -/
 
 namespace Tau

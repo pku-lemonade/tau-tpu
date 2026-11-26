@@ -9,6 +9,8 @@ Arithmetic wraps around on overflow, as it does in hardware.
 
 Terms to look up: *two's complement*, *SIMD*, *saturating arithmetic*,
 *arithmetic shift*.
+
+Docs: Machine 1 (`Tau/Docs/`).
 -/
 
 namespace Tau

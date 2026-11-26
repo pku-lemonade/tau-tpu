@@ -10,6 +10,7 @@ add_mlir_dialect_library(TauDialect
 )
 
 add_mlir_library(TauTransforms
+  Transforms/Inline.cpp
   Transforms/Simplify.cpp
   Transforms/Unroll.cpp
   Transforms/Passes.cpp
@@ -29,9 +30,11 @@ add_mlir_library(TauTarget
   Target/Chip.cpp
   Target/Emit.cpp
   Target/EmitKernel.cpp
+  Target/Fold.cpp
   Target/Place.cpp
   Target/Route.cpp
   Target/Schedule.cpp
+  Target/Slice.cpp
 
   DEPENDS
   MLIRTauOpsIncGen

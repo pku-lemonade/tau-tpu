@@ -18,8 +18,9 @@ chapter is homework: add something to tau-tpu, and keep every theorem true.
 It is also the whole method of the course in one piece of work. For each
 feature:
 
-1. *Write its page of the manual first.* A paragraph, and a table if it has
-   timing. Add it to your copy of `course/architecture-manual.md`.
+1. *Write its section of the docs first.* A paragraph, and a table if it has
+   timing. Add it to `Tau/Docs/Machine.md`, or to `Tau/Docs/Programs.md` if
+   it is something a program says.
 2. *Specify it.* The definitions on the path below.
 3. *Test it* against your table.
 4. *List what your paragraph left open,* and what you decided.
@@ -52,8 +53,10 @@ In dependency order. A small feature touches only the first few.
 
 1. `Tau/Data/Word.lean`: what it does to a lane or a word.
 2. `Tau/Isa/Op.lean`: its name as an operation, and its meaning in `wordSem`.
+   `Tau/Isa/Encode.lean`: its number in the image, both ways.
 3. `Tau/Isa/Instr.lean` and `Tau/SliceLevel/Machine.lean`: its instruction,
-   and what `exec` does with it.
+   and what `exec` does with it. `Tau/SliceLevel/Issues.lean` if it issues a
+   word in a new way. `Tau/Isa/Encode.lean` again, for the instruction.
 4. `Tau/Proofs/SliceLevel/Map.lean`: the machine still does not look at its
    values.
 5. `Tau/IR/Kernel.lean`, `Tau/IR/Expr.lean` and their proofs, if kernels can
@@ -62,7 +65,9 @@ In dependency order. A small feature touches only the first few.
 7. `Tau/CellLevel/Machine.lean` and `Tau/Proofs/CellLevel/Refine.lean`: how
    the slice does it with blocks, and that this is the same thing.
 8. `Tau/Sim/Json.lean`: reading it from a file.
-9. `compiler/`: the dialect and the passes. Optional: without it, write your
+9. `compiler/`: the dialect, the passes, and `encodeEntry` in
+   `compiler/lib/Target/Emit.cpp`. `frontend/tau/__init__.py`: a function for
+   it that records and one that computes. Optional: without them, write your
    test programs by hand as Lean values, as `tests/TauTest/Features.lean`
    does.
 10. A test in `tests/TauTest/`, and an example under `examples/`.
@@ -77,10 +82,11 @@ done before doing your own. `git log` and `git show` on the files above show
 the changes.
 
 *An operation.* `neg` negates every lane. It is a constructor of `UnOp`, a
-line in `UnOp.kind`, and a line in `wordSem`. Nothing else in Lean changed:
-no instruction, no proof. The machine, the kernels and the checker were
-written for any set of operations, so they already handle it. That is what
-writing against `Sem` bought.
+line in `UnOp.kind`, a line in `wordSem`, and a number in
+`Tau/Isa/Encode.lean`. Nothing else in Lean changed: no instruction, no
+proof. The machine, the kernels and the checker were written for any set of
+operations, so they already handle it. That is what writing against `Sem`
+bought.
 
 *An instruction.* `seed` replaces the matrix slice's accumulator by a word
 from a stream. It is a constructor of `Instr`, a case in `exec`, and one new
@@ -114,20 +120,26 @@ Pick one.
   half of the lanes.
 
 Steps: `Tau/Data/Word.lean` if it needs a helper, then `Tau/Isa/Op.lean`,
-then `Tau/Sim/Json.lean`. Add `#guard` lines to `tests/TauTest/Features.lean`
+then `Tau/Isa/Encode.lean`, where it needs a number that no other operation
+has, in `encode` and in `decode`, then `Tau/Sim/Json.lean`. Add `#guard` lines to `tests/TauTest/Features.lean`
 with inputs for which you worked the answer out by hand, including a
 negative lane.
 
 You are done when `lake build Tau TauTest` succeeds. Notice that you did not
-touch a proof, and say why.
+touch a proof, and say why. For the proof in `Tau/Proofs/Isa/Encode.lean`,
+say what would have happened had you given your operation a number that is
+already taken.
 
 Then state one fact about your operation on a single lane and prove it with
 `bv_decide`, in the style of `Tau/Proofs/Data/Lane.lean`.
 
 With the compiler: add the operation to
 `compiler/include/tau/Dialect/TauOps.td` and to `isUnaryKernelOp` or
-`isBinaryKernelOp` in `compiler/lib/Target/Chip.cpp`, write an example
-kernel with its buffers, and run `scripts/check-examples.sh`.
+`isBinaryKernelOp` in `compiler/lib/Target/Chip.cpp`, give it its number in
+`encodeEntry` in `compiler/lib/Target/Emit.cpp`, add a function for it to
+`frontend/tau/__init__.py`, write an example in Python with its buffers, and
+run `scripts/check-examples.sh`. If the number in the C++ is not the number
+in Lean, say which line of the script's output tells you.
 
 ## An instruction
 
@@ -141,7 +153,9 @@ Pick one.
   another unchanged. This lets a word turn round.
 
 Steps 3, 4, 6, 7 and 8 of the path. For each proof, find the existing case
-that is most like yours and copy its shape.
+that is most like yours and copy its shape. Decide whether your instruction
+issues a word, in the sense of Machine 3.9, and check that
+`issued` in `Tau/SliceLevel/Issues.lean` agrees.
 
 You are done when `lake build Tau TauTest` succeeds, with a hand-written
 program in `tests/TauTest/Features.lean` that uses your instruction, run on

@@ -8,6 +8,8 @@ index filled in. The result has no loops.
 
 This is the Lean model of the compiler's `tau-unroll` pass. The proof that it
 does not change what a kernel computes is in `Tau/Proofs/Passes/Unroll.lean`.
+
+Docs: Compiler 4, Programs 3 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -25,6 +27,7 @@ def Stmt.inst (k : Nat) : Stmt → Stmt
   | .affine dst x bias buf ix n => .affine dst x bias buf (ix.inst k) n
   | .const dst xs => .const dst xs
   | .sel dst m a b => .sel dst m a b
+  | .pin t s => .pin (t.inst k) (s.inst k)
 
 /-- The first `n` iterations of a loop body, written out. -/
 def unrollLoop (body : List Stmt) : Nat → List Stmt

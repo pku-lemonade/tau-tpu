@@ -12,6 +12,8 @@ It is built from an accumulator by putting a multiplier in front of the input.
 In tau-tpu each lane of the matrix slice is one MAC cell.
 
 Terms to look up: *multiply-accumulate*, *dot product*.
+
+Docs: Machine 2.3 (`Tau/Docs/`).
 -/
 
 namespace Tau

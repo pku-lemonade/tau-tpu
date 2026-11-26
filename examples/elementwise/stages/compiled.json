@@ -59,37 +59,6 @@
       "time": 0
     },
     {
-      "addr": 0,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "gap": 8,
-      "op": "read",
-      "repeats": 1,
-      "slice": 3,
-      "stride": 0,
-      "time": 1
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 4
-    },
-    {
       "addr": 4,
       "op": "write",
       "slice": 2,
@@ -113,22 +82,76 @@
       "time": 9
     },
     {
-      "a": {
+      "addr": 1,
+      "dst": {
         "dir": "east",
         "id": 0
       },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
+      "gap": 7,
+      "op": "read",
+      "repeats": 1,
+      "slice": 2,
+      "stride": 0,
+      "time": 25
+    },
+    {
+      "addr": 2,
       "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "gap": 8,
+      "op": "read",
+      "repeats": 1,
+      "slice": 2,
+      "stride": 0,
+      "time": 43
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 62
+    },
+    {
+      "addr": 5,
+      "op": "write",
+      "slice": 2,
+      "src": {
         "dir": "west",
         "id": 0
       },
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4,
-      "time": 13
+      "time": 70
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "gap": 7,
+      "op": "read",
+      "repeats": 1,
+      "slice": 2,
+      "stride": 2,
+      "time": 71
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "gap": 8,
+      "op": "read",
+      "repeats": 1,
+      "slice": 3,
+      "stride": 0,
+      "time": 1
     },
     {
       "addr": 4,
@@ -151,6 +174,101 @@
       "time": 18
     },
     {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "gap": 7,
+      "op": "read",
+      "repeats": 1,
+      "slice": 3,
+      "stride": 0,
+      "time": 26
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "gap": 8,
+      "op": "read",
+      "repeats": 1,
+      "slice": 3,
+      "stride": 0,
+      "time": 44
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "gap": 8,
+      "op": "read",
+      "repeats": 1,
+      "slice": 3,
+      "stride": 0,
+      "time": 63
+    },
+    {
+      "addr": 5,
+      "op": "write",
+      "slice": 3,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 78
+    },
+    {
+      "addr": 5,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 80
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "east",
+        "id": 1
+      },
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 4,
+      "time": 4
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "east",
+        "id": 1
+      },
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4,
+      "time": 13
+    },
+    {
       "a": {
         "dir": "east",
         "id": 0
@@ -169,45 +287,6 @@
       "time": 21
     },
     {
-      "addr": 0,
-      "gap": 7,
-      "op": "write",
-      "repeats": 1,
-      "slice": 5,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "stride": 4,
-      "time": 24
-    },
-    {
-      "addr": 1,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "gap": 7,
-      "op": "read",
-      "repeats": 1,
-      "slice": 2,
-      "stride": 0,
-      "time": 25
-    },
-    {
-      "addr": 1,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "gap": 7,
-      "op": "read",
-      "repeats": 1,
-      "slice": 3,
-      "stride": 0,
-      "time": 26
-    },
-    {
       "a": {
         "dir": "east",
         "id": 0
@@ -224,16 +303,6 @@
       "op": "bin",
       "slice": 4,
       "time": 29
-    },
-    {
-      "addr": 4,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 5,
-      "time": 36
     },
     {
       "a": {
@@ -272,45 +341,6 @@
       "time": 39
     },
     {
-      "addr": 1,
-      "gap": 18,
-      "op": "write",
-      "repeats": 1,
-      "slice": 5,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "stride": 1,
-      "time": 42
-    },
-    {
-      "addr": 2,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "gap": 8,
-      "op": "read",
-      "repeats": 1,
-      "slice": 2,
-      "stride": 0,
-      "time": 43
-    },
-    {
-      "addr": 2,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "gap": 8,
-      "op": "read",
-      "repeats": 1,
-      "slice": 3,
-      "stride": 0,
-      "time": 44
-    },
-    {
       "a": {
         "dir": "east",
         "id": 0
@@ -327,26 +357,6 @@
       "op": "bin",
       "slice": 4,
       "time": 47
-    },
-    {
-      "addr": 0,
-      "op": "write",
-      "slice": 6,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 51
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 6,
-      "time": 54
     },
     {
       "a": {
@@ -385,29 +395,6 @@
       "time": 58
     },
     {
-      "addr": 3,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 2,
-      "time": 62
-    },
-    {
-      "addr": 3,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "gap": 8,
-      "op": "read",
-      "repeats": 1,
-      "slice": 3,
-      "stride": 0,
-      "time": 63
-    },
-    {
       "a": {
         "dir": "east",
         "id": 0
@@ -424,29 +411,6 @@
       "op": "bin",
       "slice": 4,
       "time": 66
-    },
-    {
-      "addr": 5,
-      "op": "write",
-      "slice": 2,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 70
-    },
-    {
-      "addr": 3,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "gap": 7,
-      "op": "read",
-      "repeats": 1,
-      "slice": 2,
-      "stride": 2,
-      "time": 71
     },
     {
       "a": {
@@ -467,26 +431,6 @@
       "time": 75
     },
     {
-      "addr": 5,
-      "op": "write",
-      "slice": 3,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 78
-    },
-    {
-      "addr": 5,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 80
-    },
-    {
       "a": {
         "dir": "east",
         "id": 0
@@ -505,6 +449,42 @@
       "time": 83
     },
     {
+      "addr": 0,
+      "gap": 7,
+      "op": "write",
+      "repeats": 1,
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "stride": 4,
+      "time": 24
+    },
+    {
+      "addr": 4,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 36
+    },
+    {
+      "addr": 1,
+      "gap": 18,
+      "op": "write",
+      "repeats": 1,
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "stride": 1,
+      "time": 42
+    },
+    {
       "addr": 3,
       "op": "write",
       "slice": 5,
@@ -513,6 +493,26 @@
         "id": 0
       },
       "time": 86
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 51
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 6,
+      "time": 54
     }
   ]
 }

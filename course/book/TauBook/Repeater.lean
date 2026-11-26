@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The repeater" =>
 *Terms to look up:* down counter, loop counter.
 
-*Source:* `course/architecture-manual.md`, section 2.7.
+*Source:* `Tau/Docs/Machine.md`, section 2.7.
 
 *Specify:* `course/Specs/Repeater.lean`.
 
@@ -25,10 +25,10 @@ The invariant is for reading.
 
 # Specify it first
 
-Stop reading here. Open section 2.7 of the manual and
+Stop reading here. Open section 2.7 of `Machine.md` and
 `course/Specs/Repeater.lean`, and follow the steps at the top of the file.
 
-This one is harder than the memory, because the manual describes the
+This one is harder than the memory, because the doc describes the
 repeater twice: by what it issues on each cycle, and by the registers it is
 built from. You may write either. The "State" step asks for the other one,
 and for the statement that the two agree. Come back when the report says
@@ -115,7 +115,7 @@ example (prog : List (Entry Nat)) (inp : Signal Unit) (t : Nat) :
 
 This is a small refinement proof, the first in the course: a description
 with state against a description without. The chapter on the cell-level
-machine does the same for the whole chip, and uses this theorem to do it.
+machine does the same for the whole machine, and uses this theorem to do it.
 
 The work is in one lemma about one entry, `Entry.slotAt_spec`. It says what
 the registers hold at every cycle. In words: at the start of cycle `t` some
@@ -138,7 +138,7 @@ statement says "there is a `k`", and the proof supplies it.
 
 # How to work through it
 
-1. Specify the repeater from the manual, as above.
+1. Specify the repeater from the doc, as above.
 2. Read `Tau/Blocks/Repeater.lean`. In your scratch file define an entry of
    your own and evaluate `timeAt`, `dueAt` and `slotAt` at several cycles.
 3. Which of the two descriptions did you write, the one with registers or the

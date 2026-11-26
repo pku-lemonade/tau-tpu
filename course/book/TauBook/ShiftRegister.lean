@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Read:* `Tau/Blocks/Basic.lean`, `Tau/Blocks/ShiftRegister.lean`.
 
-*In the manual:* `course/architecture-manual.md`, section 2.1. Read it after the definition,
+*In the doc:* `Tau/Docs/Machine.md`, section 2.1. Read it after the definition,
 and see how much less it says.
 
 *Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Basic.lean`,

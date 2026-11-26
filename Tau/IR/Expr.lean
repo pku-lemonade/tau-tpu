@@ -15,6 +15,8 @@ is called *symbolic execution*.
 contents.
 
 Terms to look up: *symbolic execution*, *abstract syntax tree*.
+
+Docs: Compiler 7 (`Tau/Docs/`).
 -/
 
 namespace Tau

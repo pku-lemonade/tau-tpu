@@ -10,16 +10,25 @@ The middle form a program takes in the compiler, and the output of
 `tau-place`. The kernel has become machine instructions. Every buffer has a
 home in some memory, every operation has a slice, and the compiler has decided
 which values travel directly and which wait in memory. What is still missing
-is time: no instruction has a cycle, and no word has a stream.
+is time: no instruction has a cycle, unless it is pinned, and no word has a
+stream.
 
 A placed program is a list of instructions to be carried out one after
 another, as if each took effect at once. `Placed.execute` gives that meaning.
 It reuses the slice state of the slice-level machine and ignores streams and
 pipes. A word in transit is named by a variable, as in a kernel.
 
-The three forms, in order: `Tau/IR/Kernel.lean`, this file,
-`Tau/IR/Compiled.lean`. The theorems about this one are in
+An instruction may carry a pin, the cycle it must be issued on
+(`Tau/Isa/Event.lean`). The pins of the kernel are now on the instructions
+that issue the pinned words. Running a placed program gives the events of its
+pinned instructions (`Placed.timeline`), although it has no cycles of its
+own yet.
+
+The four forms, in order: `Tau/IR/Source.lean`, `Tau/IR/Kernel.lean`, this
+file, `Tau/IR/Compiled.lean`. The theorems about this one are in
 `Tau/Proofs/IR/Placed.lean`.
+
+Docs: Compiler 2 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -55,11 +64,41 @@ inductive PInstr where
   /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
   the accumulator. -/
   | macw (j : Nat)
+  /-- The instruction `i`, to be issued on cycle `t`. -/
+  | pin (t : Nat) (i : PInstr)
   deriving DecidableEq, Repr
+
+/-- The word an instruction issues, if it issues one: the variable that holds
+it, and for a write the address. -/
+def PInstr.target : PInstr → Option (Var × Option Nat)
+  | .read dst _ => some (dst, none)
+  | .write src addr => some (src, some addr)
+  | .un dst _ _ => some (dst, none)
+  | .bin dst _ _ _ => some (dst, none)
+  | .emit dst => some (dst, none)
+  | .const dst _ => some (dst, none)
+  | .sel dst _ _ _ => some (dst, none)
+  | .pin _ i => i.target
+  | _ => none
+
+/-- The cycles an instruction is pinned to. -/
+def PInstr.pins : PInstr → List Nat
+  | .pin t i => t :: i.pins
+  | _ => []
+
+/-- What a pinned instruction at the slice at `p` issues, once it has run and
+the words in transit are `vars`: its word, on each cycle it is pinned to. -/
+def PInstr.issues (p : Nat) (i : PInstr) (vars : List (Var × V)) : List (Issue V) :=
+  match i.target with
+  | some (v, addr) =>
+    match vars.lookup v with
+    | some w => i.pins.map fun t => ⟨t, p, addr, w⟩
+    | none => []
+  | none => []
 
 /-- The output of `tau-place`. -/
 structure Placed where
-  /-- The chip the program is for. -/
+  /-- The machine the program is for. -/
   cfg : Config
   /-- The number of words in the memory at each position. -/
   memSizes : List Nat
@@ -69,12 +108,15 @@ structure Placed where
   instrs : List (Nat × PInstr)
   deriving Repr
 
-/-- The words in transit and the state of every slice. -/
+/-- The words in transit, the state of every slice, and what the pinned
+instructions have issued so far. -/
 structure PState (V : Type) where
   /-- Words in transit, most recent first. -/
   vars : List (Var × V)
   /-- The state of the slice at each position. -/
   slices : List (Slice V)
+  /-- What the pinned instructions have issued, most recent first. -/
+  issues : List (Issue V)
 
 /-- Carry out one instruction at a slice of the given kind. `none` if the
 slice is of the wrong kind, an address is out of range, or a word is used
@@ -149,6 +191,7 @@ def PInstr.exec (S : Sem V) (kind : Kind) (vars : List (Var × V)) (sl : Slice V
       match sl.x, sl.weights[j]? with
       | some x, some w => some (vars, { sl with acc := S.mac j sl.acc x w })
       | _, _ => none
+  | .pin _ i => i.exec S kind vars sl
 
 /-- Carry out one instruction at the slice at position `p`. -/
 def PState.step (S : Sem V) (cfg : Config) (st : PState V) (p : Nat) (i : PInstr) :
@@ -156,7 +199,7 @@ def PState.step (S : Sem V) (cfg : Config) (st : PState V) (p : Nat) (i : PInstr
   match cfg.kindAt p, st.slices[p]? with
   | some kind, some sl =>
     match i.exec S kind st.vars sl with
-    | some (vars, sl') => some ⟨vars, st.slices.set p sl'⟩
+    | some (vars, sl') => some ⟨vars, st.slices.set p sl', i.issues p vars ++ st.issues⟩
     | none => none
   | _, _ => none
 
@@ -172,12 +215,24 @@ def PState.run (S : Sem V) (cfg : Config) : PState V → List (Nat × PInstr) �
 contents. -/
 def Placed.execute (S : Sem V) (pl : Placed) (image : List (List V)) :
     Option (List (List V)) :=
-  match PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices⟩ pl.instrs with
+  match PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices, []⟩ pl.instrs with
   | some st => some (st.slices.map (·.words))
   | none => none
+
+/-- The events of a placed program run from a memory image: the word of every
+pinned instruction, with its cycle. Empty if the run fails. -/
+def Placed.timelineFrom (S : Sem V) (pl : Placed) (image : List (List V)) : List (Event V) :=
+  match PState.run S pl.cfg ⟨[], (State.init S pl.cfg image).slices, []⟩ pl.instrs with
+  | some st => st.issues.filterMap (Issue.event pl.map)
+  | none => []
 
 /-- The starting memory contents for the given buffer contents. -/
 def Placed.image (pl : Placed) (bufs : List (List V)) (fill : V) : List (List V) :=
   Tau.image pl.map pl.memSizes (bufWord bufs fill) fill
+
+/-- The events of a placed program run on the given buffer contents. -/
+def Placed.timeline (S : Sem V) (pl : Placed) (bufs : List (List V)) (fill : V) :
+    List (Event V) :=
+  pl.timelineFrom S (pl.image bufs fill)
 
 end Tau

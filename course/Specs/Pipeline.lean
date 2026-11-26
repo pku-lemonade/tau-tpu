@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: the pipeline
 
-Source: `course/architecture-manual.md`, section 2.4.
+Source: `Tau/Docs/Machine.md`, section 2.4.
 
 The steps, which are the same in every file of this folder:
 
@@ -34,7 +34,7 @@ def pipeline (d : Nat) (f : Int → Int) (reset : Int) : Block (State d) Int Int
 
 #eval report "the pipeline" (Tables.pipeline pipeline)
 
--- #eval report "the pipeline, what the manual leaves open" (Tables.pipelineDecisions pipeline)
+-- #eval report "the pipeline, what the doc leaves open" (Tables.pipelineDecisions pipeline)
 
 /-! ## State -/
 

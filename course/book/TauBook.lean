@@ -13,6 +13,8 @@ import TauBook.SliceLevel
 import TauBook.Kernels
 import TauBook.Expressions
 import TauBook.Checker
+import TauBook.Pins
+import TauBook.Flow
 import TauBook.CellLevel
 import TauBook.EndToEnd
 import TauBook.Extending
@@ -31,11 +33,11 @@ shortTitle := "tau-tpu"
 
 This is a self-paced course in writing specifications in Lean 4. It works
 through a real development from the bottom up: tau-tpu, a small statically
-scheduled tensor processor, a compiler for it, and the proofs that connect
+scheduled machine for tensor programs, a compiler for it, and the proofs that connect
 them.
 
-The skill it teaches is turning something that is not Lean, an architecture
-manual or a compiler pass in C++, into definitions and statements precise
+The skill it teaches is turning something that is not Lean, a description of
+hardware in words or a compiler pass in C++, into definitions and statements precise
 enough to prove things about. The proofs themselves it mostly leaves to an
 AI agent, and teaches you to read them and to judge what comes back.
 
@@ -43,9 +45,10 @@ After two introductory chapters, three chapters take a small hardware
 component each, read its specification and prove what it does, so that you
 know what a proof is. One chapter sets out the method. From then on you
 write the specification first: four more components, the machine, the
-compiler's input, two of its passes, and a rule for its schedules. Two
-chapters read the two large proofs of the development. One states the
-result, and one sets homework: extend the machine.
+compiler's input, two of its passes, a rule for its schedules, what it means
+to be on time, and how a program becomes numbers. Two chapters read the two
+large proofs of the development. One states the result, and one sets
+homework: extend the machine.
 
 {include 1 TauBook.StartHere}
 
@@ -74,6 +77,10 @@ result, and one sets homework: extend the machine.
 {include 1 TauBook.Expressions}
 
 {include 1 TauBook.Checker}
+
+{include 1 TauBook.Pins}
+
+{include 1 TauBook.Flow}
 
 {include 1 TauBook.CellLevel}
 

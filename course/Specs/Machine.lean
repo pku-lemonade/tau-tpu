@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: streams and instructions
 
-Source: `course/architecture-manual.md`, sections 3.2, 3.5 and 3.7.
+Source: `Tau/Docs/Machine.md`, sections 3.2, 3.5 and 3.7.
 
 Two parts of the machine, small enough to write in an afternoon. The types
 are the ones in `Tau/Isa/Instr.lean` and at the top of
@@ -44,7 +44,7 @@ def advanceWest (placed : Nat → Option Int) (row : List (Option Int)) : List (
 #eval report "stream going east" (Tables.streamEast advanceEast)
 #eval report "stream going west" (Tables.streamWest advanceWest)
 
--- #eval report "streams, what the manual leaves open" (Tables.streamEastDecisions advanceEast)
+-- #eval report "streams, what the doc leaves open" (Tables.streamEastDecisions advanceEast)
 
 /-! ## Instructions -/
 
@@ -67,7 +67,7 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V) (sl 
 
 #eval report "instructions" (Tables.exec exec)
 
--- #eval report "instructions, what the manual leaves open" (Tables.execDecisions exec)
+-- #eval report "instructions, what the doc leaves open" (Tables.execDecisions exec)
 
 /-! ## State -/
 

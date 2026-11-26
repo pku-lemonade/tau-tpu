@@ -67,3 +67,27 @@ compiler (see `Tau/Proofs/Data/Lane.lean`).
 /-- info: 'Tau.repeater_outAt' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.repeater_outAt
+
+/-- info: 'Tau.check_pins' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.check_pins
+
+/-- info: 'Tau.checkInlined_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.checkInlined_sound
+
+/-- info: 'Tau.passes_pins' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.passes_pins
+
+/-- info: 'Tau.issues_map' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.issues_map
+
+/-- info: 'Tau.Image.decode_encode' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.Image.decode_encode
+
+/-- info: 'Tau.end_to_end_passes' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Tau.end_to_end_passes

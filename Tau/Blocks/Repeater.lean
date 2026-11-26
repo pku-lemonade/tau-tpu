@@ -26,6 +26,8 @@ memory on consecutive cycles is one entry: read, repeat, and add one to the
 address each time.
 
 Terms to look up: *down counter*, *loop counter*.
+
+Docs: Machine 2.7 (`Tau/Docs/`).
 -/
 
 namespace Tau

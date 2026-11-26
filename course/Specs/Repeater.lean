@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: the repeater
 
-Source: `course/architecture-manual.md`, section 2.7.
+Source: `Tau/Docs/Machine.md`, section 2.7.
 
 The steps, which are the same in every file of this folder:
 
@@ -24,7 +24,7 @@ namespace Specs.Repeater
 
 open Tau Specs
 
-/-- The state of a repeater. `Unit` is a placeholder. The manual says which
+/-- The state of a repeater. `Unit` is a placeholder. The doc says which
 registers the hardware keeps for each entry. -/
 abbrev State : Type := Unit
 
@@ -34,7 +34,7 @@ def repeater (prog : List (Entry Nat)) : Block State Unit (List Nat) := todo
 
 #eval report "the repeater" (Tables.repeater repeater)
 
--- #eval report "the repeater, what the manual leaves open" (Tables.repeaterDecisions repeater)
+-- #eval report "the repeater, what the doc leaves open" (Tables.repeaterDecisions repeater)
 
 /-! ## State -/
 

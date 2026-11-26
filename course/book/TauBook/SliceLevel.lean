@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The slice-level machine" =>
 *Terms to look up:* instruction set architecture, SIMD.
 
-*Source:* `course/architecture-manual.md`, section 3.
+*Source:* `Tau/Docs/Machine.md`, section 3.
 
 *Specify:* `course/Specs/Machine.lean`.
 
@@ -26,12 +26,12 @@ specified.
 *Time:* three days.
 
 The components are done. This chapter puts a machine together. You specify
-two parts of it from the manual, read the specification of the whole, and
+two parts of it from the doc, read the specification of the whole, and
 then program the machine by hand.
 
 # Specify two parts of it first
 
-Read section 3 of the manual, all of it. Then read `Tau/Isa/Op.lean`,
+Read section 3 of `Machine.md`, all of it. Then read `Tau/Isa/Op.lean`,
 `Tau/Isa/Instr.lean`, and the first sixty lines of
 `Tau/SliceLevel/Machine.lean`, down to the definition of `State`. Those are
 the types: operations, instructions, traps, the state of a slice. Stop
@@ -56,7 +56,7 @@ that all rows agree.
 `Timed.once slice time instr` is an instruction issued once. The other three
 fields make it repeat, and are explained below.
 
-A program is a list of timed instructions, and a chip is described by a
+A program is a list of timed instructions, and a machine is described by a
 `Config`:
 
 {docstring Tau.Config}
@@ -87,11 +87,11 @@ specification: it says which programs the hardware gives no meaning to.
 
 # The timing rule, on the smallest example
 
-Here is a chip with three slices: a memory, a vector slice, a memory. Each
+Here is a machine with three slices: a memory, a vector slice, a memory. Each
 has a delay of one cycle and there is one stream in each direction.
 
 ```lean
-def tinyChip : Tau.Config where
+def tinyMachine : Tau.Config where
   kinds := [.mem, .vxm, .mem]
   streams := 1
   memDelay := 1
@@ -151,7 +151,7 @@ explains these. `exprSem` tells the machine to compute with names.
 def startImage : List (List Expr) := [[.init 0 0], [], [.fill]]
 
 example :
-    execute exprSem tinyChip copyProgram 5 startImage
+    execute exprSem tinyMachine copyProgram 5 startImage
       = .ok [[.init 0 0], [], [.init 0 0]] := by
   rfl
 ```
@@ -167,7 +167,7 @@ def lateProgram : Program :=
     .once 2 5 (.write ⟨.east, 0⟩ 0) ]
 
 example :
-    execute exprSem tinyChip lateProgram 6 startImage
+    execute exprSem tinyMachine lateProgram 6 startImage
       = .error ⟨.emptyRead, 2, 5⟩ := by
   rfl
 ```
@@ -184,7 +184,7 @@ def copyTwo : Program :=
     { slice := 2, time := 4, instr := .write ⟨.east, 0⟩ 0, repeats := 1, stride := 1 } ]
 
 example :
-    execute exprSem tinyChip copyTwo 6 [[.init 0 0, .init 0 1], [], [.fill, .fill]]
+    execute exprSem tinyMachine copyTwo 6 [[.init 0 0, .init 0 1], [], [.fill, .fill]]
       = .ok [[.init 0 0, .init 0 1], [], [.init 0 0, .init 0 1]] := by
   rfl
 ```
@@ -212,7 +212,7 @@ course.
 # A real program
 
 `tests/TauTest/Linear.lean` contains a quantized linear layer scheduled by
-hand on a nine-slice chip, with a comment on each instruction. Follow one
+hand on a nine-slice machine, with a comment on each instruction. Follow one
 value through it: the word `x` leaves slice 2 on cycle 0 and is used by slice
 0 on cycle 4. Check that against the rule: 0 + 1 + 1 + 2 = 4. Then check the
 arrival of `W * x` and of `b` at slice 4 on cycle 14.
@@ -222,11 +222,11 @@ now.
 
 # How to work through it
 
-1. Read section 3 of the manual, and the types, as above.
+1. Read section 3 of `Machine.md`, and the types, as above.
 2. Specify streams and instructions in `course/Specs/Machine.lean`.
 3. Read `Tau/SliceLevel/Machine.lean` top to bottom. Compare `advanceRow` and
    `exec` with yours. In which order does the repository's `exec` make its
-   checks? The manual does not say, and the `Decisions` table shows that the
+   checks? The doc does not say, and the `Decisions` table shows that the
    order can be seen from outside.
 4. Copy the tiny example above into your scratch file and change it: move the
    read to cycle 3, make the word travel west from slice 2 to slice 0, add a
@@ -243,10 +243,10 @@ now.
 
 *State.* `MovesOnePosition` in that file.
 
-*By hand.* On the nine-slice chip of `tests/TauTest/Linear.lean`, write a
+*By hand.* On the nine-slice machine of `tests/TauTest/Linear.lean`, write a
 schedule that adds a word held in slice 2 to a word held in slice 3 and
 stores the sum in slice 5. Make a file `course/Work/Add.lean` that starts
-with the chip and the helpers of that test, and fill in the four times:
+with the machine and the helpers of that test, and fill in the four times:
 
 ```
 import TauTest.Linear
@@ -271,13 +271,13 @@ different distances from it. You are done when the guard passes. Then make
 the program one cycle shorter, or convince yourself that it cannot be done.
 You are doing by hand what the compiler's scheduler does.
 
-*By hand.* Write seven small programs for `tinyChip`, each of which traps with
+*By hand.* Write seven small programs for `tinyMachine`, each of which traps with
 a different one of the seven kinds of trap, and check each with an
 `example ... := by rfl` as above. One of the seven is raised by `execute`
 before the first cycle.
 
 *State.* The theorem `arrives_east` has the hypothesis `hfree`. Write a
-program for `tinyChip` in which `hfree` is false, run it, and say what the
+program for `tinyMachine` in which `hfree` is false, run it, and say what the
 slice at the far end reads. Then answer: is the statement without `hfree`
 false, or only harder to prove?
 
@@ -292,5 +292,5 @@ chapter: what it is, and how it stands.
 # Checkpoint
 
 The three reports say that all rows agree. Your add schedule passes its
-guard. Given a schedule and the chip, you can say on which cycle a given word
+guard. Given a schedule and the machine, you can say on which cycle a given word
 is at a given position, and which theorem says so.

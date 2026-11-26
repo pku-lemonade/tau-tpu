@@ -5,7 +5,7 @@ set_option linter.unusedVariables false
 /-!
 # Specify: a rule for schedules
 
-Source: `course/architecture-manual.md`, section 3.4, and
+Source: `Tau/Docs/Machine.md`, section 3.4, and
 `compiler/lib/Target/Schedule.cpp`.
 
 The checks of the course ask whether a compiled program computes its kernel.

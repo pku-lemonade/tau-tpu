@@ -65,8 +65,9 @@ EXERCISES: dict[str, set[str] | None] = {
     "Blocks/SystolicArray.lean": {"systolicArray_matvec"},
     "Passes/Unroll.lean": {"Idx.eval_inst", "Stmt.exec_inst", "Kernel.run_unroll"},
     "Check/Simplify.lean": ALL,
-    "Check/Sound.lean": {"check_sound", "check_safe"},
-    "Check/Passes.lean": {"checkKernels_sound", "passes_sound"},
+    "Check/Sound.lean": {"check_sound", "check_pins", "check_safe"},
+    "Check/Passes.lean": {"checkKernels_sound", "checkKernels_pins", "passes_sound",
+                          "passes_pins"},
     "EndToEnd.lean": ALL,
 }
 

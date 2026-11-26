@@ -6,7 +6,7 @@ import Tau.Proofs.Blocks.Repeater
 /-!
 # The cell-level machine refines the slice-level machine
 
-The main result is `cellExecute_eq`: for every chip, program, cycle count and
+The main result is `cellExecute_eq`: for every machine, program, cycle count and
 starting memory, the cell-level machine and the slice-level machine on real
 words give the same result. They trap on the same cycle for the same reason,
 or they end with the same memory contents.

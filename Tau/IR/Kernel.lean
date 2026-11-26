@@ -1,19 +1,33 @@
 import Tau.Isa.Op
+import Tau.Isa.Event
 
 /-!
 # Kernels
 
-A *kernel* is the program a user writes: load words from buffers, compute, and
-store words back. It says nothing about slices, streams or cycles. It is the
-Lean model of the compiler's `tau` dialect (see `compiler/`).
+A *kernel* is a program with no machine in it: load words from buffers, compute,
+and store words back. It says nothing about slices or streams, and about
+cycles only where a statement is pinned. It is the Lean model of one function
+of the compiler's `tau` dialect (see `compiler/`), and the second form a
+program takes: a source program (`Tau/IR/Source.lean`) is a kernel that may
+also call other kernels, and `tau-inline` turns it into one that does not.
 
-What a kernel computes (`Kernel.run`) is the definition of correctness for
-everything below it: a compiled program is right if the machine, running it,
-ends with the buffer contents that `Kernel.run` gives.
+What a kernel computes (`Kernel.run`) and what a source program computes are
+defined by the same statements, in this file. Together they are the
+definition of correctness for everything below: a compiled program is right
+if the machine, running it, ends with the buffer contents that the source
+gives.
+
+A statement may carry a *pin*: the cycle on which its word must be issued
+(`Tau/Isa/Event.lean`). A pin does not change what the kernel computes. Running
+a kernel also gives its *timeline* (`Kernel.timeline`): for every pinned
+statement, the word and the cycle. A compiled program keeps the pins if the
+machine issues those words on those cycles.
 
 Like the machine, kernels are given meaning over an arbitrary `Sem`.
 
 Terms to look up: *intermediate representation*, *SSA form*, *loop unrolling*.
+
+Docs: Programs 1 to 3 and 5 (`Tau/Docs/`).
 -/
 
 namespace Tau
@@ -52,7 +66,23 @@ inductive Stmt where
   | const (dst : Var) (xs : List Int)
   /-- `dst = sel m a b`: lane by lane, `a` where `m` is not zero, else `b`. -/
   | sel (dst : Var) (m a b : Var)
+  /-- The statement `s`, with its word issued on cycle `t`. Inside a loop the
+  cycle moves with the iteration, as a position does. -/
+  | pin (t : Idx) (s : Stmt)
   deriving DecidableEq, Repr
+
+/-- The word a statement issues: the variable that holds it, and for a store
+the buffer and position it goes to, on loop iteration `i`. -/
+def Stmt.target (i : Nat) : Stmt → Var × Option (Nat × Nat)
+  | .load dst _ _ => (dst, none)
+  | .store src buf ix => (src, some (buf, ix.eval i))
+  | .un dst _ _ => (dst, none)
+  | .bin dst _ _ _ => (dst, none)
+  | .matvec dst _ _ _ _ => (dst, none)
+  | .affine dst _ _ _ _ _ => (dst, none)
+  | .const dst _ => (dst, none)
+  | .sel dst _ _ _ => (dst, none)
+  | .pin _ s => s.target i
 
 /-- A statement, or a loop that runs its body `n` times. Loops do not nest. -/
 inductive Item where
@@ -67,16 +97,25 @@ abbrev Kernel := List Item
 
 variable {V : Type}
 
-/-- The values of a kernel's variables and the contents of its buffers. -/
+/-- The values of a kernel's variables, the contents of its buffers, and the
+events of its pinned statements so far. -/
 structure Env (V : Type) where
   /-- Variable bindings, most recent first. -/
   vars : List (Var × V)
   /-- The contents of each buffer. -/
   bufs : List (List V)
+  /-- The events so far, most recent first. -/
+  events : List (Event V)
 
 /-- Give variable `v` the value `x`. -/
 def Env.bind (env : Env V) (v : Var) (x : V) : Env V :=
   { env with vars := (v, x) :: env.vars }
+
+/-- Record that the word of variable `v` is issued on cycle `t`. -/
+def Env.issue (env : Env V) (t : Nat) (target : Var × Option (Nat × Nat)) : Env V :=
+  match env.vars.lookup target.1 with
+  | some w => { env with events := ⟨t, target.2, w⟩ :: env.events }
+  | none => env
 
 /-- `init` plus the product of a matrix with `x`, built up one column at a
 time. `cols j` is column `j`; the result is `none` if a column is missing. -/
@@ -128,6 +167,10 @@ def Stmt.exec (S : Sem V) (i : Nat) (env : Env V) : Stmt → Option (Env V)
     match env.vars.lookup m, env.vars.lookup a, env.vars.lookup b with
     | some vm, some va, some vb => some (env.bind dst (S.sel vm va vb))
     | _, _, _ => none
+  | .pin t s =>
+    match s.exec S i env with
+    | some env' => some (env'.issue (t.eval i) (s.target i))
+    | none => none
 
 /-- Run a list of statements in order, on loop iteration `i`. -/
 def execStmts (S : Sem V) (i : Nat) : Env V → List Stmt → Option (Env V)
@@ -160,8 +203,15 @@ def Kernel.exec (S : Sem V) : Env V → Kernel → Option (Env V)
 
 /-- Run a kernel on the given buffer contents and return the final contents. -/
 def Kernel.run (S : Sem V) (k : Kernel) (bufs : List (List V)) : Option (List (List V)) :=
-  match Kernel.exec S ⟨[], bufs⟩ k with
+  match Kernel.exec S ⟨[], bufs, []⟩ k with
   | some env => some env.bufs
   | none => none
+
+/-- The events of a kernel run on the given buffer contents: for every pinned
+statement, its word and its cycle. Empty if the run fails. -/
+def Kernel.timeline (S : Sem V) (k : Kernel) (bufs : List (List V)) : List (Event V) :=
+  match Kernel.exec S ⟨[], bufs, []⟩ k with
+  | some env => env.events
+  | none => []
 
 end Tau

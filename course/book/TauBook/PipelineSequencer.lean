@@ -12,7 +12,7 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Pipeline and sequencer" =>
 *Terms to look up:* pipelining, latency, program counter, static scheduling.
 
-*Source:* `course/architecture-manual.md`, sections 2.4 and 2.6.
+*Source:* `Tau/Docs/Machine.md`, sections 2.4 and 2.6.
 
 *Specify:* `course/Specs/Pipeline.lean`, `course/Specs/Sequencer.lean`.
 
@@ -28,13 +28,13 @@ set_option verso.code.warnLineLength 100
 
 These are your first two specifications. Stop reading here.
 
-Open sections 2.4 and 2.6 of the manual, and the two files under
+Open sections 2.4 and 2.6 of `Machine.md`, and the two files under
 `course/Specs/`. Follow the steps at the top of each file: choose the state,
-write the block, read the report, list what the manual does not say. Come
+write the block, read the report, list what the doc does not say. Come
 back when both reports say that all rows agree.
 
 The rest of this chapter shows the definitions in the repository. They are
-one way to say what the manual says. Yours is another.
+one way to say what the doc says. Yours is another.
 
 # The pipeline
 
@@ -84,7 +84,7 @@ The input type is `Unit`, the type with one value `()`. A sequencer takes no
 information from outside. Its state is the cycle count.
 
 The sequencer is where static scheduling lives. Nothing that happens while
-the chip runs can change when an instruction is issued.
+the machine runs can change when an instruction is issued.
 
 This sequencer needs no real state: it compares a cycle count with the times
 in the program. The chapter after next builds one that has state, and that is
@@ -92,7 +92,7 @@ the one tau-tpu uses.
 
 # How to work through it
 
-1. Specify the pipeline and the sequencer from the manual, as above.
+1. Specify the pipeline and the sequencer from the doc, as above.
 2. Read both definition files in `Tau/Blocks/`. Compare the states. The
    repository builds the pipeline out of the shift register and `mapIn`, so
    its state is the shift register's. The state of its sequencer is the
