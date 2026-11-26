@@ -16,38 +16,37 @@ compiler for it, and the proofs that connect them.
   separately.
 
 ```
-kernel.py ─frontend→ kernel.mlir ─tauc→ source → kernel → simplified → unrolled → placed
-                                         → scheduled → routed → sliced → compiled → image
+Machine (9 slices, 1 hop/cycle along east & west streams):
+  ──east──▶ [0:mxm] [1:sxm] [2:mem] [3:mem] [4:vxm] [5:mem] [6:mem] [7:sxm] [8:mxm]
+  ◀─west──
+
+Flow:
+  kernel.py ─frontend→ kernel.mlir ─tauc→ source → ... → compiled → image
+                                            │                        │
+                                            └─────── tau-check ──────┘ (proved sound)
+                                                       compiled = cell-level (cellExecute_eq)
 ```
 
 **Taking the course?** Start in [`course/`](course/README.md). The rest of
 this file describes the project the course is about.
 
-## Where to read
-
-| For | Read |
-|---|---|
-| the specification, and the map from its docs to its Lean | [`Tau/Docs/README.md`](Tau/Docs/README.md), sections 1 to 3 |
-| the machine, in words | [`Tau/Docs/Machine.md`](Tau/Docs/Machine.md) |
-| what a program is and what it promises | [`Tau/Docs/Programs.md`](Tau/Docs/Programs.md) |
-| what a compiler has to deliver | [`Tau/Docs/Compiler.md`](Tau/Docs/Compiler.md) |
-| what is proved, checked, tested or trusted | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 4 |
-| the files the tools exchange | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 5 |
-| how this compiler works, and its limits | [`compiler/README.md`](compiler/README.md) |
-| the course | [`course/README.md`](course/README.md) |
-
 ## What is proved
 
-If the checker accepts a compiled program for a source program, then for
-every contents of the buffers the cell-level machine runs the program without
-a trap and leaves in memory exactly the buffers the source program computes;
+`Tau/Proofs/EndToEnd.lean` states the main result (`end_to_end`). If the
+checker accepts a compiled program for a source program, then for every
+contents of the buffers the cell-level machine runs the program without a
+trap and leaves in memory exactly the buffers the source program computes;
 and the slice-level machine issues every word the source pins to a cycle on
-that cycle. That is `end_to_end` in `Tau/Proofs/EndToEnd.lean`.
+that cycle.
 
-The compiler and the frontend are not proved. A bug in either gives a
-program the checker rejects, not a wrong answer. Section 4 of
-[`Tau/Docs/README.md`](Tau/Docs/README.md) lists every claim and how it
-stands, including what is only tested and what is trusted.
+The theorem rests on Lean's three standard axioms and nothing else;
+`tests/TauTest/Axioms.lean` fails the build if that changes. The compiler
+and the frontend are not proved: a bug in a compiler pass gives a program
+the checker rejects, not a wrong answer. Trust begins at `source.json` (for
+Python programs, tested against the frontend's `traced.json`), the JSON
+readers (`Tau/Sim/Json.lean`), and the Lean definitions against `Tau/Docs/`.
+Section 4 of [`Tau/Docs/README.md`](Tau/Docs/README.md) lists every claim
+and how it stands, including what is only tested and what is trusted.
 
 ## Setup
 
@@ -109,45 +108,49 @@ lake exe tau-sim --timeline out/source.json examples/paced/buffers.json   # the 
 lake exe tau-sim --timeline out/image.json examples/paced/buffers.json    # every word the machine issues
 ```
 
-`tauc` writes one file per pass (section 5 of [`Tau/Docs/README.md`](Tau/Docs/README.md)),
-and each can be checked and run on its own:
-
-| File | Written after | What it is |
-|---|---|---|
-| `source.json` | parsing | the program as written, calls and all |
-| `kernel.json` | `tau-inline` | a kernel: no calls |
-| `simplified.json` | `tau-simplify` | a kernel |
-| `unrolled.json` | `tau-unroll` | a kernel with no loops |
-| `placed.json` | `tau-place` | instructions in order, with slices and addresses |
-| `scheduled.json` | `tau-schedule` | timed instructions, one stream per word |
-| `routed.json` | `tau-route` | timed instructions on the machine's streams |
-| `sliced.json` | `tau-slice` | each slice's entries, naming streams |
-| `compiled.json` | `tau-fold` | the finished program, with repeating entries |
-| `image.json` | encoding | the finished program as numbers |
-
-`tau-check` takes the input of a pass and its output, and decides whether
-they compute the same thing and the output keeps the pins of the input:
+`tauc` writes one JSON file per pass (listed in section 5 of
+[`Tau/Docs/README.md`](Tau/Docs/README.md)), and each stage can be checked
+and run on its own; a rejection names the pass that went wrong:
 
 ```bash
-lake exe tau-check out/source.json out/kernel.json          # tau-inline
-lake exe tau-check out/kernel.json out/simplified.json      # tau-simplify
-lake exe tau-check out/simplified.json out/unrolled.json    # tau-unroll
-lake exe tau-check out/unrolled.json out/placed.json        # tau-place
-lake exe tau-check out/placed.json out/scheduled.json       # tau-schedule
-lake exe tau-check out/scheduled.json out/routed.json       # tau-route
-lake exe tau-check out/routed.json out/sliced.json          # tau-slice
-lake exe tau-check out/sliced.json out/compiled.json        # tau-fold
-lake exe tau-check out/compiled.json out/image.json         # the image
+lake exe tau-check out/placed.json out/scheduled.json   # check tau-schedule
 lake exe tau-sim out/placed.json examples/paced/buffers.json
 ```
-
-A rejection names the pass that went wrong.
 
 `scripts/check-examples.sh` compiles every example, checks every pass against
 its input, runs every file, and confirms that a damaged copy of each file is
 rejected, and for a program with pins a copy that is one cycle late. For the
 examples written in Python it also compares the frontend with the compiler
 and with the Lean tools.
+
+## Where to read
+
+| For | Read |
+|---|---|
+| the specification, and the map from its docs to its Lean | [`Tau/Docs/README.md`](Tau/Docs/README.md), sections 1 to 3 |
+| the machine, in words | [`Tau/Docs/Machine.md`](Tau/Docs/Machine.md) |
+| what a program is and what it promises | [`Tau/Docs/Programs.md`](Tau/Docs/Programs.md) |
+| what a compiler has to deliver | [`Tau/Docs/Compiler.md`](Tau/Docs/Compiler.md) |
+| what is proved, checked, tested or trusted | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 4 |
+| the files the tools exchange | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 5 |
+| how this compiler works, and its limits | [`compiler/README.md`](compiler/README.md) |
+| the course | [`course/README.md`](course/README.md) |
+
+## Layout
+
+| Folder | Contents |
+|---|---|
+| `Tau/` | Lean specification, proofs, and `Tau/Docs/` |
+| `frontend/` | The Python frontend: `python3 -m tau` |
+| `compiler/` | The C++ compiler: `tauc` and `tau-opt` |
+| `tools/` | Entry points of `tau-sim` and `tau-check` |
+| `tests/` | Lean tests, run at build time |
+| `examples/` | Programs with input buffers, as MLIR or as Python |
+| `chips/` | Machine descriptions: 9 slices and 17 slices |
+| `course/` | The course: a book and exercise files |
+| `scripts/` | The examples script and the exercise generator |
+| `docker/`, `.devcontainer/` | A container with everything installed |
+| `.vscode/` | Recommended editor extension and settings |
 
 ## Examples
 
@@ -177,22 +180,6 @@ and with the Lean tools.
 | `two-layer` | written in Python; one kernel called twice, the second call from a later cycle, with a scratch buffer between |
 | `conv-taps` | written in Python; a Python loop over constant taps inside a `tau.loop` |
 | `pinned-chain` | written in Python; three pins that agree and stay in one group, and three that do not, so a word waits in memory |
-
-## Layout
-
-| Folder | Contents |
-|---|---|
-| `Tau/` | The specification: Lean definitions, statements and proofs, and in `Tau/Docs/` all the prose about them. [`Tau/Docs/README.md`](Tau/Docs/README.md) is the map. |
-| `frontend/` | The Python frontend: `python3 -m tau` |
-| `compiler/` | The C++ compiler: `tauc` and `tau-opt` |
-| `tools/` | Entry points of `tau-sim` and `tau-check` |
-| `tests/` | Lean tests, run at build time |
-| `examples/` | Programs with input buffers, as MLIR or as Python |
-| `chips/` | Machine descriptions: 9 slices and 17 slices |
-| `course/` | The course: a book and exercise files |
-| `scripts/` | The examples script and the exercise generator |
-| `docker/`, `.devcontainer/` | A container with everything installed |
-| `.vscode/` | Recommended editor extension and settings |
 
 ## Background
 
