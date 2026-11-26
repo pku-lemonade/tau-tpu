@@ -7,8 +7,8 @@ import Tau.Isa.Event
 A *kernel* is a program with no machine in it: load words from buffers, compute,
 and store words back. It says nothing about slices or streams, and about
 cycles only where a statement is pinned. It is the Lean model of one function
-of the compiler's `tau` dialect (see `compiler/`), and the second form a
-program takes: a source program (`spec/Tau/IR/Source.lean`) is a kernel that may
+of the compiler's `tau` dialect (see `compiler/`), and the second IR a
+program takes: a source program (`Tau.IR.Source`) is a kernel that may
 also call other kernels, and `tau-inline` turns it into one that does not.
 
 What a kernel computes (`Kernel.run`) and what a source program computes are
@@ -18,7 +18,7 @@ if the machine, running it, ends with the buffer contents that the source
 gives.
 
 A statement may carry a *pin*: the cycle on which its word must be issued
-(`spec/Tau/Isa/Event.lean`). A pin does not change what the kernel computes. Running
+(`Tau.Isa.Event`). A pin does not change what the kernel computes. Running
 a kernel also gives its *timeline* (`Kernel.timeline`): for every pinned
 statement, the word and the cycle. A compiled program keeps the pins if the
 machine issues those words on those cycles.

@@ -7,7 +7,7 @@ A repeater is a sequencer whose entries can repeat. An entry says: issue this
 item at this cycle, then issue it again a number of times, waiting a fixed
 number of cycles in between, and change the item in a fixed way each time.
 
-A plain sequencer (`spec/Tau/Blocks/Sequencer.lean`) could be built with nothing
+A plain sequencer (`Tau.Blocks.Sequencer`) could be built with nothing
 but a cycle counter. A repeater needs real state. For every entry it keeps
 three registers: how many issues are left, how many cycles until the next
 one, and the item it will issue next. No cycle count is compared with
@@ -19,7 +19,7 @@ This file gives two descriptions of the same behaviour.
   number `i` happens at cycle `timeAt i` and carries `itemAt i`.
 * `repeater` says *how*, with the three registers.
 
-`spec/Tau/Proofs/Blocks/Repeater.lean` proves they agree.
+`Tau.Proofs.Blocks.Repeater` proves they agree.
 
 In tau-tpu every slice has a repeater. Reading the columns of a matrix out of
 memory on consecutive cycles is one entry: read, repeat, and add one to the

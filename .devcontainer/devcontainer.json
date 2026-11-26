@@ -4,7 +4,7 @@
     "dockerfile": "../docker/Dockerfile",
     "context": ".."
   },
-  "postCreateCommand": "lake build Tau TauTest tau-sim tau-check",
+  "postCreateCommand": "lake build",
   "customizations": {
     "vscode": {
       "extensions": ["leanprover.lean4"]

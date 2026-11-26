@@ -1,4 +1,5 @@
 import Tau.Isa.Op
+import Tau.IR.MemMap
 
 /-!
 # Expressions
@@ -51,10 +52,6 @@ def exprSem : Sem Expr where
   sel := .sel
 
 variable {V : Type}
-
-/-- Word `idx` of buffer `buf`, or `fill` if there is no such word. -/
-def bufWord (bufs : List (List V)) (fill : V) (buf idx : Nat) : V :=
-  (bufs[buf]?.getD [])[idx]?.getD fill
 
 /-- The value of an expression, given the starting buffer contents. -/
 def Expr.denote (S : Sem V) (bufs : List (List V)) (fill : V) : Expr → V

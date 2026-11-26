@@ -3,14 +3,14 @@ import Tau.Machine.Arch
 /-!
 # What the timing rule is stated with
 
-`spec/Tau/Machine/Arch.lean` defines one cycle of the machine. The timing
+`Tau.Machine.Arch` defines one cycle of the machine. The timing
 rule is about many cycles: a result computed at slice `p` on cycle `t` is at
 slice `q` on cycle `t + delay + 1 + |q - p|`. To state it one needs names for
 "the states of a run", "the result a slice computes in a cycle" and "what a
 slice places on a stream in a cycle". They are defined here.
 
 Nothing here changes what the machine does. The rule itself is stated in
-`spec/Tau/Claims.lean` and proved in `spec/Tau/Proofs/Machine/Timing.lean`.
+`Tau.Claims` and proved in `Tau.Proofs.Machine.Timing`.
 
 Docs: Machine 3.4 (`docs/`).
 -/

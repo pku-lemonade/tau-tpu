@@ -37,7 +37,7 @@ this file describes the project the course is about.
 ## What is proved
 
 Two main results hold for every input and every machine size, using only
-Lean's standard axioms (checked by `tests/TauTest/Axioms.lean`):
+Lean's standard axioms (checked by `spec/tests/TauTest/Axioms.lean`):
 
 - **The machine matches its component build.** Running a program on the
   machine built from hardware blocks (shift registers, memories, systolic
@@ -60,7 +60,7 @@ trust begins, see [`spec/Tau/Claims.lean`](spec/Tau/Claims.lean) and
   the simulator, the checker, and the course.
 - **Optional:** Python 3 for the frontend (no extra packages), and LLVM/MLIR
   21 for the C++ compiler (`tauc`). Without the compiler,
-  `examples/*/stages/` holds its output for three examples.
+  `examples/*/*/stages/` holds its output for three examples.
 - **All-in-one alternative:** Use the Docker container or VS Code Dev
   Container below.
 
@@ -76,7 +76,7 @@ curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolch
 source ~/.elan/env
 
 # Build the library, proofs, tests, simulator, and checker (a few minutes the first time)
-lake build Tau TauTest tau-sim tau-check
+lake build
 ```
 
 For VS Code:
@@ -195,6 +195,7 @@ and with the Lean tools.
 | the Lean map, reading order, and proof status | [`spec/README.md`](spec/README.md) |
 | how this compiler works, and its limits | [`compiler/README.md`](compiler/README.md) |
 | how the Python frontend records a program | [`compiler/python/tau/__init__.py`](compiler/python/tau/__init__.py) (opening docstring) |
+| the examples | [`examples/README.md`](examples/README.md) |
 | the course | [`course/README.md`](course/README.md) |
 
 ## Layout
@@ -205,43 +206,16 @@ and with the Lean tools.
 | `machines/` | Shared machine descriptions (`tau9.json`, `tau17.json`) |
 | `spec/` | Lean specification (`Tau/`), proofs (`Tau/Proofs/`), `tau-sim`/`tau-check` (`tools/`), and tests (`tests/`) |
 | `compiler/` | Python tracing frontend (`python/tau/`) and C++/MLIR compiler (`tauc`, `tau-opt`) |
-| `examples/` | Timed examples at root; `nn/` neural layers; `ops/` operator and memory-hazard kernels |
-| `course/` | Self-paced specification course: `book/`, `Specify/`, `Prove/`, and `Work/` |
+| `examples/` | Programs with their buffers: pins and calls at the top, `nn/` neural layers, `ops/` single operations and memory hazards ([`examples/README.md`](examples/README.md)) |
+| `course/` | Self-paced specification course: `book/`, `Specify/`, `Prove/`, `Work/`, and its tests (`tests/`) |
 | `scripts/` | Example verification (`check-examples.sh`) and exercise generator (`make-exercises.py`) |
 | `docker/`, `.devcontainer/` | Container with Lean, Python 3, and LLVM/MLIR 21 |
 | `.vscode/` | Recommended editor extension and settings |
 
 ## Examples
 
-Timed / pinned programs sit directly in `examples/`, neural layers under `examples/nn/`,
-and single-op / memory-hazard tests under `examples/ops/`:
-
-| Example | Input | What it exercises |
-|---|---|---|
-| `paced` | Python | a loop pinned to one iteration every four cycles, which folds into three repeating entries |
-| `two-layer` | Python | one kernel called twice, the second call from a later cycle, with a scratch buffer between |
-| `pinned-chain` | Python | three pins that agree and stay in one group, and three that do not, so a word waits in memory |
-| `linear-by-hand` | JSON | the linear layer scheduled by hand |
-| `nn/linear` | Python & MLIR | one quantized linear layer; a redundant `relu` for the simplifier |
-| `nn/residual` | Python & MLIR | a residual block; one value used twice |
-| `nn/affine` | MLIR | the linear layer with the bias added inside the matrix slice |
-| `nn/affine-batch` | MLIR | two affine layers in a loop, each with its own matrix |
-| `nn/batch-linear` | MLIR | a matrix multiplied four times; its columns are stored in the matrix slice once |
-| `nn/mlp` | MLIR | two linear layers in a row |
-| `nn/mlp-wide` | MLIR | the same kernel on the 17-slice machine (`machines/tau17.json`) |
-| `nn/gemv8` | MLIR | an 8 x 8 matrix times a vector |
-| `nn/conv1d` | MLIR | a three-tap convolution along the lanes, using lane shifts |
-| `nn/conv-taps` | Python | a Python loop over constant taps inside a `tau.loop` |
-| `nn/maxpool` | MLIR | pooling over neighbouring lanes, using lane rotation |
-| `ops/elementwise` | Python & MLIR | a loop of add, subtract and max over four words |
-| `ops/axpy` | MLIR | scaled add, updating a buffer in place |
-| `ops/clip` | MLIR | clamping between two bounds |
-| `ops/leaky-relu` | MLIR | a constant word, a lane compare and a lane-wise select |
-| `ops/bitops` | MLIR | absolute value, negation, constant add and multiply, shifts, and, or, xor |
-| `ops/lanes` | MLIR | reverse, broadcast and permute |
-| `ops/shuffle` | MLIR | the rearrangement slice, and a value that waits in memory |
-| `ops/east-side` | MLIR | buffers east of the vector slice; uses the east matrix and rearrangement slices |
-| `ops/overwrite` | MLIR | a running sum in one word, and a load that must survive a store |
+[`examples/README.md`](examples/README.md) lists the examples, what each
+exercises, and what the files in an example's folder are.
 
 ## Limitations
 

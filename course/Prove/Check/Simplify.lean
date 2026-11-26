@@ -18,7 +18,7 @@ Two results.
 * `Expr.denote_simp`: simplifying an expression does not change its value,
   for any operations that obey the laws in `Sem.Lawful`.
 * `wordSem_lawful`: the operations on real words obey those laws. The facts
-  about single lanes are in `spec/Tau/Proofs/Isa/Word.lean`.
+  about single lanes are in `Tau.Proofs.Isa.Word`.
 -/
 
 namespace Tau

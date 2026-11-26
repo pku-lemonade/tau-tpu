@@ -9,7 +9,7 @@ import Tau.Machine.Circuit
 
 Computes `y = relu (requant (W * x + b))` with two lanes on a nine-slice machine.
 The schedule below was worked out by hand from the timing rule in
-`spec/Tau/Machine/Arch.lean`.
+`Tau.Machine.Arch`.
 -/
 
 namespace TauTest.Linear

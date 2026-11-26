@@ -7,7 +7,7 @@ Replaces every loop by copies of its body, one per iteration, with the loop
 index filled in. The result has no loops.
 
 This is the Lean model of the compiler's `tau-unroll` pass. The proof that it
-does not change what a kernel computes is in `spec/Tau/Proofs/IR/Unroll.lean`.
+does not change what a kernel computes is in `Tau.Proofs.IR.Unroll`.
 
 Docs: Compiler 4, Programs 3 (`docs/`).
 -/

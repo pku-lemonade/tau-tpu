@@ -1,5 +1,5 @@
 import Tau.IR.MemMap
-import Tau.Proofs.Isa.List
+import Tau.Proofs.Isa.Event
 
 /-!
 # The memory map does not look at its values

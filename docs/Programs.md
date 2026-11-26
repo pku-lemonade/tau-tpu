@@ -5,7 +5,7 @@
 | Describes | What a user of tau-tpu writes: buffers and words, statements, loops, calls and pins; and the two things a program promises, what it computes and when. |
 | Does not describe | The machine the program runs on ([`Machine.md`](Machine.md)), what the compiler does with the program ([`Compiler.md`](Compiler.md)), or the Python and MLIR notations beyond the table in section 7. |
 | Specified in | `spec/Tau/IR/Kernel.lean`, `spec/Tau/IR/Source.lean`, `spec/Tau/Isa/Event.lean` |
-| Tables tested by | `spec/tests/TauTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
+| Tables tested by | `course/tests/CourseTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
 
 A program is written with no machine in mind. It names buffers, says how words
 are loaded from them, combined and stored back, and it may say on which cycle

@@ -14,12 +14,12 @@ can be wrong.
 The checker decides whether a compiled program is right, without looking at
 how the compiler made its decisions. It runs the machine on the compiled
 program and it runs the source program, both over expressions instead of real
-words (`spec/Tau/Check/Expr.lean`). Each run gives two things.
+words (`Tau.Check.Expr`). Each run gives two things.
 
 * An expression for every word of every buffer at the end. If the two runs
   end with the same expressions, the compiled program computes what the
   source program computes, whatever the buffers hold (`sameExprs`).
-* A timeline: the words issued and their cycles (`spec/Tau/Isa/Event.lean`). If
+* A timeline: the words issued and their cycles (`Tau.Isa.Event`). If
   the machine's timeline has every event of the source program's, the
   compiled program keeps every pin (`covers`).
 

@@ -12,7 +12,7 @@ Python + MLIR compiler in [`compiler/`](../compiler/README.md).
 |---|---|---|
 | [`Machine.md`](Machine.md) | The machine: components, slices, streams, one cycle, the timing rule, instructions, traps, the image. | `spec/Tau/Isa/`, `spec/Tau/Blocks/`, `spec/Tau/Machine/` |
 | [`Programs.md`](Programs.md) | What a user writes: buffers, statements, loops, calls, pins; and what a program promises. | `spec/Tau/IR/Kernel.lean`, `spec/Tau/IR/Source.lean`, `spec/Tau/Isa/Event.lean` |
-| [`Compiler.md`](Compiler.md) | What any compiler for the machine must deliver: the forms a program takes and what every step between them must keep. | `spec/Tau/IR/`, `spec/Tau/Check/`, `spec/Tau/Isa/Encode.lean` |
+| [`Compiler.md`](Compiler.md) | What any compiler for the machine must deliver: the IRs a program takes and what every step between them must keep. | `spec/Tau/IR/`, `spec/Tau/Check/`, `spec/Tau/Isa/Encode.lean` |
 | [`Formats.md`](Formats.md) | The JSON formats the frontend, compiler and Lean tools exchange. | `spec/Tau/Sim/Json.lean` |
 | [`../spec/README.md`](../spec/README.md) | How the Lean development fits together, its reading order, and how every claim stands. | `spec/Tau/Claims.lean` |
 
@@ -36,7 +36,7 @@ of what the doc left open and the Lean settled.
 
 **A table is a test.** Every table in a doc that gives a result for an
 input has the same rows in `course/Specify/Support/Tables.lean`, and
-`spec/tests/TauTest/Docs.lean` runs them on the definitions in `spec/Tau/`. If
+`course/tests/CourseTest/Docs.lean` runs them on the definitions in `spec/Tau/`. If
 the doc, the rows and the definition come apart, the build fails. Change the
 three together.
 

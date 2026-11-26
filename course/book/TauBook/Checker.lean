@@ -14,10 +14,10 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
 *Sources:* `docs/Compiler.md`, sections 2, 4, 5 and 7;
-`compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
+`compiler/lib/Passes/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
 for their opening comments; `docs/Machine.md`, section 3.4.
 
-*Specify:* `course/Specify/OnTime.lean`.
+*Specify:* `course/Specify/Machine/OnTime.lean`.
 
 *Read:* `spec/Tau/IR/MemMap.lean`, `spec/Tau/IR/Compiled.lean`,
 `spec/Tau/Check/Checker.lean`, `spec/Tau/IR/Placed.lean`, `spec/Tau/Check/Passes.lean`.
@@ -33,15 +33,16 @@ four short ones are exercises. `spec/Tau/Proofs/Machine/Arch.lean`,
 
 # The problem
 
-The compiler has eight passes. `tau-inline`, `tau-simplify` and `tau-unroll`
+The compiler has nine passes. `tau-inline`, `tau-simplify` and `tau-unroll`
 rewrite the kernel. You have seen a Lean copy of `tau-unroll`, and the
 rewrites that `tau-simplify` makes; `tau-inline` comes two chapters on. The
 next three are the back end: `tau-place` decides where every buffer lives and
 which slice runs each operation, `tau-schedule` decides the cycle of every
 instruction, and `tau-route` decides on which stream each word travels. The
-last two, `tau-slice` and `tau-fold`, put the result in the shape the machine is
-loaded with. Read the comment at the top of each file in
-`compiler/lib/Target/`. Together they are several hundred lines of
+next two, `tau-slice` and `tau-fold`, put the result in the shape the machine is
+loaded with, and the last, `tau-encode`, writes it as numbers. Read the
+comment at the top of `Place.cpp`, `Schedule.cpp`, `Route.cpp`, `Slice.cpp`
+and `Fold.cpp` in `compiler/lib/Passes/`. Together they are several hundred lines of
 heuristics, and they will change. Proving them correct would be a large
 project that had to be redone with every change.
 
@@ -203,8 +204,8 @@ wrong from that day on.
 
 # Checking each pass on its own
 
-`check` compares the finished program with the source. That covers all eight
-passes at once, so when it rejects it does not say which pass was wrong. And
+`check` compares the finished program with the source. That covers every
+pass at once, so when it rejects it does not say which pass was wrong. And
 it is not the usual way to say what a pass must do. The usual specification
 of a compiler pass is: the output computes what the input computes.
 
@@ -213,10 +214,10 @@ So the compiler writes a file after every pass, and
 output of the pass with its input, in the same way as `check`: run both sides
 on names and compare the expressions.
 
-A program takes four forms on the way. A source program is a kernel with
+A program takes four IRs on the way. A source program is a kernel with
 calls, and `tau-inline` makes a kernel of it. A kernel you know. `tau-place`
 produces instructions in order, with slices and addresses but no cycles and
-no streams; this form and its meaning are in `spec/Tau/IR/Placed.lean`:
+no streams; this IR and its meaning are in `spec/Tau/IR/Placed.lean`:
 
 {docstring Tau.Placed}
 
@@ -274,8 +275,8 @@ Run the compiler on an example and check the eight passes in order.
 
 ```
 compiler/build/bin/tauc examples/nn/residual/kernel.mlir -o out
-lake exe tau-check out/source.json out/kernel.json
-lake exe tau-check out/kernel.json out/simplified.json
+lake exe tau-check out/source.json out/inlined.json
+lake exe tau-check out/inlined.json out/simplified.json
 lake exe tau-check out/simplified.json out/unrolled.json
 lake exe tau-check out/unrolled.json out/placed.json
 lake exe tau-check out/placed.json out/scheduled.json
@@ -317,7 +318,7 @@ answers, chosen by heuristics that will change: the check does not care how
 the answer was found. A rule fits when somebody needs to be told what a right
 answer is, which is what the writer of a scheduler needs.
 
-`course/Specify/OnTime.lean` has you write one part of a rule for schedules:
+`course/Specify/Machine/OnTime.lean` has you write one part of a rule for schedules:
 every operand arrives on the cycle it is read. You do not prove it. You test
 it against the machine.
 
@@ -339,7 +340,7 @@ it against the machine.
 5. Run the eight per-pass commands above on an example.
 6. Read the opening comments of `Place.cpp`, `Schedule.cpp` and `Route.cpp`,
    and section 3.4 of `Machine.md`. Specify the rule in
-   `course/Specify/OnTime.lean`.
+   `course/Specify/Machine/OnTime.lean`.
 7. Do the exercise "Choose".
 
 # Lean you will need
@@ -358,7 +359,7 @@ it against the machine.
 
 # Exercises
 
-*Specify.* `course/Specify/OnTime.lean`.
+*Specify.* `course/Specify/Machine/OnTime.lean`.
 
 *State.* What would it mean for your rule to be right? State it: if the rule
 accepts a program, the machine does not trap with an empty read. Do not
@@ -387,12 +388,12 @@ with `cmake --build compiler/build` and run `scripts/check-examples.sh`.
 Write down which stage you expect to be the first rejected before you look,
 and undo the change afterwards.
 
-1. In `compiler/lib/Target/Schedule.cpp`, in the function `lag`, remove the
+1. In `compiler/lib/Passes/Schedule.cpp`, in the function `lag`, remove the
    `+ 1` from the timing rule.
-2. In `compiler/lib/Target/Route.cpp`, delete the loop
+2. In `compiler/lib/Passes/Route.cpp`, delete the loop
    `while (numbers.count(stream)) ++stream;`, so that every word gets
    stream 0.
-3. In `compiler/lib/Target/Place.cpp`, at the end of `placeComputed`, delete
+3. In `compiler/lib/Passes/Place.cpp`, at the end of `placeComputed`, delete
    the line `emitWrite(flight, scratch);`, so that a value that should wait
    in memory is never written there.
 

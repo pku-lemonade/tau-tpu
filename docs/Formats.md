@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | Describes | The JSON formats that the frontend, the compiler and the Lean tools exchange: source/kernel, placed, compiled, image, buffers and timeline, and which tool writes which. |
-| Does not describe | What the contents mean: a statement and a pin ([`Programs.md`](Programs.md)), an instruction and the numbers of an image ([`Machine.md`](Machine.md)), a form ([`Compiler.md`](Compiler.md)). |
+| Does not describe | What the contents mean: a statement and a pin ([`Programs.md`](Programs.md)), an instruction and the numbers of an image ([`Machine.md`](Machine.md)), an IR ([`Compiler.md`](Compiler.md)). |
 | Specified in | `spec/Tau/Sim/Json.lean` |
 | Tables tested by | none; `scripts/check-examples.sh` reads every kind of file on every example |
 
 The reader, `spec/Tau/Sim/Json.lean`, is the specification. The writers are
-`compiler/lib/Target/` and, for source files, also `compiler/python/tau/`.
-Each form of a program (Compiler 2) has a file. The Lean tools tell the kind
+`compiler/lib/Emit/` and, for source files, also `compiler/python/tau/`.
+Each IR of a program (Compiler 2) has a file. The Lean tools tell the kind
 of a file from the fields present.
 
 ## 1. Source and kernel
@@ -179,7 +179,7 @@ decodes to.
 |---|---|---|
 | `kernel.mlir`, `traced.json` | MLIR text, source | the frontend, `python3 -m tau kernel.py -o out` |
 | `source.json` | source or kernel | parsing |
-| `kernel.json` | kernel | `tau-inline` |
+| `inlined.json` | kernel | `tau-inline` |
 | `simplified.json` | kernel | `tau-simplify` |
 | `unrolled.json` | kernel | `tau-unroll` |
 | `placed.json` | placed | `tau-place` |
@@ -187,7 +187,7 @@ decodes to.
 | `routed.json` | compiled | `tau-route` |
 | `sliced.json` | compiled | `tau-slice` |
 | `compiled.json` | compiled | `tau-fold` |
-| `image.json` | image | encoding |
+| `image.json` | image | `tau-encode` |
 
 `traced.json` and `source.json` are the same program written by two
 programs, the frontend and `tauc`; `scripts/check-examples.sh` fails if they

@@ -398,8 +398,8 @@ def Tau_IEmitOp : Tau_Instr<"emit"> {
 // After `tau-slice` a function holds one `tau.slice` for each slice of the
 // machine, and in it the entries of that slice's repeater. An entry no longer
 // has operands and results: it names the streams it reads and writes, as the
-// machine's instructions do (`Tau.Timed` in spec/Tau/Isa/Instr.lean). This is the
-// form the image is written from.
+// machine's instructions do (`Tau.Timed` in spec/Tau/Isa/Instr.lean).
+// `tau-encode` then replaces each `tau.slice` by a `tau.image`.
 //
 // A stream is written "e3" or "w0": east or west, and its number.
 
@@ -435,6 +435,21 @@ def Tau_EntryOp : Tau_Op<"entry"> {
                        OptionalAttr<I64Attr>:$gap,
                        OptionalAttr<I64Attr>:$stride);
   let assemblyFormat = "$instr `at` $time attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// The image
+//===----------------------------------------------------------------------===//
+
+def Tau_ImageOp : Tau_Op<"image"> {
+  let summary = "The numbers the repeater of the slice at one position is loaded with";
+  let description = [{
+    The number of entries, then each entry as numbers: time, repeats, gap,
+    stride, opcode, operands (Machine 3.10; `Program.encode` in
+    spec/Tau/Isa/Encode.lean). `tau-encode` makes one for each `tau.slice`.
+  }];
+  let arguments = (ins I64Attr:$position, DenseI64ArrayAttr:$numbers);
+  let assemblyFormat = "$position $numbers attr-dict";
 }
 
 #endif // TAU_OPS_TD

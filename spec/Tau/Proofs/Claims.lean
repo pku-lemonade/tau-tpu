@@ -14,8 +14,8 @@ import Tau.Proofs.Isa.Encode
 /-!
 # Every claim is proved
 
-One line for each proposition of `spec/Tau/Claims.lean`: the theorem that says it.
-If a statement in `spec/Tau/Claims.lean` and the theorem named beside it ever say
+One line for each proposition of `Tau.Claims`: the theorem that says it.
+If a statement in `Tau.Claims` and the theorem named beside it ever say
 different things, this file stops compiling.
 -/
 

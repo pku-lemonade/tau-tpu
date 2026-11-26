@@ -6,13 +6,13 @@ import Tau.Proofs.IR.MemMap
 /-!
 # A placed program does not look at its values
 
-The same fact as `spec/Tau/Proofs/Machine/Arch.lean` and `spec/Tau/Proofs/IR/Kernel.lean`,
-for the placed form: a function `f` that respects the operations commutes
+The same fact as `Tau.Proofs.Machine.Arch` and `Tau.Proofs.IR.Kernel`,
+for the placed IR: a function `f` that respects the operations commutes
 with carrying out a placed program. Whether the program fails depends only on
 the program and the memory sizes, never on the values.
 
 The main result is `Placed.execute_map`. `checkPlaced_sound`
-(`spec/Tau/Proofs/Check/Passes.lean`) uses it.
+(`Tau.Proofs.Check.Passes`) uses it.
 -/
 
 namespace Tau

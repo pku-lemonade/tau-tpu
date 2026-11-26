@@ -5,7 +5,7 @@ import Tau.Isa.Instr
 
 This is tau-tpu with each slice treated as one box: an instruction goes in at
 one cycle and its result comes out a fixed number of cycles later. What happens
-inside the box is the subject of `spec/Tau/Machine/`.
+inside the box is the subject of `Tau.Machine.Circuit`.
 
 One cycle of the machine (`step`) does three things.
 
@@ -20,7 +20,7 @@ So a result computed at slice `p` on cycle `t` can be read at slice `q` on
 cycle `t + delay + 1 + |q - p|`, and on no other cycle. A program that reads a
 slot on the wrong cycle finds it empty, and the machine traps.
 
-The machine is written for an arbitrary type `V` of values. See `spec/Tau/Isa/Op.lean`.
+The machine is written for an arbitrary type `V` of values. See `Tau.Isa.Op`.
 
 Docs: Machine 3.3, 3.5 and 3.7 (`docs/`).
 -/

@@ -13,8 +13,8 @@ set_option verso.code.warnLineLength 100
 *Read:* `docs/Machine.md`, sections 1 and 2.1 to 2.3; `spec/README.md`,
 "The words".
 
-*Work in:* `course/Specify/Candidates.lean`, `course/Specify/Review.lean`,
-`course/Specify/Repair.lean`, `course/Specify/Provable.lean`.
+*Work in:* `course/Specify/Method/Candidates.lean`, `course/Specify/Method/Review.lean`,
+`course/Specify/Method/Repair.lean`, `course/Specify/Method/Provable.lean`.
 
 *Time:* one day.
 
@@ -98,7 +98,7 @@ Put the cursor on the line. It prints how many rows agree and lists the rows
 that do not.
 
 A table is a handful of inputs. A definition can give every row and still be
-wrong. `course/Specify/Candidates.lean` shows this on the three components you
+wrong. `course/Specify/Method/Candidates.lean` shows this on the three components you
 know. For each it has three definitions. All three give every row of the
 doc's table, and two of them are wrong.
 
@@ -170,7 +170,7 @@ Then one of three things happens.
   Check the input with `#eval`. Then the statement is wrong, or the
   definition is.
 * *The agent is stuck.* Ask for the goal it is stuck on. A goal that cannot
-  be proved tells you which case you forgot. `course/Specify/Repair.lean` has
+  be proved tells you which case you forgot. `course/Specify/Method/Repair.lean` has
   three statements that sound right and are false, each with the goal an
   agent got stuck on.
 
@@ -199,7 +199,7 @@ looks.
 5. *Was the definition changed?* Look at the difference in the definition
    file, not only at the proof.
 
-`course/Specify/Review.lean` has five theorems that came back. Four should not
+`course/Specify/Method/Review.lean` has five theorems that came back. Four should not
 be accepted.
 
 # What makes a specification provable
@@ -224,7 +224,7 @@ rules. Each is visible in the code.
   there too, as named propositions in `spec/Tau/Claims.lean`.
 
 A rule is easier to believe after seeing what happens without it.
-`course/Specify/Provable.lean` takes the first three rules. For each it gives a
+`course/Specify/Method/Provable.lean` takes the first three rules. For each it gives a
 definition that breaks the rule and asks you for the input on which that
 goes wrong.
 
@@ -248,11 +248,11 @@ repository's `spec/README.md` ("Status").
 
 1. Read "The words" in `spec/README.md`, and sections 1
    and 2.1 to 2.3 of `docs/Machine.md`.
-2. Do `course/Specify/Candidates.lean`.
-3. Do `course/Specify/Review.lean`. Then read
+2. Do `course/Specify/Method/Candidates.lean`.
+3. Do `course/Specify/Method/Review.lean`. Then read
    `course/Specify/Answers/Review.md`.
-4. Do `course/Specify/Repair.lean`.
-5. Do `course/Specify/Provable.lean`.
+4. Do `course/Specify/Method/Repair.lean`.
+5. Do `course/Specify/Method/Provable.lean`.
 6. Read `spec/Tau/Claims.lean` from top to the end of "The components". These are
    the statements about the three components you know, written the way the
    course asks you to write yours.
@@ -261,7 +261,7 @@ repository's `spec/README.md` ("Status").
 
 # Exercises
 
-*Specify.* `course/Specify/Candidates.lean`. For each of the three components,
+*Specify.* `course/Specify/Method/Candidates.lean`. For each of the three components,
 find the right candidate and an input that gives each wrong one away. For
 each wrong candidate, say whether it contradicts a sentence of the doc or
 settles something the doc does not say. Those are different kinds of
@@ -271,14 +271,14 @@ mistake: the first is a bug, the second is a question nobody asked.
 right candidate satisfies and one wrong candidate does not. Show that the
 wrong one fails by giving the input.
 
-*Review.* `course/Specify/Review.lean`. Decide for each of the five whether to
+*Review.* `course/Specify/Method/Review.lean`. Decide for each of the five whether to
 accept it, and which of the five looks told you.
 
-*Repair.* `course/Specify/Repair.lean`. For each of the three statements, find
+*Repair.* `course/Specify/Method/Repair.lean`. For each of the three statements, find
 an input that makes it false, then change it so that it is true and still
 useful.
 
-*Break a rule.* `course/Specify/Provable.lean`. Three definitions, each of which
+*Break a rule.* `course/Specify/Method/Provable.lean`. Three definitions, each of which
 breaks one rule of "What makes a specification provable". For each, give the
 input on which it goes wrong, and find the place in `spec/Tau/` that the task
 names.
@@ -286,7 +286,7 @@ names.
 *Questions.* Read sections 2.1 to 2.3 of `Machine.md` once more and write down
 everything they leave open. There are at least six such things across the
 three sections. The rows of the three `Decisions` tables in
-`course/Specify/Tables.lean` are some of them.
+`course/Specify/Support/Tables.lean` are some of them.
 
 # Checkpoint
 

@@ -6,15 +6,15 @@
 // can be checked on its own:
 //
 //   source.json      the program as written, calls and all
-//   kernel.json      after tau-inline     (a kernel)
+//   inlined.json     after tau-inline     (a kernel)
 //   simplified.json  after tau-simplify   (a kernel)
 //   unrolled.json    after tau-unroll     (a kernel)
 //   placed.json      after tau-place      (instructions in order)
-//   scheduled.json   after tau-schedule   (timed; one stream per word)
+//   scheduled.json   after tau-schedule   (timed; a stream for every word)
 //   routed.json      after tau-route      (timed, on the machine's streams)
 //   sliced.json      after tau-slice      (entries, slice by slice)
 //   compiled.json    after tau-fold       (the finished program)
-//   image.json       the finished program as numbers
+//   image.json       after tau-encode     (the finished program as numbers)
 //
 // The program is the last function of the file. The functions before it are
 // kernels it may call.
@@ -26,8 +26,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "tau/Dialect/TauDialect.h"
-#include "tau/Target/Target.h"
-#include "tau/Transforms/Passes.h"
+#include "tau/Emit.h"
+#include "tau/Machine.h"
+#include "tau/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -128,7 +129,7 @@ int main(int argc, char **argv) {
     return true;
   };
 
-  if (!write("source.json", tau::emitKernel(program())))
+  if (!write("source.json", tau::emitSource(program())))
     return 1;
 
   // tau-inline is a pass on the module: it removes the kernels it copies in.
@@ -142,16 +143,16 @@ int main(int argc, char **argv) {
     show("tau-inline");
   }
   mlir::func::FuncOp func = program();
-  if (!write("kernel.json", tau::emitKernel(func)))
+  if (!write("inlined.json", tau::emitSource(func)))
     return 1;
 
   if (!noSimplify && !run("tau-simplify", tau::createSimplifyPass()))
     return 1;
-  if (!write("simplified.json", tau::emitKernel(func)))
+  if (!write("simplified.json", tau::emitSource(func)))
     return 1;
 
   if (!run("tau-unroll", tau::createUnrollPass()) ||
-      !write("unrolled.json", tau::emitKernel(func)))
+      !write("unrolled.json", tau::emitSource(func)))
     return 1;
 
   if (!run("tau-place", tau::createPlacePass(machine)) ||
@@ -159,19 +160,22 @@ int main(int argc, char **argv) {
     return 1;
 
   if (!run("tau-schedule", tau::createSchedulePass()) ||
-      !write("scheduled.json", tau::emitCompiled(func, /*idealRouting=*/true)))
+      !write("scheduled.json", tau::emitCompiled(func)))
     return 1;
 
   if (!run("tau-route", tau::createRoutePass()) ||
-      !write("routed.json", tau::emitCompiled(func, /*idealRouting=*/false)))
+      !write("routed.json", tau::emitCompiled(func)))
     return 1;
 
   if (!run("tau-slice", tau::createSlicePass()) ||
-      !write("sliced.json", tau::emitCompiled(func, /*idealRouting=*/false)))
+      !write("sliced.json", tau::emitCompiled(func)))
     return 1;
 
   if (!run("tau-fold", tau::createFoldPass()) ||
-      !write("compiled.json", tau::emitCompiled(func, /*idealRouting=*/false)) ||
+      !write("compiled.json", tau::emitCompiled(func)))
+    return 1;
+
+  if (!run("tau-encode", tau::createEncodePass()) ||
       !write("image.json", tau::emitImage(func)))
     return 1;
   return 0;

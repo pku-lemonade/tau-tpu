@@ -9,10 +9,10 @@ entry of a program becomes numbers (`encode`) and how the numbers are read
 back (`decode`).
 
 `decode` is what gives an image its meaning: the machine loaded with an image
-does what `execute` (`spec/Tau/Machine/Arch.lean`) does with the decoded
+does what `execute` (`Tau.Machine.Arch`) does with the decoded
 program. `encode` is the Lean copy of the last step of the compiler. That
 reading back what was written gives the program again is proved in
-`spec/Tau/Proofs/Isa/Encode.lean`.
+`Tau.Proofs.Isa.Encode`.
 
 An image has one list per slice, so an entry does not store its slice. The
 list of a slice starts with the number of entries. Each entry is

@@ -5,15 +5,15 @@ import Tau.Isa.Event
 
 A kernel names its buffers by number. On the machine, a buffer is a run of words
 in the memory of one slice. The memory map says, for every buffer, which
-slice and which addresses. `tau-place` decides it, and every later form of
-the program carries it (`spec/Tau/IR/Placed.lean`, `spec/Tau/IR/Compiled.lean`).
+slice and which addresses. `tau-place` decides it, and every later IR of
+the program carries it (`Tau.IR.Placed`, `Tau.IR.Compiled`).
 
 `image` turns buffer contents into the starting contents of every memory, and
 `extract` reads the buffers back out at the end. Every theorem that says a
 program computes a kernel is stated with these two. `Issue.event` says which
 buffer word a write at an address is a store to.
 
-The theorems about them are in `spec/Tau/Proofs/IR/MemMap.lean`.
+The theorems about them are in `Tau.Proofs.IR.MemMap`.
 
 Docs: Compiler 3 (`docs/`).
 -/
@@ -34,6 +34,10 @@ structure Placement where
 abbrev MemMap := List Placement
 
 variable {V : Type}
+
+/-- Word `idx` of buffer `buf`, or `fill` if there is no such word. -/
+def bufWord (bufs : List (List V)) (fill : V) (buf idx : Nat) : V :=
+  (bufs[buf]?.getD [])[idx]?.getD fill
 
 /-- The buffer word stored at address `a` of slice `p`, if any: the number of
 the buffer and the position within it. -/

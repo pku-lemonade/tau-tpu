@@ -14,11 +14,11 @@ metaprogramming, function inlining, assembler, instruction encoding.
 
 *Sources:* the opening comment of `compiler/python/tau/__init__.py`; the description
 of `tau.call` in `compiler/include/tau/Dialect/TauOps.td`; the opening
-comments of `compiler/lib/Transforms/Inline.cpp`, `compiler/lib/Target/Slice.cpp`
+comments of `compiler/lib/Passes/Inline.cpp`, `compiler/lib/Passes/Slice.cpp`
 and `Fold.cpp`; `docs/Programs.md`, sections 4 and 7;
 `docs/Compiler.md`; `docs/Machine.md`, section 3.10.
 
-*Specify:* `course/Specify/Encode.lean`.
+*Specify:* `course/Specify/Isa/Encode.lean`.
 
 *Read:* `spec/Tau/IR/Source.lean`, `spec/Tau/Isa/Encode.lean`.
 
@@ -41,7 +41,7 @@ chapter on the checker: what is the specification, and which of the three
 ways is used.
 
 ```
-kernel.py -> kernel.mlir -> source -> kernel -> ... -> routed -> sliced -> compiled -> image
+kernel.py -> kernel.mlir -> source -> inlined -> ... -> routed -> sliced -> compiled -> image
 ```
 
 # The front end records
@@ -206,7 +206,7 @@ rewrite belongs in a pass, with a file before it and a file after.
 # The image
 
 The last step writes the entries of each slice as numbers. Read section 3.10
-of `Machine.md` and do `course/Specify/Encode.lean` now.
+of `Machine.md` and do `course/Specify/Isa/Encode.lean` now.
 
 {docstring Tau.Timed.encode}
 
@@ -256,7 +256,7 @@ the compiled program that `Image.decode` reads out of it.
 | recording a Python function | nothing; the record is the program | two writers agree; a run in Python agrees with the Lean tools |
 | `tau-inline` | `Source.run`, `Source.timeline` | a check, proved sound |
 | `tau-slice`, `tau-fold` | the machine | a check, proved sound |
-| writing the image | `Image.decode` | a copy, proved to be undone by `decode`; and a check on the decoded image |
+| `tau-encode` | `Image.decode` | a copy, proved to be undone by `decode`; and a check on the decoded image |
 
 # How to work through it
 
@@ -266,15 +266,15 @@ the compiled program that `Image.decode` reads out of it.
    scratch file, with a third call.
 3. Run `tauc` with `--print-mlir` on `examples/paced/kernel.py` after
    recording it, and follow one instruction from `tau-route` through
-   `tau-slice` and `tau-fold` into `out/image.json`.
-4. Do `course/Specify/Encode.lean`, with its questions.
+   `tau-slice`, `tau-fold` and `tau-encode` into `out/image.json`.
+4. Do `course/Specify/Isa/Encode.lean`, with its questions.
 5. Read `spec/Tau/Isa/Encode.lean` and the statements in
    `spec/Tau/Proofs/Isa/Encode.lean`. Each layer has the same statement; say what
    it is.
 
 # Exercises
 
-*Specify.* `course/Specify/Encode.lean`.
+*Specify.* `course/Specify/Isa/Encode.lean`.
 
 *State.* In the same file: the two directions, and which one the compiler
 relies on.
@@ -297,9 +297,9 @@ by anything. Say why, and write the example that would catch it.
 1. In `compiler/python/tau/__init__.py`, in the table `_BIN`, make `sub` compute
    `b - a`.
 2. In the same file, in `_Tracer.stmt`, record a pin one cycle late.
-3. In `compiler/lib/Target/EmitMachine.cpp`, in `encodeEntry`, write `gap` before
+3. In `compiler/lib/Passes/Encode.cpp`, in `encodeEntry`, write `gap` before
    `repeats`.
-4. In `compiler/lib/Target/Fold.cpp`, set `gap` to `period` and not
+4. In `compiler/lib/Passes/Fold.cpp`, set `gap` to `period` and not
    `period - 1`.
 
 *Claims.* Add to `course/Work/Claims.md` a row for each line of the table

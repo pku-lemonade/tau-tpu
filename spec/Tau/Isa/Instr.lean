@@ -15,7 +15,7 @@ are no branches and no waiting. Everything that will happen is in the list.
 An entry of the list may repeat: issue again a number of times, a fixed
 number of cycles apart, with the address or column index stepping by a fixed
 amount. What an entry issues at each cycle is given by `Entry.dueAt` in
-`spec/Tau/Blocks/Repeater.lean`.
+`Tau.Blocks.Repeater`.
 
 Terms to look up: *instruction set architecture*, *static scheduling*.
 

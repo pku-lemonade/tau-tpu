@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Describes | What any compiler from programs to the machine has to deliver: the forms a program takes on the way, the steps between them, and what every step must keep. |
+| Describes | What any compiler from programs to the machine has to deliver: the intermediate representations (IRs) a program takes on the way, the steps between them, and what every step must keep. |
 | Does not describe | How a step finds its output. The methods and the limits of the compiler in this repository are in `compiler/README.md`, and the Python frontend's in `compiler/python/tau/__init__.py`. |
-| Specified in | `spec/Tau/IR/` for the forms, `spec/Tau/Check/` for what must be kept, `spec/Tau/Isa/Encode.lean` for the image |
+| Specified in | `spec/Tau/IR/` for the IRs, `spec/Tau/Check/` for what must be kept, `spec/Tau/Isa/Encode.lean` for the image |
 | Tables tested by | none; this doc has no table of results |
 
 A compiler takes a program ([`Programs.md`](Programs.md)) and a machine
@@ -25,11 +25,12 @@ change.
 This has to hold for every contents of the buffers. A compiler does not see
 the contents.
 
-## 2. Four forms
+## 2. Four IRs
 
-On the way a program takes four forms. Each says more than the one before.
+On the way a program is written in four *intermediate representations*
+(IRs). Each says more than the one before.
 
-| Form | What it has | What it does not have yet |
+| IR | What it has | What it does not have yet |
 |---|---|---|
 | Source | kernels that call each other; statements, loops, pins | |
 | Kernel | one kernel, with no calls | slices, addresses, cycles but for its pins |
@@ -39,15 +40,15 @@ On the way a program takes four forms. Each says more than the one before.
 A compiled program is a program for the machine (Machine 3.8). The image
 (Machine 3.10) is a compiled program written as numbers.
 
-Each form has the two meanings a program has (Programs 6): the buffers it
-ends with, and the words it issues on fixed cycles. For the first three
-forms those are the pinned ones. A compiled program has a cycle for every
+In each IR a program has the two meanings a program has (Programs 6): the
+buffers it ends with, and the words it issues on fixed cycles. In the first
+three IRs those are the pinned ones. A compiled program has a cycle for every
 instruction, so every word it issues is on a fixed cycle.
 
 ## 3. The memory map
 
 A program names buffers; a machine has memories with addresses. The placed and
-compiled forms carry a *memory map*: for every buffer, the memory slice that
+compiled IRs carry a *memory map*: for every buffer, the memory slice that
 holds it and its first address. Loading the buffers into the machine, and
 reading them back, go through the map.
 

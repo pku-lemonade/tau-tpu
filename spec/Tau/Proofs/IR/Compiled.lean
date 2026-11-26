@@ -5,7 +5,7 @@ import Tau.Proofs.IR.MemMap
 /-!
 # The timeline of a compiled program does not depend on its values
 
-`issues_map` (`spec/Tau/Proofs/Machine/Issues.lean`) carried over to events:
+`issues_map` (`Tau.Proofs.Machine.Issues`) carried over to events:
 the timeline of a run from a mapped memory image is the mapped timeline.
 -/
 

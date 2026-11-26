@@ -5,7 +5,7 @@
 | Describes | The tau-tpu machine: its components, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
 | Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`Formats.md`](Formats.md)). |
 | Specified in | `spec/Tau/Isa/`, `spec/Tau/Blocks/`, `spec/Tau/Machine/` |
-| Tables tested by | `spec/tests/TauTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
+| Tables tested by | `course/tests/CourseTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
 
 This doc describes the machine in words and tables, the way an architect
 hands it to someone who has to specify it. The Lean files named above are

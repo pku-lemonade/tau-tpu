@@ -9,7 +9,7 @@ and the value in the last slot leaves as the output.
 
 In tau-tpu a stream is a shift register: a value written at one slice reaches a
 slice `n` hops away exactly `n` cycles later. That fact is
-`shiftRegister_outAt` in `spec/Tau/Proofs/Blocks/ShiftRegister.lean`.
+`shiftRegister_outAt` in `Tau.Proofs.Blocks.ShiftRegister`.
 
 Terms to look up: *flip-flop*, *register*, *shift register*.
 

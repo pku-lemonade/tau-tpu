@@ -191,7 +191,7 @@ def explainPair (before after : Json.Stage) : String :=
 
 /-! ## Comparing a pass with its Lean model
 
-`Kernel.unroll` (`spec/Tau/IR/Unroll.lean`) is the Lean model of the compiler's
+`Kernel.unroll` (`Tau.IR.Unroll`) is the Lean model of the compiler's
 `tau-unroll`. The functions below decide whether the two gave the same kernel
 for one input. This is a test of the compiler against the model. It is not
 covered by a proof and no theorem depends on it. -/
@@ -248,7 +248,7 @@ def sameUnroll (before after : Kernel) : Bool :=
 
 /-! ## Comparing the image with the Lean encoding
 
-`Program.encode` (`spec/Tau/Isa/Encode.lean`) is the Lean copy of the compiler's
+`Program.encode` (`Tau.Isa.Encode`) is the Lean copy of the compiler's
 last step. This is a test of the compiler against the copy, as above. -/
 
 /-- Whether `img` is the image that `Program.encode` gives for the compiled

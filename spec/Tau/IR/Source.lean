@@ -3,9 +3,9 @@ import Tau.IR.Kernel
 /-!
 # Source programs
 
-The first form a program takes: what the user wrote. A source program is a
+The first IR a program takes: what the user wrote. A source program is a
 kernel that may also *call* other kernels. It is what the Python frontend
-records (`frontend/`), and the Lean model of a module of the compiler's `tau`
+records (`compiler/python/tau/`), and the Lean model of a module of the compiler's `tau`
 dialect with `tau.call` in it.
 
 A call names the kernel to run, the caller's buffers that the kernel's own
@@ -19,11 +19,11 @@ machine, running it, ends with the buffers that `Source.run` gives and issues
 the words of `Source.timeline` on their cycles.
 
 `tau-inline` turns a source program into a kernel with no calls
-(`spec/Tau/IR/Kernel.lean`), by copying each called kernel in. `checkInlined`
-(`spec/Tau/Check/Passes.lean`) checks its output.
+(`Tau.IR.Kernel`), by copying each called kernel in. `checkInlined`
+(`Tau.Check.Passes`) checks its output.
 
-The forms, in order: this file, `spec/Tau/IR/Kernel.lean`, `spec/Tau/IR/Placed.lean`,
-`spec/Tau/IR/Compiled.lean`.
+The IRs, in order: this file, `Tau.IR.Kernel`, `Tau.IR.Placed`,
+`Tau.IR.Compiled`.
 
 Terms to look up: *function inlining*, *call by reference*.
 

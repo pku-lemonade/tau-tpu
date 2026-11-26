@@ -8,7 +8,7 @@ Rewrites an expression into a simpler one that has the same value:
 * `relu (relu a)` becomes `relu a`,
 * `max a a` and `min a a` become `a`.
 
-Every check uses it (`sameExprs` in `spec/Tau/Check/Checker.lean`): two programs
+Every check uses it (`sameExprs` in `Tau.Check.Checker`): two programs
 are accepted as equal if their expressions are the same after simplifying.
 The compiler's `tau-simplify` pass makes the same three rewrites on a kernel,
 which is why its output is accepted.
@@ -16,7 +16,7 @@ which is why its output is accepted.
 The rewrites are only valid if the operations obey certain laws
 (`Sem.Lawful`). The proof that simplifying does not change an expression's
 value, and the proof that real words obey the laws, are in
-`spec/Tau/Proofs/Check/Simplify.lean`.
+`Tau.Proofs.Check.Simplify`.
 
 Terms to look up: *peephole optimization*.
 -/

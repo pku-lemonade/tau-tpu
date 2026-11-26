@@ -1,11 +1,14 @@
 name = "tau-tpu"
 version = "0.1.0"
-defaultTargets = ["Tau"]
+# `lake build` builds the library and its proofs, both test suites and both
+# tools.
+defaultTargets = ["Tau", "TauTest", "CourseTest", "tau-sim", "tau-check"]
 
 [[lean_lib]]
 name = "Tau"
 srcDir = "spec"
 
+# Tests of the specification alone.
 [[lean_lib]]
 name = "TauTest"
 srcDir = "spec/tests"
@@ -28,11 +31,18 @@ srcDir = "course"
 globs = ["Prove.+"]
 
 # The specification exercises: definitions for you to write from a source,
-# with tests. `course/Specify/Foo.lean` is the module `Specify.Foo`.
+# with tests. `course/Specify/Blocks/Memory.lean` is the module
+# `Specify.Blocks.Memory`.
 [[lean_lib]]
 name = "Specify"
 srcDir = "course"
 globs = ["Specify.+"]
+
+# Tests of the course: the tables of the docs hold of the specification, and
+# every specification exercise can be solved.
+[[lean_lib]]
+name = "CourseTest"
+srcDir = "course/tests"
 
 # A place for a student's own files. `course/Work/Foo.lean` is the module
 # `Work.Foo`, and files there can import each other.

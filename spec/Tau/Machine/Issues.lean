@@ -4,13 +4,13 @@ import Tau.Isa.Event
 /-!
 # What the machine issues, and when
 
-`spec/Tau/Machine/Arch.lean` says what the memories hold after a run. This
+`Tau.Machine.Arch` says what the memories hold after a run. This
 file says what happened on the way: on which cycle each slice issued which
 word. A slice *issues* a word when it runs an instruction that has a result,
 or one that writes a word to memory.
 
 `issues` is the list for a whole run. `Compiled.timeline`
-(`spec/Tau/IR/Compiled.lean`) turns it into the events that pins are checked
+(`Tau.IR.Compiled`) turns it into the events that pins are checked
 against.
 
 Nothing here changes what the machine does.

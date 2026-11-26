@@ -6,7 +6,7 @@
 # both must produce the same source.json). For each, tauc writes the program as
 # written and one file per pass:
 #
-#   source  kernel  simplified  unrolled  placed  scheduled  routed  sliced
+#   source  inlined  simplified  unrolled  placed  scheduled  routed  sliced
 #   compiled  image
 #
 # For each pass:
@@ -32,9 +32,9 @@
 #   - the program run in Python on real numbers must end with the buffers,
 #     and issue the pinned words, that tau-sim gives for source.json.
 #
-# `examples/nn/linear/stages/` holds a copy of those files, so that the course
-# can be followed without building the compiler. The script fails if the copy
-# is stale; UPDATE_STAGES=1 refreshes it.
+# `examples/*/*/stages/` holds a copy of those files for three examples, so
+# that the course can be followed without building the compiler. The script
+# fails if a copy is stale; UPDATE_STAGES=1 refreshes them.
 #
 # Build first: `lake build tau-sim tau-check` and `cmake --build compiler/build`.
 set -euo pipefail
@@ -47,7 +47,7 @@ FRONTEND="env PYTHONPATH=compiler/python python3 -m tau"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
-STAGES="kernel simplified unrolled placed scheduled routed sliced compiled image"
+STAGES="inlined simplified unrolled placed scheduled routed sliced compiled image"
 FILES="source $STAGES"
 
 # Damage a stage file so that it no longer does what the source does.

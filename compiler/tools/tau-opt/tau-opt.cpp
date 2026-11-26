@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "tau/Dialect/TauDialect.h"
-#include "tau/Transforms/Passes.h"
+#include "tau/Passes.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectRegistry.h"

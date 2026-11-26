@@ -3,7 +3,7 @@ import Tau.Machine.Timing
 /-!
 # The timing rule
 
-`spec/Tau/Machine/Arch.lean` defines one cycle of the machine: a result enters
+`Tau.Machine.Arch` defines one cycle of the machine: a result enters
 the pipe of its slice, the oldest entry of the pipe comes out, and every
 stream moves one position. This file proves what follows from that over many
 cycles. A result computed at slice `p` on cycle `t` can be read at slice `q` on
@@ -19,7 +19,7 @@ The rule comes in three steps.
 
 The statements are about the states of a run that does not trap (`IsRun`).
 `isRun_of_run` says that every such run of the machine has them. The
-definitions the statements need are in `spec/Tau/Machine/Timing.lean`.
+definitions the statements need are in `Tau.Machine.Timing`.
 
 Nothing else in tau-tpu depends on this file. The checker does not need the
 rule, because it runs the machine itself. The rule is what a person uses to

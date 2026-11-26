@@ -1,28 +1,27 @@
 import Tau.Machine.Issues
 import Tau.IR.MemMap
-import Tau.Check.Expr
 
 /-!
 # Compiled programs
 
-The last form a program takes in the compiler: every instruction has a slice,
+The last IR a program takes in the compiler: every instruction has a slice,
 a cycle and streams. It is the output of `tau-schedule`, `tau-route`,
 `tau-slice` and `tau-fold`. The first two differ in how many streams they
 use. The last two differ in how the same instructions are written down:
 slice by slice, and with runs merged into repeating entries. An image
-(`spec/Tau/Isa/Encode.lean`) decodes to this form too.
+(`Tau.Isa.Encode`) decodes to this IR too.
 
-A compiled program is a `Program` (`spec/Tau/Isa/Instr.lean`) together with the
+A compiled program is a `Program` (`Tau.Isa.Instr`) together with the
 machine it is for, the memory map and the number of cycles to run. What it
 computes is what the machine does with it: `execute` in
-`spec/Tau/Machine/Arch.lean`.
+`Tau.Machine.Arch`.
 
 Every instruction of a compiled program has a cycle, so every word it issues
-is an event (`spec/Tau/Isa/Event.lean`). `Compiled.timeline` lists them. The pins
-of the earlier forms are checked against this list.
+is an event (`Tau.Isa.Event`). `Compiled.timeline` lists them. The pins
+of the earlier IRs are checked against this list.
 
-The four forms, in order: `spec/Tau/IR/Source.lean`, `spec/Tau/IR/Kernel.lean`,
-`spec/Tau/IR/Placed.lean`, this file.
+The four IRs, in order: `Tau.IR.Source`, `Tau.IR.Kernel`,
+`Tau.IR.Placed`, this file.
 
 Docs: Compiler 2 (`docs/`).
 -/

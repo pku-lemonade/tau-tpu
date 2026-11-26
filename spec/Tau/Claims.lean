@@ -16,7 +16,7 @@ import Tau.Check.Passes
 # What tau-tpu claims
 
 Every main statement of the development, as a named proposition. Each is
-proved in `spec/Tau/Proofs/Claims.lean`, by the theorem named in its comment.
+proved in `Tau.Proofs.Claims`, by the theorem named in its comment.
 
 This file is for reading. It imports definitions only, so everything in a
 statement here is something defined outside `spec/Tau/Proofs/`. A person who has

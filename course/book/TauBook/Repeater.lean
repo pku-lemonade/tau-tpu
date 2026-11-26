@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, section 2.7.
 
-*Specify:* `course/Specify/Repeater.lean`.
+*Specify:* `course/Specify/Blocks/Repeater.lean`.
 
 *Read, after you have specified it:* `spec/Tau/Blocks/Repeater.lean`.
 
@@ -26,7 +26,7 @@ The invariant is for reading.
 # Specify it first
 
 Stop reading here. Open section 2.7 of `Machine.md` and
-`course/Specify/Repeater.lean`, and follow the steps at the top of the file.
+`course/Specify/Blocks/Repeater.lean`, and follow the steps at the top of the file.
 
 This one is harder than the memory, because the doc describes the
 repeater twice: by what it issues on each cycle, and by the registers it is
@@ -153,7 +153,7 @@ statement says "there is a `k`", and the proof supplies it.
 
 # Exercises
 
-*Specify.* `course/Specify/Repeater.lean`.
+*Specify.* `course/Specify/Blocks/Repeater.lean`.
 
 *State.* `IssuesWhatIsDue` in that file: the description without registers,
 and the statement that the block agrees with it.

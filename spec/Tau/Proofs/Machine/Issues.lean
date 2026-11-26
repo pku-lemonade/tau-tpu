@@ -1,11 +1,11 @@
 import Tau.Machine.Issues
 import Tau.Proofs.Machine.Arch
-import Tau.Proofs.Isa.List
+import Tau.Proofs.Isa.Event
 
 /-!
 # When the machine issues a word does not depend on its values
 
-`spec/Tau/Proofs/Machine/Arch.lean` shows that a function `f` that respects the
+`Tau.Proofs.Machine.Arch` shows that a function `f` that respects the
 operations commutes with a run. This file shows the same for what the run
 issues: the cycles, slices and addresses are the same, and the words are the
 words of the other run with `f` applied.

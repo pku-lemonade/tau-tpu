@@ -4,7 +4,7 @@ import Tau.IR.Placed
 /-!
 # Checking each compiler pass on its own
 
-`check` (`spec/Tau/Check/Checker.lean`) compares the compiled program with the
+`check` (`Tau.Check.Checker`) compares the compiled program with the
 source program. That covers the whole compiler at once. This file has one
 check for each pass. Each compares the output of the pass with its input, so
 a rejection names the pass that went wrong.
@@ -19,13 +19,14 @@ a rejection names the pass that went wrong.
 | `tau-route` | a compiled program | a compiled program | `checkRouted` |
 | `tau-slice` | a compiled program | a compiled program | `checkRouted` |
 | `tau-fold` | a compiled program | a compiled program | `checkRouted` |
+| `tau-encode` | a compiled program | an image | `checkRouted` |
 
-The image, the program as numbers, is decoded (`spec/Tau/Isa/Encode.lean`) and
+The image, the program as numbers, is decoded (`Tau.Isa.Encode`) and
 then checked as a compiled program, again by `checkRouted`.
 
 Every check works the same way. It runs both sides on expressions. That
 gives an expression for every word of every buffer, and a timeline
-(`spec/Tau/Isa/Event.lean`). The check accepts if the two tables of expressions
+(`Tau.Isa.Event`). The check accepts if the two tables of expressions
 are the same after simplifying, and the timeline of the output has every
 event of the timeline of the input (`agree`).
 
@@ -45,8 +46,8 @@ as many streams as that takes, so that the schedule can be checked before
 any stream is shared. `tau-route` then fits the words onto the streams the
 machine has.
 
-The forms are in `spec/Tau/IR/`. The soundness theorems, two for each check, are
-in `spec/Tau/Proofs/Check/Passes.lean`.
+The IRs are in `spec/Tau/IR/`. The soundness theorems, two for each check, are
+in `Tau.Proofs.Check.Passes`.
 
 Terms to look up: *translation validation*.
 
@@ -89,7 +90,8 @@ def checkScheduled (pl : Placed) (c : Compiled) : Bool :=
   agree (placedExprs pl) (machineExprs c) (placedEvents pl) (machineEvents c)
 
 /-- `tau-route`, `tau-slice`, `tau-fold` and the encoding: accept or reject
-the compiled program `c'` as another form of the compiled program `c`. -/
+the compiled program `c'` as another way of writing the compiled program
+`c`. -/
 def checkRouted (c c' : Compiled) : Bool :=
   agree (machineExprs c) (machineExprs c') (machineEvents c) (machineEvents c')
 

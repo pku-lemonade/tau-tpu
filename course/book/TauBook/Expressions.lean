@@ -13,9 +13,9 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* symbolic execution, abstract syntax tree, peephole
 optimization.
 
-*Source:* `compiler/lib/Transforms/Simplify.cpp`.
+*Source:* `compiler/lib/Passes/Simplify.cpp`.
 
-*Specify:* `course/Specify/Simplify.lean`.
+*Specify:* `course/Specify/IR/Simplify.lean`.
 
 *Read:* `spec/Tau/Check/Expr.lean`, `spec/Tau/Check/Simplify.lean`.
 
@@ -66,7 +66,7 @@ work on `examples/nn/linear/kernel.mlir`, which has a `relu` of a `relu`:
 compiler/build/bin/tau-opt examples/nn/linear/kernel.mlir --tau-simplify
 ```
 
-Without the compiler, compare `examples/nn/linear/stages/kernel.json` with
+Without the compiler, compare `examples/nn/linear/stages/inlined.json` with
 `simplified.json` in the same folder.
 
 # What to prove
@@ -104,9 +104,9 @@ number format untouched.
    places, and check the result with `rfl`.
 3. Do `Prove/Check/Simplify.lean`: first `denote_simpUn` and
    `denote_simpBin`, then `Expr.denote_simp` by induction on the expression.
-4. Read `compiler/lib/Transforms/Simplify.cpp`. It makes the same three
+4. Read `compiler/lib/Passes/Simplify.cpp`. It makes the same three
    rewrites, on a kernel.
-5. Specify that pass in Lean, in `course/Specify/Simplify.lean`. It is the
+5. Specify that pass in Lean, in `course/Specify/IR/Simplify.lean`. It is the
    hardest "Specify" of the course.
 6. Compare what you wrote with `Expr.simp`. The same three rewrites take five
    lines on expressions and several times that on kernels. Say why.
@@ -124,7 +124,7 @@ number format untouched.
 
 *Prove.* `Prove/Check/Simplify.lean`.
 
-*Specify.* `course/Specify/Simplify.lean`: a copy of `tau-simplify`, on
+*Specify.* `course/Specify/IR/Simplify.lean`: a copy of `tau-simplify`, on
 kernels. One of its tests is the check of the next chapter, `checkKernels`,
 asked whether your output computes what your input computes.
 
@@ -175,7 +175,7 @@ For `Expr.denote_simp`: in the `un` and `bin` cases use the two lemmas and
 the induction hypotheses. The other cases are `rfl` or `simp only` with the
 definitions.
 
-For `course/Specify/Simplify.lean`: walk the statements in order and carry two
+For `course/Specify/IR/Simplify.lean`: walk the statements in order and carry two
 things along, the values that were replaced and by what, and the values that
 are the result of a `relu`. Apply the replacements to the operands of every
 statement before you look at it.

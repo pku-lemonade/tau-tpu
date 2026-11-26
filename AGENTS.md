@@ -3,7 +3,7 @@
 ## Build and test
 
 ```bash
-lake build Tau TauTest tau-sim tau-check     # library, proofs, tests, tools
+lake build                                   # library, proofs, both test suites, tools
 lake build Specify Prove Work                # the course's exercise files
 cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
 cmake --build compiler/build                 # tauc and tau-opt
@@ -28,6 +28,9 @@ Lake package because it depends on Verso.
   `spec/Tau/Proofs/<Area>/`, in a file with the same name.
 - No `sorry` under `spec/Tau/`. `spec/tests/TauTest/Axioms.lean` pins the
   axioms of the main theorems.
+- Nothing in `spec/` imports from `course/`. `spec/tests/` (`TauTest`) tests
+  the specification alone; a test that needs the course's tables or
+  exercises goes in `course/tests/` (`CourseTest`).
 - A person writes and judges what is outside `spec/Tau/Proofs/`; what is inside it
   only has to compile. So a main theorem's statement is also a named
   proposition in `spec/Tau/Claims.lean`, proved in `spec/Tau/Proofs/Claims.lean` by
@@ -36,12 +39,14 @@ Lake package because it depends on Verso.
   theorem.
 - Every hardware component is a `Tau.Block` (`spec/Tau/Blocks/Basic.lean`). Every
   block theorem gives the output at cycle `t` as a function of earlier inputs.
-- Every form of a program has two meanings: what it computes (`run`,
+- Every IR of a program has two meanings: what it computes (`run`,
   `execute`) and its timeline, the words it issues on fixed cycles
   (`spec/Tau/Isa/Event.lean`). Every check compares both, and has two theorems,
-  `_sound` and `_pins`. A new form or check needs both.
+  `_sound` and `_pins`. A new IR or check needs both.
 - Every rewrite of a program is a pass with a file of its own and a check.
-  Do not put a rewrite in a file writer.
+  Do not put a rewrite in a file writer. The passes are in
+  `compiler/lib/Passes/`, one file each; the writers, in `compiler/lib/Emit/`,
+  write what the IR holds.
 - Sizes are parameters. A theorem holds for every size; a check at one fixed
   size is a test.
 - The machine and the kernel semantics are written for an arbitrary `Sem`
@@ -51,6 +56,10 @@ Lake package because it depends on Verso.
   is, where tau-tpu uses it, and which terms a newcomer should look up, and
   ends with the doc sections it specifies (`Docs: Machine 2.5`). It does not
   teach digital design or compilers.
+- In a comment in a Lean file under `spec/` or `course/tests/`, name another
+  Lean file by its module (`Tau.Machine.Arch`), not its path, so that moving
+  a folder does not change the comment. Name folders, and files that are not
+  Lean, by their path.
 - `course/Work/` is for a student's own files. Do not put project code
   there.
 - `course/Prove/` is generated. Change the proof under `spec/Tau/Proofs/` and
@@ -59,9 +68,13 @@ Lake package because it depends on Verso.
   for short ones. A comment at the top level of a proof (`  -- ...`) is kept
   in the exercise as an outline, so write such comments in long proofs.
 - `course/Specify/` holds the specification exercises: a definition for the
-  student to write from a source, with tests. `course/Specify/Support/Tables.lean`
-  has the tests, and `spec/tests/TauTest/Docs.lean` and
-  `spec/tests/TauTest/SpecSolutions.lean` run them on a solution, so an
+  student to write from a source, with tests. It has the folders of
+  `spec/Tau/`, as `course/Prove/` has those of `spec/Tau/Proofs/`: an
+  exercise about `spec/Tau/<Area>/` goes in `course/Specify/<Area>/`, under
+  the name of the file it asks for when there is one; the exercises about
+  the method are in `course/Specify/Method/`. `course/Specify/Support/Tables.lean`
+  has the tests, and `course/tests/CourseTest/Docs.lean` and
+  `course/tests/CourseTest/SpecSolutions.lean` run them on a solution, so an
   exercise that cannot be solved fails the build. Commit these files with
   `todo` in place of the definitions.
 - All shared prose about the specification is in `docs/`, and a fact is
@@ -83,27 +96,28 @@ Lake package because it depends on Verso.
   keeps its number.
 - Every table in a doc that gives a result for an input is a row in
   `course/Specify/Support/Tables.lean`, run on the definitions by
-  `spec/tests/TauTest/Docs.lean`. Change the table, the rows and the definition
+  `course/tests/CourseTest/Docs.lean`. Change the table, the rows and the definition
   in `spec/Tau/` together.
 - Outside `docs/` and `spec/`, each part documents itself and nothing else:
   `compiler/README.md` says how this compiler works and its limits, the
   comment at the top of `compiler/python/tau/__init__.py` how the frontend
-  records, `spec/README.md` the Lean map and claim status, and the root
-  `README.md` how to set up and try the project.
-- `course/Specify/ReadCpp.lean` quotes lines of the C++ by number. After
+  records, `examples/README.md` the examples, `spec/README.md` the Lean map
+  and claim status, and the root `README.md` how to set up and try the
+  project.
+- `course/Specify/IR/ReadCpp.lean` quotes lines of the C++ by number. After
   changing `Unroll.cpp` or `Schedule.cpp`, renumber it; a test fails until
   you do.
 - To add a feature, follow the path in the book chapter "Extending the
   machine" (`course/book/TauBook/Extending.lean`).
-- `examples/*/stages/` (`nn/linear`, `ops/elementwise`, `nn/residual`) are
+- `examples/*/*/stages/` (`nn/linear`, `ops/elementwise`, `nn/residual`) are
   copies of `tauc`'s output, for readers without the compiler; the book points
   to them. After changing the compiler, refresh them with
   `UPDATE_STAGES=1 scripts/check-examples.sh`.
 - After changing the compiler or the JSON formats, run
   `scripts/check-examples.sh` and update `docs/Formats.md`.
 - The image is described in section 3.10 of `docs/Machine.md`, specified
-  in `spec/Tau/Isa/Encode.lean`, and written by `encodeEntry` in
-  `compiler/lib/Target/EmitMachine.cpp`. Change them together. Its tables
+  in `spec/Tau/Isa/Encode.lean`, and made by `tau-encode`
+  (`encodeEntry` in `compiler/lib/Passes/Encode.cpp`). Change them together. Its tables
   are tested against the Lean, and `tau-check --encode` fails until the C++
   agrees with it.
 - The frontend (`compiler/python/tau/`) is one Python module with no dependencies.
@@ -111,7 +125,7 @@ Lake package because it depends on Verso.
   a function there with both behaviours, recording and computing, and the
   computing one must follow `spec/Tau/Isa/Word.lean`. An example written in
   Python is `examples/.../kernel.py` and binds its program to `kernel`.
-- `spec/README.md` ("The map" and "Status") names every form, step, check and
+- `spec/README.md` ("The map" and "Status") names every IR, step, check and
   main theorem, and says how each claim stands. Update both when you add or
   rename one. They point to Lean files and doc sections and do not restate
   definitions.
@@ -141,7 +155,7 @@ write and theirs to review. When someone is working through the course:
     hypothesis to get past it without saying so.
   - Leave no `sorry`. If part is unproved, say which part.
   - Report every file you changed.
-- `course/Specify/Review.lean` contains proofs that are wrong on purpose. Do
+- `course/Specify/Method/Review.lean` contains proofs that are wrong on purpose. Do
   not point out what is wrong with them unless asked for the answer.
 - Do not explain digital design or compiler theory at length. Name the term
   and point to the reading list in the book.

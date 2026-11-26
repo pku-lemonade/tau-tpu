@@ -6,4 +6,4 @@ me or by an agent, or not yet.
 
 | What | How it stands |
 |---|---|
-| my `memory` (`course/Specify/Memory.lean`) | a definition. Tested on the doc's table. |
+| my `memory` (`course/Specify/Blocks/Memory.lean`) | a definition. Tested on the doc's table. |

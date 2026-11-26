@@ -30,8 +30,8 @@ jobs:
           curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
-      - name: Lean library, proofs and tests
-        run: lake build Tau TauTest tau-sim tau-check
+      - name: Lean library, proofs, tests and tools
+        run: lake build
       - name: Exercises are up to date and compile
         run: |
           python3 scripts/make-exercises.py --check
@@ -53,7 +53,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/work" -w /work tau-tpu bash -c '
             set -e
-            lake build Tau TauTest tau-sim tau-check
+            lake build
             cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir
             cmake --build compiler/build
             scripts/check-examples.sh'

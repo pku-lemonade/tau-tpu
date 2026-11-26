@@ -9,7 +9,7 @@ commands below fail the build if that list ever changes, in particular if a
 
 The theorems below rest only on Lean's three standard axioms. In particular
 none of them uses `bv_decide`, whose proofs add an axiom that trusts the Lean
-compiler (see `spec/Tau/Proofs/Isa/Word.lean`).
+compiler (see `Tau.Proofs.Isa.Word`).
 -/
 
 /-- info: 'Tau.check_sound' depends on axioms: [propext, Quot.sound] -/

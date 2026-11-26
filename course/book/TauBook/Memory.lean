@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, section 2.5.
 
-*Specify:* `course/Specify/Memory.lean`.
+*Specify:* `course/Specify/Blocks/Memory.lean`.
 
 *Read, after you have specified it:* `spec/Tau/Blocks/Memory.lean`.
 
@@ -25,7 +25,7 @@ set_option verso.code.warnLineLength 100
 # Specify it first
 
 Stop reading here. Open section 2.5 of `Machine.md` and
-`course/Specify/Memory.lean`, and follow the steps at the top of the file.
+`course/Specify/Blocks/Memory.lean`, and follow the steps at the top of the file.
 Come back when the report says that all rows agree.
 
 # The idea
@@ -98,13 +98,13 @@ there.
 3. Compare your statement with `memory_outAt_read`. Did you need a function
    like `lastWrite`? Does your statement have the hypothesis that the
    address is valid? Without it the statement is false: this is the third
-   statement of `course/Specify/Repair.lean`.
+   statement of `course/Specify/Method/Repair.lean`.
 4. In `Prove/Blocks/Memory.lean`, read the statement and the outline of
    `memory_stateAt`, which is given. Then prove `memory_outAt_read` from it.
 
 # Exercises
 
-*Specify.* `course/Specify/Memory.lean`.
+*Specify.* `course/Specify/Blocks/Memory.lean`.
 
 *State.* `ReadsLastWrite` in that file.
 

@@ -61,12 +61,12 @@ In dependency order. A small feature touches only the first few.
    values.
 5. `spec/Tau/IR/Kernel.lean`, `spec/Tau/Check/Expr.lean` and their proofs, if kernels can
    say it.
-6. `spec/Tau/IR/Placed.lean` and its proof: the placed form.
+6. `spec/Tau/IR/Placed.lean` and its proof: the placed IR.
 7. `spec/Tau/Machine/Circuit.lean` and `spec/Tau/Proofs/Machine/Circuit.lean`: how
    the slice does it with blocks, and that this is the same thing.
 8. `spec/Tau/Sim/Json.lean`: reading it from a file.
 9. `compiler/`: the dialect, the passes, and `encodeEntry` in
-   `compiler/lib/Target/EmitMachine.cpp`. `compiler/python/tau/__init__.py`: a function for
+   `compiler/lib/Passes/Encode.cpp`. `compiler/python/tau/__init__.py`: a function for
    it that records and one that computes. Optional: without them, write your
    test programs by hand as Lean values, as `spec/tests/TauTest/Features.lean`
    does.
@@ -125,7 +125,7 @@ has, in `encode` and in `decode`, then `spec/Tau/Sim/Json.lean`. Add `#guard` li
 with inputs for which you worked the answer out by hand, including a
 negative lane.
 
-You are done when `lake build Tau TauTest` succeeds. Notice that you did not
+You are done when `lake build` succeeds. Notice that you did not
 touch a proof, and say why. For the proof in `spec/Tau/Proofs/Isa/Encode.lean`,
 say what would have happened had you given your operation a number that is
 already taken.
@@ -135,8 +135,8 @@ Then state one fact about your operation on a single lane and prove it with
 
 With the compiler: add the operation to
 `compiler/include/tau/Dialect/TauOps.td` and to `isUnaryKernelOp` or
-`isBinaryKernelOp` in `compiler/lib/Target/Machine.cpp`, give it its number in
-`encodeEntry` in `compiler/lib/Target/EmitMachine.cpp`, add a function for it to
+`isBinaryKernelOp` in `compiler/lib/Support/OpUtils.cpp`, give it its number in
+`encodeEntry` in `compiler/lib/Passes/Encode.cpp`, add a function for it to
 `compiler/python/tau/__init__.py`, write an example in Python with its buffers, and
 run `scripts/check-examples.sh`. If the number in the C++ is not the number
 in Lean, say which line of the script's output tells you.
@@ -157,7 +157,7 @@ that is most like yours and copy its shape. Decide whether your instruction
 issues a word, in the sense of Machine 3.9, and check that
 `issued` in `spec/Tau/Machine/Issues.lean` agrees.
 
-You are done when `lake build Tau TauTest` succeeds, with a hand-written
+You are done when `lake build` succeeds, with a hand-written
 program in `spec/tests/TauTest/Features.lean` that uses your instruction, run on
 both machines as `run` does there. `#print axioms Tau.end_to_end` must still
 list three axioms.
@@ -195,7 +195,7 @@ same cycle, which the machine has no rule for.
 * At the cell level you need a new block: a shift register with several
   inputs. Write it, and its theorem, in the style of the block chapters
   before using it.
-* The scheduler in `compiler/lib/Target/Schedule.cpp` needs the new delays,
+* The scheduler in `compiler/lib/Passes/Schedule.cpp` needs the new delays,
   and `tau-place` needs to avoid the new conflict.
 
 The chapters on the shift register, the slice-level machine and the

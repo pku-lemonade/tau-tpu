@@ -13,10 +13,10 @@ set_option verso.code.warnLineLength 100
 observable behaviour.
 
 *Sources:* `docs/Programs.md`, sections 5 and 6; `docs/Machine.md`,
-section 3.9; the opening comments of `compiler/lib/Target/Place.cpp` and
+section 3.9; the opening comments of `compiler/lib/Passes/Place.cpp` and
 `Schedule.cpp`, for what they say about pins.
 
-*Specify:* `course/Specify/Pins.lean`.
+*Specify:* `course/Specify/IR/Pins.lean`.
 
 *Read:* `spec/Tau/Isa/Event.lean`, `spec/Tau/Machine/Issues.lean`; the `pin` case of
 `Stmt.exec` in `spec/Tau/IR/Kernel.lean`; `covers` and `agree` in
@@ -49,7 +49,7 @@ _pin_.
 # What a pin claims
 
 A pin is attached to one operation and names a cycle. Read section 5 of
-`docs/Programs.md`, and do the first part of `course/Specify/Pins.lean` now, before you
+`docs/Programs.md`, and do the first part of `course/Specify/IR/Pins.lean` now, before you
 read on.
 
 What a pin claims is an _event_.
@@ -130,7 +130,7 @@ the pin.
 
 # The check
 
-A later form keeps the pins of an earlier one if its timeline contains the
+A program in a later IR keeps the pins of an earlier one if its timeline contains the
 earlier timeline.
 
 {docstring Tau.covers}
@@ -159,7 +159,7 @@ example :
   rfl
 ```
 
-# Every form has a timeline
+# Every IR has a timeline
 
 A source program, a kernel and a placed program have the events of their
 pinned operations. A compiled program has every word it issues. So as a
@@ -264,7 +264,7 @@ iter 3:                          R───────V─────W
 
 # How to work through it
 
-1. Do `course/Specify/Pins.lean`, including the four questions under "Judge".
+1. Do `course/Specify/IR/Pins.lean`, including the four questions under "Judge".
 2. Read `spec/Tau/Isa/Event.lean` and `spec/Tau/Machine/Issues.lean`. Redo the small
    example above in your scratch file with a pin on the store.
 3. Read `covers` and `agree`. Then prove `check_pins` in
@@ -286,7 +286,7 @@ iter 3:                          R───────V─────W
 
 # Exercises
 
-*Specify.* `course/Specify/Pins.lean`.
+*Specify.* `course/Specify/IR/Pins.lean`.
 
 *State.* In the same file: what it means for a compiled program to keep the
 pins of a source program.
@@ -315,17 +315,17 @@ between them.
 stage you expect to be rejected. For one of the three the answer is none;
 say why that change is harmless.
 
-1. In `compiler/lib/Target/Schedule.cpp`, replace `start = *pin - offset;` by
+1. In `compiler/lib/Passes/Schedule.cpp`, replace `start = *pin - offset;` by
    `start = now;`, so that pins are ignored.
-2. In `compiler/lib/Transforms/Inline.cpp`, replace `at.getInt() + origin` by
+2. In `compiler/lib/Passes/Inline.cpp`, replace `at.getInt() + origin` by
    `at.getInt()`, so that a called kernel's pins are not moved.
-3. In `compiler/lib/Transforms/Unroll.cpp`, delete the line
+3. In `compiler/lib/Passes/Unroll.cpp`, delete the line
    `op->removeAttr("every");`.
 
 *Challenge.* Make a pin say which slice. Decide what the event has to hold,
-which forms can know it, and which checks would have to change. You do not
-have to build it. Write down the first form of a program in which "the slice
-of this operation" has a meaning, and what that says about pins in the forms
+which IRs can know it, and which checks would have to change. You do not
+have to build it. Write down the first IR of a program in which "the slice
+of this operation" has a meaning, and what that says about pins in the IRs
 before it.
 
 # Hints

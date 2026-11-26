@@ -52,9 +52,10 @@ example in the book is checked when the book is built.
 |---|---|---|
 | `docs/` | The shared prose specs: the machine, programs, the compiler and JSON formats, as their designers would write them. The source for most chapters, and what you specify from. They say less than the Lean on purpose. | Nobody |
 | `compiler/` | The Python tracing frontend (`compiler/python/tau/`) and the C++/MLIR compiler. The source for the compiler and frontend chapters. | Nobody |
-| `course/Specify/` | One file per thing you specify, with support code under `Support/` and notes under `Answers/`. | You write the definitions and the statements |
+| `course/Specify/` | One file per thing you specify, in the folders of `spec/Tau/`, with the method exercises under `Method/`, support code under `Support/` and notes under `Answers/`. | You write the definitions and the statements |
 | `course/Prove/` | A few proof files with some proofs replaced by `sorry`. | You fill in the proofs |
 | `course/Work/` | Your own files: a scratch file, your questions for the architect, your claims table, your times. | You |
+| `course/tests/` | Tests that the tables of the docs hold of `spec/Tau/`, and that every exercise in `course/Specify/` can be solved. Some answers are here. | Nobody |
 | `spec/` | The finished Lean development (`spec/Tau/`), its tools (`tau-sim`, `tau-check`), its tests (`spec/tests/`), its map (`spec/README.md`), and `spec/Tau/Claims.lean`. | Nobody, except in the exercises that say to work on a branch |
 
 ## The three kinds of exercise
@@ -66,8 +67,15 @@ lines; put the cursor on one in VS Code to see which rows of the source's
 table your definition gets right. The steps are at the top of every file.
 
 ```bash
-lake build Specify.Memory    # prints the same reports in a terminal
+lake build Specify.Blocks.Memory    # prints the same reports in a terminal
 ```
+
+`course/Specify/` has the folders of `spec/Tau/`, as `course/Prove/` has
+those of `spec/Tau/Proofs/`. A file `course/Specify/<Area>/X.lean` is about
+what `spec/Tau/<Area>/` specifies. Where `spec/Tau/<Area>/X.lean` exists, it
+is the definition to compare with; the other files say what to compare
+with. `Method/` holds the exercises of the chapter "Writing a
+specification", which are about the method itself.
 
 There is one rule: write your definition before you open the one in `spec/Tau/`.
 The docs are in `docs/` and you read them first. It is the Lean files
@@ -111,17 +119,17 @@ Lean examples and their exercises under `course/Specify/` work without it.
 | 1-2 | The shift register | | `Blocks/Basic`, `Blocks/ShiftRegister` |
 | 3 | The accumulator | | `Blocks/Accumulator` |
 | 4 | Multiply-accumulate | | `Blocks/Mac`, `Isa/Word` |
-| 5 | Writing a specification | `Candidates`, `Review`, `Repair`, `Provable` | |
-| 6 | Pipeline and sequencer | `Pipeline`, `Sequencer` | `Blocks/Pipeline`, `Blocks/Sequencer` |
-| 7 | Memory | `Memory` | `Blocks/Memory`, one proof |
-| 8-9 | The repeater | `Repeater` | `Blocks/Repeater`, two proofs |
-| 10-11 | The systolic array | `SystolicArray` | `Blocks/SystolicArray`, one proof |
-| 12-14 | The slice-level machine | `Machine` | none; you write schedules |
-| 15-16 | Kernels and loop unrolling | `Kernel`, `Unroll`, `ReadCpp` | `IR/Unroll`, three proofs |
-| 17 | Expressions and simplification | `Simplify` | `Check/Simplify` |
-| 18-20 | The checker | `OnTime` | `Check/Checker`, `Check/Passes`, two proofs each |
-| 21-22 | Pins | `Pins` | `Check/Checker`, one proof; `Check/Passes`, two proofs |
-| 23-24 | From Python to an image | `Encode` | none; you read two proofs |
+| 5 | Writing a specification | `Method/Candidates`, `Method/Review`, `Method/Repair`, `Method/Provable` | |
+| 6 | Pipeline and sequencer | `Blocks/Pipeline`, `Blocks/Sequencer` | `Blocks/Pipeline`, `Blocks/Sequencer` |
+| 7 | Memory | `Blocks/Memory` | `Blocks/Memory`, one proof |
+| 8-9 | The repeater | `Blocks/Repeater` | `Blocks/Repeater`, two proofs |
+| 10-11 | The systolic array | `Blocks/SystolicArray` | `Blocks/SystolicArray`, one proof |
+| 12-14 | The slice-level machine | `Machine/Arch` | none; you write schedules |
+| 15-16 | Kernels and loop unrolling | `IR/Kernel`, `IR/Unroll`, `IR/ReadCpp` | `IR/Unroll`, three proofs |
+| 17 | Expressions and simplification | `IR/Simplify` | `Check/Simplify` |
+| 18-20 | The checker | `Machine/OnTime` | `Check/Checker`, `Check/Passes`, two proofs each |
+| 21-22 | Pins | `IR/Pins` | `Check/Checker`, one proof; `Check/Passes`, two proofs |
+| 23-24 | From Python to an image | `Isa/Encode` | none; you read two proofs |
 | 25 | The cell-level machine | a statement | none; you read the proof |
 | 26 | End to end | your claims table | `EndToEnd` |
 | after | Extending the machine | you add features | |

@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, sections 2.4 and 2.6.
 
-*Specify:* `course/Specify/Pipeline.lean`, `course/Specify/Sequencer.lean`.
+*Specify:* `course/Specify/Blocks/Pipeline.lean`, `course/Specify/Blocks/Sequencer.lean`.
 
 *Read, after you have specified them:* `spec/Tau/Blocks/Pipeline.lean`,
 `spec/Tau/Blocks/Sequencer.lean`.
@@ -105,7 +105,7 @@ the one tau-tpu uses.
 
 # Exercises
 
-*Specify.* `course/Specify/Pipeline.lean` and `course/Specify/Sequencer.lean`.
+*Specify.* `course/Specify/Blocks/Pipeline.lean` and `course/Specify/Blocks/Sequencer.lean`.
 
 *State.* `OutputIsDelayed` and `IssuesWhatIsDue` in those two files.
 

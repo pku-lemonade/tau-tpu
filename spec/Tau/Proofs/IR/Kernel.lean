@@ -3,7 +3,7 @@ import Tau.IR.Kernel
 /-!
 # A kernel does not look at its values
 
-The same fact as `spec/Tau/Proofs/Machine/Arch.lean`, for kernels: a function `f`
+The same fact as `Tau.Proofs.Machine.Arch`, for kernels: a function `f`
 that respects the operations commutes with running a kernel. Whether a kernel
 fails depends only on the kernel and the buffer sizes, never on the values.
 

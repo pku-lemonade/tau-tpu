@@ -10,7 +10,7 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "End to end" =>
-*Read:* `spec/Tau/Claims.lean`; `spec/spec/tests/TauTest/Axioms.lean`; `spec/README.md`
+*Read:* `spec/Tau/Claims.lean`; `spec/tests/TauTest/Axioms.lean`; `spec/README.md`
 ("The map" and "Status"), after you have finished your own.
 
 *Proofs:* `spec/Tau/Proofs/EndToEnd.lean`. All of them are exercises, and each is

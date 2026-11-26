@@ -1,12 +1,11 @@
 import Tau.Machine.Arch
 import Tau.IR.Kernel
 import Tau.IR.MemMap
-import Tau.Check.Expr
 
 /-!
 # Placed programs
 
-The middle form a program takes in the compiler, and the output of
+The third IR a program takes in the compiler, and the output of
 `tau-place`. The kernel has become machine instructions. Every buffer has a
 home in some memory, every operation has a slice, and the compiler has decided
 which values travel directly and which wait in memory. What is still missing
@@ -19,14 +18,14 @@ It reuses the slice state of the slice-level machine and ignores streams and
 pipes. A word in transit is named by a variable, as in a kernel.
 
 An instruction may carry a pin, the cycle it must be issued on
-(`spec/Tau/Isa/Event.lean`). The pins of the kernel are now on the instructions
+(`Tau.Isa.Event`). The pins of the kernel are now on the instructions
 that issue the pinned words. Running a placed program gives the events of its
 pinned instructions (`Placed.timeline`), although it has no cycles of its
 own yet.
 
-The four forms, in order: `spec/Tau/IR/Source.lean`, `spec/Tau/IR/Kernel.lean`, this
-file, `spec/Tau/IR/Compiled.lean`. The theorems about this one are in
-`spec/Tau/Proofs/IR/Placed.lean`.
+The four IRs, in order: `Tau.IR.Source`, `Tau.IR.Kernel`, this
+file, `Tau.IR.Compiled`. The theorems about this one are in
+`Tau.Proofs.IR.Placed`.
 
 Docs: Compiler 2 (`docs/`).
 -/

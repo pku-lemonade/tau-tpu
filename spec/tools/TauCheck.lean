@@ -16,7 +16,7 @@ writes.
 | kernel | kernel | `checkKernels` | `tau-simplify`, `tau-unroll` |
 | kernel | placed | `checkPlaced` | `tau-place` |
 | placed | compiled | `checkScheduled` | `tau-schedule` |
-| compiled | compiled | `checkRouted` | `tau-route`, `tau-slice`, `tau-fold`, the image |
+| compiled | compiled | `checkRouted` | `tau-route`, `tau-slice`, `tau-fold`, `tau-encode` |
 | source or kernel | compiled | `check` | the whole compiler |
 
 A source file with no call in it is a kernel file. An image is decoded and

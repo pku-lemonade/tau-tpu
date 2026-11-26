@@ -4,7 +4,7 @@ import Tau.Proofs.IR.Kernel
 /-!
 # A source program does not look at its values
 
-The same fact as `spec/Tau/Proofs/IR/Kernel.lean`, for source programs: a function
+The same fact as `Tau.Proofs.IR.Kernel`, for source programs: a function
 `f` that respects the operations commutes with running a source program, calls
 included. Whether a call can be made depends on how many buffers there are,
 never on what they hold.

@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, section 3.
 
-*Specify:* `course/Specify/Machine.lean`.
+*Specify:* `course/Specify/Machine/Arch.lean`.
 
 *Read:* `spec/Tau/Isa/Op.lean` and `spec/Tau/Isa/Instr.lean` now.
 `spec/Tau/Machine/Arch.lean` and `spec/tests/TauTest/Linear.lean` after you have
@@ -37,7 +37,7 @@ Read section 3 of `Machine.md`, all of it. Then read `spec/Tau/Isa/Op.lean`,
 the types: operations, instructions, traps, the state of a slice. Stop
 there.
 
-The whole machine is too large to write in a day. `course/Specify/Machine.lean`
+The whole machine is too large to write in a day. `course/Specify/Machine/Arch.lean`
 asks for the two parts that everything else follows from: how a stream moves
 in one cycle, and what four of the instructions do, traps included. Follow
 the steps at the top of the file and come back when the three reports say
@@ -229,7 +229,7 @@ now.
 # How to work through it
 
 1. Read section 3 of `Machine.md`, and the types, as above.
-2. Specify streams and instructions in `course/Specify/Machine.lean`.
+2. Specify streams and instructions in `course/Specify/Machine/Arch.lean`.
 3. Read `spec/Tau/Machine/Arch.lean` top to bottom. Compare `advanceRow` and
    `exec` with yours. In which order does the repository's `exec` make its
    checks? The doc does not say, and the `Decisions` table shows that the
@@ -245,7 +245,7 @@ now.
 
 # Exercises
 
-*Specify.* `course/Specify/Machine.lean`.
+*Specify.* `course/Specify/Machine/Arch.lean`.
 
 *State.* `MovesOnePosition` in that file.
 

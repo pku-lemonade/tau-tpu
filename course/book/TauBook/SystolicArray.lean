@@ -14,7 +14,7 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, section 2.8.
 
-*Specify:* `course/Specify/SystolicArray.lean`.
+*Specify:* `course/Specify/Blocks/SystolicArray.lean`.
 
 *Read, after you have specified it:* `spec/Tau/Blocks/SystolicArray.lean`.
 
@@ -25,7 +25,7 @@ set_option verso.code.warnLineLength 100
 # Specify it first
 
 Stop reading here. Open section 2.8 of `Machine.md` and
-`course/Specify/SystolicArray.lean`, and follow the steps at the top of the
+`course/Specify/Blocks/SystolicArray.lean`, and follow the steps at the top of the
 file. Come back when the report says that all rows agree.
 
 The statement is the hard part of this one. The array computes a product
@@ -157,7 +157,7 @@ The assumption `hc` is a timetable.
 
 # Exercises
 
-*Specify.* `course/Specify/SystolicArray.lean`.
+*Specify.* `course/Specify/Blocks/SystolicArray.lean`.
 
 *State.* `ComputesMatVec` in that file.
 

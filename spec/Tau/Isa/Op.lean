@@ -9,7 +9,7 @@ operations compute.
 The meaning of the operations is packaged as a `Sem` ("semantics"). The machine
 and the compiler's intermediate representation are both written against an
 arbitrary `Sem`, so the same definitions can run on real words (`wordSem`) or
-on symbolic expressions (`spec/Tau/Check/Expr.lean`). The schedule checker depends on
+on symbolic expressions (`Tau.Check.Expr`). The schedule checker depends on
 this.
 
 Docs: Machine 3.1 and 3.6 (`docs/`).

@@ -15,11 +15,11 @@ loop unrolling, MLIR.
 
 *Sources:* `docs/Programs.md`, sections 1 to 3;
 `compiler/include/tau/Dialect/TauOps.td`,
-`compiler/lib/Transforms/Unroll.cpp`.
+`compiler/lib/Passes/Unroll.cpp`.
 
-*Specify:* `course/Specify/Kernel.lean`, `course/Specify/Unroll.lean`.
+*Specify:* `course/Specify/IR/Kernel.lean`, `course/Specify/IR/Unroll.lean`.
 
-*Read side by side:* `course/Specify/ReadCpp.lean`.
+*Read side by side:* `course/Specify/IR/ReadCpp.lean`.
 
 *Read, after you have specified:* `spec/Tau/IR/Kernel.lean`,
 `spec/Tau/IR/Unroll.lean`.
@@ -44,8 +44,8 @@ Code differs from a doc in two ways that matter to you.
   computes" appears nowhere in the C++. You have to supply it.
 
 Read this chapter to the end of "What a kernel means" with
-`course/Specify/Kernel.lean` open, and write `execStmt` before you read
-`Stmt.exec`. Then read `Unroll.cpp` and write `course/Specify/Unroll.lean`
+`course/Specify/IR/Kernel.lean` open, and write `execStmt` before you read
+`Stmt.exec`. Then read `Unroll.cpp` and write `course/Specify/IR/Unroll.lean`
 before you read "A pass and its proof".
 
 # The idea
@@ -64,7 +64,7 @@ compiler/build/bin/tau-opt examples/ops/elementwise/kernel.mlir --tau-unroll
 
 The pass replaced the loop by four copies of its body, with positions
 `[0, 0]`, `[1, 0]`, `[2, 0]` and `[3, 0]`. Without the compiler, compare
-`examples/ops/elementwise/stages/kernel.json` with `unrolled.json` in the same
+`examples/ops/elementwise/stages/inlined.json` with `unrolled.json` in the same
 folder: the same kernel before and after the pass, written as JSON.
 
 The last constructor of `Stmt` below, `pin`, and the third field of `Env`,
@@ -149,7 +149,7 @@ about it by induction on the same structure.
 # What the proof does and does not cover
 
 The proof is about the Lean function `Kernel.unroll`. It is not about the C++
-in `compiler/lib/Transforms/Unroll.cpp`. Nothing in this repository proves
+in `compiler/lib/Passes/Unroll.cpp`. Nothing in this repository proves
 that the two do the same thing. They are compared on the examples:
 
 ```
@@ -166,15 +166,15 @@ checker.
 1. Read `examples/ops/elementwise/kernel.mlir` and run `tau-opt` on it as above.
 2. Read the descriptions of `tau.load`, `tau.store` and the operations in
    `TauOps.td`. Specify what a statement does, in
-   `course/Specify/Kernel.lean`.
+   `course/Specify/IR/Kernel.lean`.
 3. Read `spec/Tau/IR/Kernel.lean` from `Stmt.exec` to `Kernel.run`. Write a kernel
    of your own in your scratch file and run it on names, as above.
 4. Read `Unroll.cpp` with a pencil. Mark each group of lines "about MLIR" or
    "about the kernel".
-5. Specify the pass, in `course/Specify/Unroll.lean`. One of its tests compares
+5. Specify the pass, in `course/Specify/IR/Unroll.lean`. One of its tests compares
    your output with what the real compiler wrote.
 6. Read `spec/Tau/IR/Unroll.lean` beside the C++, and do
-   `course/Specify/ReadCpp.lean`: for each group of lines of the C++, what it
+   `course/Specify/IR/ReadCpp.lean`: for each group of lines of the C++, what it
    is about, and which Lean definition says the same.
 7. In `Prove/IR/Unroll.lean`, read the statements of the lemmas in
    order: one for each layer of the definition. Prove the first two and the
@@ -182,13 +182,13 @@ checker.
 
 # Exercises
 
-*Specify.* `course/Specify/Kernel.lean`: what a statement does.
+*Specify.* `course/Specify/IR/Kernel.lean`: what a statement does.
 
-*Specify.* `course/Specify/Unroll.lean`: a copy of the pass.
+*Specify.* `course/Specify/IR/Unroll.lean`: a copy of the pass.
 
 *State.* `LoadAfterStore` and `KeepsWhatIsComputed` in those two files.
 
-*Read side by side.* `course/Specify/ReadCpp.lean`. For nine groups of lines of
+*Read side by side.* `course/Specify/IR/ReadCpp.lean`. For nine groups of lines of
 `Unroll.cpp`, say whether the group is about MLIR, about the kernel, or a
 limit, and name the Lean definition that says the same. Then four questions
 about where the C++ and its copy differ. The file ends with what this

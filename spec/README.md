@@ -36,7 +36,7 @@ Everything outside `spec/Tau/` is measured against it and specified by it.
 | `compiler/` | Python frontend + C++/MLIR compiler | each file it writes is judged by a check from `Check/`; Python traces are compared with the compiler and with `Tau` |
 | `tools/` | `tau-sim` and `tau-check` | they are the definitions, with a command line |
 | `tests/`, `examples/` | runs on particular inputs | |
-| `course/` | a course in writing all of this | its students write the definitions from the docs and compare with the ones in `spec/Tau/` |
+| `course/` | a course in writing all of this | its students write the definitions from the docs and compare with the ones in `spec/Tau/`; `course/tests/` runs the docs' tables on `spec/Tau/` and checks that every exercise can be solved |
 
 Nothing in `spec/Tau/` depends on anything outside it.
 
@@ -116,9 +116,9 @@ rule a person uses to write a schedule.
 
 ### Part 2: the path to the machine
 
-**The forms.**
+**The IRs.**
 
-| `docs/Compiler.md` 2, form | Definition | What it computes, and when |
+| `docs/Compiler.md` 2, IR | Definition | What it computes, and when |
 |---|---|---|
 | Source | `Source` in `IR/Source.lean` | `Source.run`, `Source.timeline` |
 | Kernel | `Kernel` in `IR/Kernel.lean` | `Kernel.run`, `Kernel.timeline` |
@@ -196,21 +196,25 @@ compiled, on Machine/Arch.lean        =  compiled, on Machine/Circuit.lean
 
 ### The folders
 
-In `spec/Tau/`, in dependency order:
+In `spec/Tau/`, in dependency order: a folder imports only from the folders
+above it, and `spec/Tau.lean` lists the modules in the same order.
 
 | Folder | Contents |
 |---|---|
-| `Isa/` | Lanes and words (`Word.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`), events (`Event.lean`), and the image (`Encode.lean`). |
 | `Blocks/` | Clocked components: shift register, accumulator, multiply-accumulate, pipeline, memory, sequencer, repeater, systolic array. |
+| `Isa/` | Lanes and words (`Word.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`, whose entries are the repeater's), events (`Event.lean`), and the image (`Encode.lean`). |
 | `Machine/` | The machine: architectural slice model (`Arch.lean`), timing rule (`Timing.lean`), issued words (`Issues.lean`), and component-built circuit (`Circuit.lean`). |
-| `IR/` | The four forms of a program (`Source.lean`, `Kernel.lean`, `Placed.lean`, `Compiled.lean`), the memory map (`MemMap.lean`), and the Lean copy of unroll (`Unroll.lean`). |
+| `IR/` | The four IRs of a program (`Source.lean`, `Kernel.lean`, `Placed.lean`, `Compiled.lean`), the memory map (`MemMap.lean`), and the Lean copy of unroll (`Unroll.lean`). |
 | `Check/` | Symbolic expressions (`Expr.lean`), expression simplification (`Simplify.lean`), and the checks (`Checker.lean`, `Passes.lean`). |
 | `Sim/` | The JSON readers and the functions behind `tau-sim` and `tau-check`. |
 | `Claims.lean` | Every main statement. |
-| `Proofs/` | The theorems, mirroring `Isa/`, `Blocks/`, `Machine/`, `IR/`, `Check/`, plus `Claims.lean` and `EndToEnd.lean`. |
+| `Proofs/` | The theorems, mirroring `Blocks/`, `Isa/`, `Machine/`, `IR/`, `Check/`, plus `Claims.lean` and `EndToEnd.lean`. |
 
 Outside `spec/Tau/`, `spec/tools/` holds the CLI entry points (`TauSim.lean`,
-`TauCheck.lean`) and `spec/tests/` holds the compile-time test suite.
+`TauCheck.lean`) and `spec/tests/` the compile-time tests of the
+specification. Nothing in `spec/` imports from `course/`; the tests that need
+the course's tables, including the test that the docs' tables hold of the
+definitions, are in `course/tests/`.
 
 A definition goes under `spec/Tau/<Area>/`. A theorem about it goes under
 `spec/Tau/Proofs/<Area>/`, in a file of the same name. Every definition file
@@ -273,7 +277,7 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | The output of each C++ pass computes what its input computes and keeps its pins | checked | `tau-check`, once per pass |
 | The image is the finished program | checked | `tau-check`, on the image decoded |
 | The compiler's output is accepted | tested, on the examples | `scripts/check-examples.sh` |
-| The tables of the docs hold of the definitions | tested | `spec/tests/TauTest/Docs.lean` |
+| The tables of the docs hold of the definitions | tested | `course/tests/CourseTest/Docs.lean` |
 | The C++ `tau-unroll` gives the kernel that its Lean copy gives; the C++ writes the image that the Lean encoding gives | tested, on the examples | `tau-check --unroll`, `tau-check --encode` |
 | The frontend's record of a Python program is what the compiler reads from the frontend's MLIR | tested, on the examples written in Python | `scripts/check-examples.sh` |
 | A Python program run on real numbers ends with the buffers, and issues the pinned words, that its record does | tested, on the same examples | `scripts/check-examples.sh` |
@@ -283,7 +287,7 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | The result is there on no other cycle | not stated | |
 | A pinned word is issued by the slice the user had in mind | not stated; a pin names a word and a cycle, not a slice | `Isa/Event.lean` |
 | The circuit machine issues the words the architectural machine issues, on the same cycles | not stated; only its final memory is compared | |
-| `source.json` says what `kernel.mlir` says | trusted; for programs written in Python, tested against the frontend's own file | MLIR's parser, `compiler/lib/Target/EmitSource.cpp` |
+| `source.json` says what `kernel.mlir` says | trusted; for programs written in Python, tested against the frontend's own file | MLIR's parser, `compiler/lib/Emit/EmitSource.cpp` |
 | The JSON files are read correctly | trusted | `Sim/Json.lean` |
 | The definitions in the theorems mean what is intended | trusted; read them against the docs | `Source.run`, `Source.timeline`, `cellExecute`, `Isa/Word.lean` |
 | The docs say what was meant | trusted; nothing can check it | `docs/` |

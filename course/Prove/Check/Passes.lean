@@ -15,7 +15,7 @@ import Tau.Proofs.IR.Placed
 /-!
 # The per-pass checks are sound
 
-Two theorems for each check in `spec/Tau/Check/Passes.lean`. The first says: if
+Two theorems for each check in `Tau.Check.Passes`. The first says: if
 the check accepts, the output of the pass computes what its input computes,
 on every buffer contents. The second says: every word the input pins to a
 cycle, the output issues on that cycle.

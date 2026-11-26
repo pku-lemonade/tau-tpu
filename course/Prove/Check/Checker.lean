@@ -45,7 +45,7 @@ buffers is the run on expressions, evaluated; `Source.timeline_of_events` and
 `timeline_of_events` say the same of the timelines. `denote_of_sameExprs` says
 that two tables the checker found equal have equal values, and
 `covers_denote` that a timeline the checker found inside another is inside it
-after evaluating. The theorems here and in `spec/Tau/Proofs/Check/Passes.lean` put
+after evaluating. The theorems here and in `Tau.Proofs.Check.Passes` put
 these together.
 -/
 

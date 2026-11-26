@@ -8,7 +8,7 @@ import Tau.Blocks.Mac
 # The cell-level machine
 
 This is tau-tpu with each slice opened up. Where the slice-level machine
-(`spec/Tau/Machine/Arch.lean`) treats a slice as one box, here a slice is
+(`Tau.Machine.Arch`) treats a slice as one box, here a slice is
 built from the blocks in `spec/Tau/Blocks/`:
 
 * a **repeater** that issues the slice's instructions, counting down to each
@@ -26,7 +26,7 @@ count, used only to report where a trap happened.)
 This machine works on real words only. The streams between slices are the
 same as at the slice level.
 
-`spec/Tau/Proofs/Machine/Circuit.lean` proves that this machine and the
+`Tau.Proofs.Machine.Circuit` proves that this machine and the
 slice-level machine cannot be told apart: on every program they trap on the
 same cycle for the same reason, or end with the same memory contents.
 

@@ -7,14 +7,14 @@ that cycle. For an operation with a result, the word is the result, and it is
 issued when the instruction that produces it runs. For a store, the word is
 the one stored, and it is issued when it is written.
 
-Every form of a program has pins (`spec/Tau/IR/Source.lean`, `spec/Tau/IR/Kernel.lean`,
-`spec/Tau/IR/Placed.lean`). In the last form, `spec/Tau/IR/Compiled.lean`, every
+Every IR of a program has pins (`Tau.IR.Source`, `Tau.IR.Kernel`,
+`Tau.IR.Placed`). In the last IR, `Tau.IR.Compiled`, every
 instruction has a cycle, so every instruction is pinned.
 
-What a pin claims is an *event*: this word, on this cycle. Running any form
-gives its list of events, its *timeline*. A later form keeps the pins of an
-earlier one if its timeline contains the earlier timeline. Every check asks
-for that (`covers` in `spec/Tau/Check/Checker.lean`).
+What a pin claims is an *event*: this word, on this cycle. Running a program in any IR
+gives its list of events, its *timeline*. A program in a later IR keeps the
+pins of an earlier one if its timeline contains the earlier timeline. Every check asks
+for that (`covers` in `Tau.Check.Checker`).
 
 An event does not say which slice issues the word. Two operations that
 compute the same word on the same cycle make the same event.
@@ -45,8 +45,8 @@ variable {V W : Type}
 def Event.map (f : V → W) (e : Event V) : Event W := ⟨e.time, e.store, f e.word⟩
 
 /-- A word issued by a slice: the cycle, the position of the slice, the
-address if the word is written to memory, and the word. The placed form and
-the machine give these; `Issue.event` (`spec/Tau/IR/MemMap.lean`) turns one into
+address if the word is written to memory, and the word. The placed IR and
+the machine give these; `Issue.event` (`Tau.IR.MemMap`) turns one into
 an event. -/
 structure Issue (V : Type) where
   /-- The cycle. -/
