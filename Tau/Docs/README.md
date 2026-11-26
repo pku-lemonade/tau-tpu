@@ -4,6 +4,13 @@
 means, and what a compiler between them has to deliver. This folder holds
 all of its prose. Everything else in `Tau/` is Lean.
 
+Together, tau-tpu consists of a statically scheduled row-of-slices machine
+with fixed-cycle streams, programs written in Python or MLIR with optional
+cycle pins, an untrusted C++/MLIR compiler that lowers each program through
+intermediate forms into slice timetables and a numeric image, and Lean
+proofs that connect a component-built machine to the slice-level machine and
+validate the checker that judges every compiler output against its source.
+
 | Doc | Describes | Specified in |
 |---|---|---|
 | [`Machine.md`](Machine.md) | The machine: components, slices, streams, one cycle, the timing rule, instructions, traps, the image. | `Tau/Data/`, `Tau/Blocks/`, `Tau/Isa/`, `Tau/SliceLevel/`, `Tau/CellLevel/` |

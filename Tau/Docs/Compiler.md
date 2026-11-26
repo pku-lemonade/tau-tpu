@@ -56,6 +56,14 @@ to wait.
 
 ## 4. The steps
 
+```
+Source ─inline─▶ Kernel ─simplify─▶ Kernel ─unroll─▶ Kernel ─place─▶ Placed
+                                                                       │
+Compiled (scheduled) ◀─────────────────────────── schedule ────────────┘
+  │
+  └─route─▶ Compiled ─slice─▶ Compiled ─fold─▶ Compiled ─encode─▶ Image
+```
+
 | Step | From | To | Decides |
 |---|---|---|---|
 | inline | source | kernel | nothing: each call is replaced by the kernel it calls |
@@ -117,6 +125,14 @@ expression for every word of every buffer, and gives an expression and a
 cycle for every word it issues. The output is accepted if the expressions
 for the buffers are the same and every issued word of the input is an issued
 word of the output, on the same cycle.
+
+```
+before ──run on names──▶ Exprs & timeline
+                            │  ▲
+                    compare │  │
+                            ▼  │
+after  ──run on names──▶ Exprs & timeline
+```
 
 This judges all contents at once, because neither a program nor the machine
 ever decides anything from what a word holds (Programs 1, Machine 3.3).

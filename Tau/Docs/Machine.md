@@ -211,6 +211,12 @@ empty at cycle 0.
 
 A slice reads from, and places results on, the slots at its own position.
 
+```
+── east ──▶  [0] ──▶ [1] ──▶ [2] ──▶ [3] ──▶ [4] ──▶ [5] ──▶ [6] ──▶ [7] ──▶ [8]
+             mxm     sxm     mem     mem     vxm     mem     mem     sxm     mxm
+◀─ west ──   [0] ◀── [1] ◀── [2] ◀── [3] ◀── [4] ◀── [5] ◀── [6] ◀── [7] ◀── [8]
+```
+
 ### 3.3 One cycle
 
 In every cycle each slice executes at most one instruction.
@@ -244,6 +250,15 @@ position 0 reads a word on cycle 0 for a stream going east:
 | 4 | on the stream at position 2 |
 
 The slice at position 2 can use it on cycle 0 + 1 + 1 + 2 = 4.
+
+```
+cycle   0:mem               1:vxm               2:mem
+  0     read ─▶ pipe
+  1     leaves pipe
+  2     stream[0] ────────▶
+  3                         stream[1] ────────▶
+  4                                             stream[2] ─▶ read
+```
 
 ### 3.5 Instructions
 
@@ -393,5 +408,12 @@ from the components of section 2.
 | the stored words of a memory slice | memory (2.5) |
 | the accumulator of a matrix slice | multiply-accumulate cells (2.3), one per lane |
 | the stored columns of a matrix slice | a second, small memory (2.5) |
+
+```
+repeater (2.7) ──▶ [ slice: mem (2.5) / vxm / sxm / mxm (mac 2.3 + mem 2.5) ]
+                         ▲                                       │
+                         │                                       ▼
+                   streams (in)                     shift register (2.1) ──▶ streams (out)
+```
 
 A machine built this way behaves exactly as section 3 says.
