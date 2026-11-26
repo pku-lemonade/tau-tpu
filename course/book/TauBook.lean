@@ -1,6 +1,6 @@
 import VersoManual
 import TauBook.StartHere
-import TauBook.Lean
+import TauBook.WorkingInLean
 import TauBook.ShiftRegister
 import TauBook.Accumulator
 import TauBook.Mac
@@ -14,7 +14,7 @@ import TauBook.Kernels
 import TauBook.Expressions
 import TauBook.Checker
 import TauBook.Pins
-import TauBook.Flow
+import TauBook.PythonToImage
 import TauBook.CellLevel
 import TauBook.EndToEnd
 import TauBook.Extending
@@ -52,7 +52,7 @@ homework: extend the machine.
 
 {include 1 TauBook.StartHere}
 
-{include 1 TauBook.Lean}
+{include 1 TauBook.WorkingInLean}
 
 {include 1 TauBook.ShiftRegister}
 
@@ -80,7 +80,7 @@ homework: extend the machine.
 
 {include 1 TauBook.Pins}
 
-{include 1 TauBook.Flow}
+{include 1 TauBook.PythonToImage}
 
 {include 1 TauBook.CellLevel}
 

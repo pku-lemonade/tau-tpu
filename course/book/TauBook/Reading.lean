@@ -44,8 +44,10 @@ pipelining, latency.
   for registers and timing, chapter 5 for memory arrays, chapter 7 for
   pipelining.
 
-For two's complement, overflow and saturating arithmetic: Harris and Harris,
-chapter 1, or any introduction to computer arithmetic.
+For two's complement, overflow, saturating arithmetic and zigzag encoding:
+Harris and Harris, chapter 1, or any introduction to computer arithmetic;
+for zigzag encoding, Google's Protocol Buffers encoding guide or the
+Wikipedia article on variable-length codes.
 
 For dot product and matrix-vector product: the first chapter of any linear
 algebra text, or the Wikipedia articles of those names.
@@ -55,14 +57,16 @@ For systolic arrays and multiply-accumulate:
 * H. T. Kung, "Why Systolic Architectures?", IEEE Computer, 1982. The
   original argument. Short and readable.
 
-For SAT solvers, the first chapter of any SAT handbook, or the Wikipedia
-article on the Boolean satisfiability problem, is enough.
+For SAT solvers and bit-blasting, the first chapter of any SAT handbook, or
+the Wikipedia article on the Boolean satisfiability problem, is enough.
 
 # The architecture
 
-For static scheduling, instruction set architecture, SIMD, and the design
-tau-tpu follows:
+For static scheduling, instruction set architecture, SIMD, instruction
+encoding, assembler, and the design tau-tpu follows:
 
+* Harris and Harris, _Digital Design and Computer Architecture_, chapter 6
+  (instruction encoding and assembly).
 * Abts and others, "Think Fast: A Tensor Streaming Processor (TSP) for
   Accelerating Deep Learning Workloads", ISCA 2020. Read sections 1 to 3.
 * Abts and others, "A Software-defined Tensor Streaming Multiprocessor for
@@ -71,25 +75,40 @@ tau-tpu follows:
 # Compilers
 
 For intermediate representation, abstract syntax tree, SSA form, compiler
-pass, loop unrolling and peephole optimization:
+pass, loop unrolling, function inlining, call by reference and peephole
+optimization:
 
 * [CS 6120: Advanced Compilers](https://www.cs.cornell.edu/courses/cs6120/2020fa/self-guided/),
   the self-guided version. Lessons 2 and 3 cover representations and local
   optimization; lesson 5 covers SSA.
+
+For MLIR:
+
 * [The MLIR Toy tutorial](https://mlir.llvm.org/docs/Tutorials/Toy/).
   Chapters 2 and 3 show how a dialect and a rewrite are written.
+
+For timing constraints and initiation interval in static schedules:
+
+* Monica Lam, "Software Pipelining: An Effective Scheduling Technique for
+  VLIW Machines", PLDI 1988, or the Wikipedia article on software pipelining.
+
+For embedded domain-specific languages, tracing and metaprogramming:
+
+* Paul Hudak, "Building Domain-Specific Embedded Languages", ACM Computing
+  Surveys, 1996 (section 1 to 3), and the JAX documentation on "How to Think
+  in JAX" / tracing.
 
 # Verified compilation
 
 For translation validation, symbolic execution, homomorphism (a function
-that respects the operations on both sides), refinement, simulation relation
-and abstraction function:
+that respects the operations on both sides), refinement, simulation relation,
+abstraction function, invariant and observable behaviour:
 
 * [Software Foundations](https://softwarefoundations.cis.upenn.edu/), volumes
   1 and 2. Proving things about programs and languages.
 * Leroy, "Formal verification of a realistic compiler", Communications of the
   ACM, 2009. The CompCert overview; section 2 explains verified compilers
-  against validated ones.
+  against validated ones and observable behaviour.
 * Rideau and Leroy, "Validating register allocation and spilling", 2010. A
   proved checker in place of a proved algorithm.
 * Bhat and others, "Verifying Peephole Rewriting in SSA Compiler IRs", ITP

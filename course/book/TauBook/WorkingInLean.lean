@@ -15,6 +15,10 @@ shows the Lean you need to write and read definitions, takes you through two
 complete proofs one step at a time, and ends with what to do when you are
 stuck. Type everything in. Do not paste.
 
+If you have not used Lean before, play the Tutorial, Addition and
+Multiplication worlds of the Natural Number Game (about two hours; linked in
+the reading list) before Day 1.
+
 # Your working setup
 
 Open the repository folder in VS Code. Open the whole folder, not a single

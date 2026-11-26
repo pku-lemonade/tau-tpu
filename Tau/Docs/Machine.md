@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | Describes | The tau-tpu machine: its components, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
-| Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`README.md`](README.md) 5). |
+| Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`Formats.md`](Formats.md)). |
 | Specified in | `Tau/Data/`, `Tau/Blocks/`, `Tau/Isa/`, `Tau/SliceLevel/`, `Tau/CellLevel/` |
 | Tables tested by | `tests/TauTest/Docs.lean`, with the rows in `course/Specs/Tables.lean` |
 
 This doc describes the machine in words and tables, the way an architect
 hands it to someone who has to specify it. The Lean files named above are
-that specification; README 1 says how the two are kept together.
+that specification; Docs/README 1 says how the two are kept together.
 
 The machine is described twice. Section 3, the *slice-level machine*, treats
 a slice as one box that takes an instruction and gives a result some cycles
@@ -195,8 +195,8 @@ last position in the east. Each slice is of one of four kinds.
 
 A machine is described by the kind of slice at each position, the number of
 streams in each direction, the number of columns a matrix slice can store,
-and one delay for each kind of slice. `chips/tau9.json` describes a machine
-of nine slices: matrix, rearrangement, two memories, vector, two memories,
+and one delay for each kind of slice. For example, a nine-slice machine has
+the row: matrix, rearrangement, two memories, vector, two memories,
 rearrangement, matrix.
 
 ### 3.2 Streams
@@ -394,6 +394,7 @@ order of 3.6, from 0 for add to 8 for less-than.
 | on cycle 9, write stream 0 going west at address 4 | 9, 0, 0, 0, 1, 1, 4 |
 | on cycle 6, relu of stream 0 going east to stream 0 going west | 6, 0, 0, 0, 2, 0, 1, 0 |
 | on cycle 7, add 5 to every lane of stream 1 going east, to stream 1 going east | 7, 0, 0, 0, 2, 2, 2, 5, 10 |
+| on cycle 8, stream 1 going east minus stream 2 going west, to stream 0 going east | 8, 0, 0, 0, 3, 1, 2, 5, 0 |
 | on cycle 4, the constant with lanes 3 and -4 to stream 2 going west | 4, 0, 0, 0, 7, 5, 2, 6, 7 |
 
 ## 4. The cell-level machine

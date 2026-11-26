@@ -43,6 +43,11 @@ the slice-level machine, in what is computed and in when; the cell-level
 machine equals the slice-level machine; and real words obey the simplifier's
 laws.
 
+`Tau/Proofs/EndToEnd.lean` and `Tau/Claims.lean` also contain
+`end_to_end_passes`, which proves the same conclusion from the eight
+per-pass checks (`passes_sound` and `passes_pins`) from "The checker" and
+"Pins".
+
 # How to work through it
 
 1. Do `Exercises/EndToEnd.lean`. Each proof names the theorems from earlier

@@ -437,6 +437,8 @@ def entries (enc : Timed → List Nat) : List Row :=
       (enc (.once 0 6 (.un .relu e0 w1))) [6, 0, 0, 0, 2, 0, 1, 0],
     row "add 5 to east 1, to east 1, on cycle 7"
       (enc (.once 0 7 (.un (.addi 5) ⟨.east, 1⟩ ⟨.east, 1⟩))) [7, 0, 0, 0, 2, 2, 2, 5, 10],
+    row "east 1 minus west 2 to east 0 on cycle 8"
+      (enc (.once 0 8 (.bin .sub ⟨.east, 1⟩ ⟨.west, 2⟩ e0))) [8, 0, 0, 0, 3, 1, 2, 5, 0],
     row "the constant 3, -4 to west 2 on cycle 4"
       (enc (.once 0 4 (.const [3, -4] ⟨.west, 2⟩))) [4, 0, 0, 0, 7, 5, 2, 6, 7] ]
 

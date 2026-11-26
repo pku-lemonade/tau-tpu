@@ -253,6 +253,15 @@ cycles between iterations two are always in flight. Open `out/compiled.json`:
 the whole loop is three entries, each issued four times, four cycles apart.
 A loop at a fixed spacing is what a repeating entry is.
 
+```
+cycle:   2   4   6   8  10  12  14  16  18  20  22
+iter 0:  R───────V─────W
+iter 1:          R───────V─────W
+iter 2:                  R───────V─────W
+iter 3:                          R───────V─────W
+         (R = read at slice 2, V = relu at slice 4, W = write at slice 3)
+```
+
 # How to work through it
 
 1. Do `course/Specs/Pins.lean`, including the four questions under "Judge".

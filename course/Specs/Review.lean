@@ -9,7 +9,7 @@ Every file compiles. Four of the five should not be accepted as they are.
 
 For each section decide: accept or not, and why. The chapter "Writing a
 specification" gives the list of things to look at. The answers are in
-`course/Specs/ReviewAnswers.md`.
+`course/Specs/Answers/Review.md`.
 -/
 
 namespace Specs.Review

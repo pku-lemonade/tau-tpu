@@ -6,8 +6,8 @@ writes a timed program for a tau-tpu machine, and its image.
 This page says how *this* compiler works and where it stops. What any
 compiler for the machine has to deliver, the forms a program takes and what
 every step must keep, is [`Tau/Docs/Compiler.md`](../Tau/Docs/Compiler.md).
-The files it writes are section 5 of
-[`Tau/Docs/README.md`](../Tau/Docs/README.md).
+The JSON formats it writes are in
+[`Tau/Docs/Formats.md`](../Tau/Docs/Formats.md).
 
 ```
 include/tau/Dialect/     the dialect: types, kernel operations, instructions,

@@ -18,7 +18,7 @@ The compiler, the frontend and the Lean tools exchange five kinds of file.
 This module is not covered by any proof: a mistake here shows up as a wrong
 file being read, not as an unsound theorem.
 
-Docs: README 5 (`Tau/Docs/`).
+Docs: Formats (`Tau/Docs/`).
 -/
 
 namespace Tau.Json

@@ -69,6 +69,9 @@ code .
 Open the repository folder in VS Code, not a subfolder, or `import Tau` is
 not found.
 
+On macOS, the same Lean and VS Code steps work (`curl` and `elan` work
+directly in Terminal).
+
 The compiler is optional and needs LLVM and MLIR 21. Without it,
 `examples/*/stages/` holds its output for three examples. The frontend needs
 Python 3 and nothing else.
@@ -81,6 +84,10 @@ cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cma
 cmake --build compiler/build
 scripts/check-examples.sh                   # every line should start with "ok"
 ```
+
+On macOS, use the container below, or install LLVM 21 with Homebrew
+(`brew install llvm@21 cmake ninja`) and pass
+`-DMLIR_DIR=$(brew --prefix llvm@21)/lib/cmake/mlir` to `cmake`.
 
 Or use the container in [`docker/`](docker/Dockerfile), which has
 everything.
@@ -108,8 +115,8 @@ lake exe tau-sim --timeline out/source.json examples/paced/buffers.json   # the 
 lake exe tau-sim --timeline out/image.json examples/paced/buffers.json    # every word the machine issues
 ```
 
-`tauc` writes one JSON file per pass (listed in section 5 of
-[`Tau/Docs/README.md`](Tau/Docs/README.md)), and each stage can be checked
+`tauc` writes one JSON file per pass (listed in
+[`Tau/Docs/Formats.md`](Tau/Docs/Formats.md)), and each stage can be checked
 and run on its own; a rejection names the pass that went wrong:
 
 ```bash
@@ -132,8 +139,9 @@ and with the Lean tools.
 | what a program is and what it promises | [`Tau/Docs/Programs.md`](Tau/Docs/Programs.md) |
 | what a compiler has to deliver | [`Tau/Docs/Compiler.md`](Tau/Docs/Compiler.md) |
 | what is proved, checked, tested or trusted | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 4 |
-| the files the tools exchange | [`Tau/Docs/README.md`](Tau/Docs/README.md), section 5 |
+| the JSON formats the tools exchange | [`Tau/Docs/Formats.md`](Tau/Docs/Formats.md) |
 | how this compiler works, and its limits | [`compiler/README.md`](compiler/README.md) |
+| how the Python frontend records a program | [`frontend/tau/__init__.py`](frontend/tau/__init__.py) (opening docstring) |
 | the course | [`course/README.md`](course/README.md) |
 
 ## Layout

@@ -65,12 +65,12 @@ Lake package because it depends on Verso.
   build. Commit these files with `todo` in place of the definitions.
 - All prose about the specification is in `Tau/Docs/`, and a fact is
   stated there once. `Machine.md`, `Programs.md` and `Compiler.md` give the
-  intent, as a designer would write it. `README.md` has the rules for the
-  docs (section 1), the map from the docs to the definitions and theorems
-  (2 and 3), how each claim stands (4), and the files the tools exchange
-  (5). Do not add another README or docs folder, and do not restate a doc
-  in a module comment, another README or the book: cite its section, as
-  "Machine 3.4" or "README 5.3".
+  intent, as a designer would write it. `Formats.md` describes the JSON
+  formats the tools exchange. `README.md` has the rules for the docs
+  (section 1), the map from the docs to the definitions and theorems (2 and 3),
+  and how each claim stands (4). Do not add another README or docs folder,
+  and do not restate a doc in a module comment, another README or the book:
+  cite its section, as "Machine 3.4", "Formats 3" or "Docs/README 1".
 - Call the thing the docs describe *the machine*: the slice-level machine
   (`Tau/SliceLevel/`) and the cell-level machine (`Tau/CellLevel/`) are two
   descriptions of it. Do not call it a chip or a processor in prose. The C++
@@ -98,7 +98,7 @@ Lake package because it depends on Verso.
   them. After changing the compiler, refresh them with
   `UPDATE_STAGES=1 scripts/check-examples.sh`.
 - After changing the compiler or the JSON formats, run
-  `scripts/check-examples.sh` and update section 5 of `Tau/Docs/README.md`.
+  `scripts/check-examples.sh` and update `Tau/Docs/Formats.md`.
 - The image is described in section 3.10 of `Tau/Docs/Machine.md`, specified
   in `Tau/Isa/Encode.lean`, and written by `encodeEntry` in
   `compiler/lib/Target/Emit.cpp`. Change them together. Its tables

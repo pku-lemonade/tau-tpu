@@ -35,7 +35,7 @@ def decodeSigned (n : Nat) : Int := todo
 
 /-- An entry as numbers. Write the cases for `read` and `write`, with your
 `encodeTrack`. The other instructions are given by `Instr.encode`, the
-finished encoding, so that the last four rows of the table can agree. -/
+finished encoding, so that the remaining rows of the table can agree. -/
 def encodeEntry (e : Timed) : List Nat :=
   match e.instr with
   | .read addr dst => todo

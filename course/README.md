@@ -12,9 +12,9 @@ mathematics. It does not assume a course in digital design, computer
 architecture or compilers; where a term from those fields is needed, the
 chapter names it and the reading list says where to look it up.
 
-Plan for about 26 days of roughly six focused hours each. The day counts are
-estimates; nobody has been timed. `Work/Log.md` is a table for your own
-times.
+Plan for about 27 days (Day 0 plus 26 days) of roughly six focused hours
+each. The day counts are estimates; nobody has been timed. `Work/Log.md`
+is a table for your own times.
 
 ## Start
 
@@ -23,12 +23,17 @@ times.
 2. In VS Code, open `course/Work/Scratch.lean`. Nothing should be underlined
    in red.
 3. Read the book, starting with "Start here" and "Working in Lean".
+4. Before Day 1, play the first three worlds of the Natural Number Game
+   (about two hours; linked in the reading list at the end of the book).
 
 ## The book
 
 The chapters are the files in `book/TauBook/`, in the order listed in
 `book/TauBook.lean`. You can read them there directly: the text after the
-`#doc` line is the chapter. To read them as web pages:
+`#doc` line is the chapter. Note that `{docstring Tau.Foo}` lines do not
+expand in raw `.lean` files; when reading them directly in VS Code, use
+Go to Definition (`F12` or Cmd/Ctrl-click) on the name to view the
+definition and its docstring. To read them as web pages:
 
 ```bash
 cd course/book
@@ -48,7 +53,7 @@ example in the book is checked when the book is built.
 | `Tau/Docs/` | The docs: the machine, programs and the compiler, in words and tables, as their designers would write them, and a README that maps them to the Lean. The source for most chapters, and what you specify from. They are not the specification and say less. | Nobody |
 | `compiler/` | The compiler in C++. The source for the compiler chapters. | Nobody |
 | `frontend/` | The frontend in Python. The source for one chapter. | Nobody |
-| `course/Specs/` | One file per thing you specify, with tests. | You write the definitions and the statements |
+| `course/Specs/` | One file per thing you specify, with tests; `course/Specs/Answers/` holds answer notes for the review and choose exercises. | You write the definitions and the statements |
 | `course/Exercises/` | A few proof files with some proofs replaced by `sorry`. | You fill in the proofs |
 | `course/Work/` | Your own files: a scratch file, your questions for the architect, your claims table, your times. | You |
 | `Tau/` | The finished development, beside its docs. `Tau/Docs/README.md` is its map, `Tau/Claims.lean` lists every main statement, and `Tau/Proofs/` holds every proof. | Nobody, except in the exercises that say to work on a branch |

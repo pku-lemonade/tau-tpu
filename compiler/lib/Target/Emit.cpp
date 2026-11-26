@@ -1,7 +1,7 @@
 //===- Emit.cpp - write placed, compiled and image files ------------------===//
 //
 // Writes a function made of instructions or entries in the JSON forms that
-// the Lean tools read (Tau/Docs/README.md section 5, Tau/Sim/Json.lean).
+// the Lean tools read (Tau/Docs/Formats.md, Tau/Sim/Json.lean).
 //
 // The image is the last file: the entries of every slice as numbers. How an
 // entry becomes numbers is specified in Tau/Isa/Encode.lean (`encode`), and

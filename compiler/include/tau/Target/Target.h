@@ -72,7 +72,7 @@ bool isBinaryKernelOp(mlir::Operation &op);
 bool isRearrangement(llvm::StringRef name);
 
 //===----------------------------------------------------------------------===//
-// Files for the Lean tools (Tau/Docs/README.md, section 5)
+// Files for the Lean tools (Tau/Docs/Formats.md)
 //===----------------------------------------------------------------------===//
 
 /// A source or kernel file. Valid on a function before `tau-place`. With a

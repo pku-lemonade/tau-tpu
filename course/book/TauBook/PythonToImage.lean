@@ -150,6 +150,15 @@ A call may not pass the same buffer twice. The called kernel would then see,
 through one buffer, what it stored to the other, and a kernel copied in and a
 kernel called would no longer do the same thing.
 
+```
+Caller buffers:   buf 0         buf 2         buf 1
+                    │           ▲   │           ▲
+call 1 [0, 2]:      └──▶ K ─────┘   │           │   (origin 0  → pin at 3)
+call 2 [2, 1]:                      └──▶ K ─────┘   (origin 10 → pin at 13)
+
+Disallowed [0, 0]: callee buf 0 and buf 1 both point to caller buf 0.
+```
+
 ```lean
 example : sourceExprs (.call reluCallee [0, 0] 0 .done) [1, 1] = none := by
   rfl

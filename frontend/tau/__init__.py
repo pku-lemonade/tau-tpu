@@ -43,7 +43,7 @@ that run with what the Lean tools compute from the record.
     python3 -m tau kernel.py --run b.json  run on the buffers in b.json
 
 `kernel.mlir` is the input of `tauc`. `traced.json` is the same program as a
-source file (Tau/Docs/README.md, 5.1), written here without the compiler; `tauc`
+source file (Tau/Docs/Formats.md, section 1), written here without the compiler; `tauc`
 writes its own from the MLIR, and the two must be equal.
 
 Terms to look up: *embedded domain-specific language*, *tracing*,
@@ -380,7 +380,7 @@ class Program:
         self.order = order
 
     def source(self):
-        """The program as a source file (Tau/Docs/README.md, 5.1)."""
+        """The program as a source file (Tau/Docs/Formats.md, section 1)."""
         def body(items):
             out = []
             for item in items:

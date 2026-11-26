@@ -250,7 +250,7 @@ repository's `Tau/Docs/README.md`, section 4.
    and 2.1 to 2.3 of `Machine.md`.
 2. Do `course/Specs/Candidates.lean`.
 3. Do `course/Specs/Review.lean`. Then read
-   `course/Specs/ReviewAnswers.md`.
+   `course/Specs/Answers/Review.md`.
 4. Do `course/Specs/Repair.lean`.
 5. Do `course/Specs/Provable.lean`.
 6. Read `Tau/Claims.lean` from top to the end of "The components". These are

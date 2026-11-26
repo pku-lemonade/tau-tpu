@@ -158,11 +158,12 @@ Python. Both say the same things.
 | a scratch buffer | one more argument of the last function | `tau.alloc(1)` |
 
 In MLIR the program is the last function of the file and the kernels it
-calls are the functions before it. The operations are defined in
-`compiler/include/tau/Dialect/TauOps.td`.
+calls are the functions before it.
 
 In Python the program is not the text of the function. The function is run
 once and the statements it calls are recorded; the record is the program.
 Whatever else the function does while it runs, a Python loop, a test on an
-integer, a helper function, leaves only the statements it called. The comment
-at the top of `frontend/tau/__init__.py` says how.
+integer, a helper function, leaves only the statements it called. `T`
+stands for the start cycle of the enclosing kernel, so `at=T + 6 + 4 * i`
+pins an operation to cycle `6 + 4 * i` from the kernel's start and
+`at=T + 40` sets a call's origin to cycle `40`.

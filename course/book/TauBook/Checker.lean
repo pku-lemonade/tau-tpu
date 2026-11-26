@@ -373,7 +373,7 @@ are never read, a register allocator, a scheduler that calls an
 integer-program solver, and for one step it has and a later chapter covers:
 the encoder that turns the finished program into numbers. For the encoder,
 what is the property, and is it about one function or about two? Then read
-`course/Specs/ChooseAnswers.md` and note where you disagree.
+`course/Specs/Answers/Choose.md` and note where you disagree.
 
 *Prove.* `check_sound` and `check_safe` in `Exercises/Check/Sound.lean`;
 `checkKernels_sound` and `passes_sound` in `Exercises/Check/Passes.lean`. The
