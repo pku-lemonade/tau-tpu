@@ -711,7 +711,7 @@ def quotedLines : List (String × Nat × String) :=
     ("compiler/lib/Passes/Unroll.cpp", 79, "builder.clone(op, mapping)"),
     ("compiler/lib/Passes/Unroll.cpp", 82, "loop.erase()"),
     ("compiler/lib/Passes/Unroll.cpp", 89, "createUnrollPass"),
-    ("compiler/lib/Passes/Schedule.cpp", 93, "machine->delayAt(p) + 1 + std::abs(q - p)") ]
+    ("compiler/lib/Passes/Schedule.cpp", 93, "machine->delayOf(p, tau::delayName(*def)) + 1 + std::abs(q - p)") ]
 
 /-- Whether every quoted line is still where the exercise says it is. -/
 def quotedLinesHold : IO (List Row) := do

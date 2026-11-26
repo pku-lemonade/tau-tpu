@@ -14,7 +14,9 @@ built from the blocks in `spec/Tau/Blocks/`:
 * a **repeater** that issues the slice's instructions, counting down to each
   one with its own registers,
 * a **memory** that holds its words,
-* a **shift register** that carries each result for the slice's delay,
+* a **shift register** that carries each result for its delay: as deep as
+  the longest delay of the machine, with a shorter result written into the
+  slot that leaves after its delay,
 * one **multiply-accumulate cell** per lane, for the matrix slice,
 * a second small **memory** for the columns a matrix slice stores.
 
@@ -47,9 +49,10 @@ structure Cell (lanes : Nat) where
   size : Nat
   /-- Memory: the stored words. -/
   mem : Vector (Word lanes) size
-  /-- Shift register: its depth, which is the slice's delay. -/
+  /-- Shift register: its depth, which is the longest delay of the machine. -/
   depth : Nat
-  /-- Shift register: results on their way out. -/
+  /-- Shift register: results on their way out. The last slot leaves in the
+  cycle about to run. -/
   pipe : Vector (Option (Stream × Word lanes)) depth
   /-- Matrix slice: the vector operand. -/
   x : Option (Word lanes)
@@ -153,12 +156,29 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
       | some x, some w =>
         .ok ({ c with acc := macLanes c.acc fun k => .add (x[j]?.getD 0, w[k]) }, none)
 
-/-- Push a result into a slice's shift register and take out the one that
-leaves it. -/
-def cellShift (c : Cell lanes) (entering : Option (Stream × Word lanes)) :
+/-- Whether a result that leaves `d` cycles from now finds its slot of the
+shift register taken by an earlier result. The last slot leaves in this
+cycle. A result that enters at the front never clashes. -/
+def cellClash (c : Cell lanes) (entering : Option (Stream × Word lanes)) (d : Nat) : Bool :=
+  match entering with
+  | some _ => d < c.depth && (c.pipe[c.depth - 1 - d]?.getD none).isSome
+  | none => false
+
+/-- Put a result that leaves `d` cycles from now into a slice's shift register,
+step it, and take out the one that leaves it. A result whose delay is the
+depth of the register is its input. A result with a shorter delay is written
+into the slot that leaves after its delay, and the register steps with no
+input. -/
+def cellShift (c : Cell lanes) (entering : Option (Stream × Word lanes)) (d : Nat) :
     Cell lanes × Option (Stream × Word lanes) :=
-  let r := (shiftRegister c.depth none).step c.pipe entering
-  ({ c with pipe := r.1 }, r.2)
+  let out :=
+    match entering with
+    | some r =>
+      if d < c.depth then
+        (shiftRegister c.depth none).step (c.pipe.setIfInBounds (c.depth - 1 - d) (some r)) none
+      else (shiftRegister c.depth none).step c.pipe (some r)
+    | none => (shiftRegister c.depth none).step c.pipe none
+  ({ c with pipe := out.1 }, out.2)
 
 /-- One cycle of the slice at position `p`. The repeater issues the
 instructions due and advances its registers. -/
@@ -169,13 +189,15 @@ def cellStep (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes
       Cell lanes × Option (Stream × Word lanes) :=
     ({ r.1 with clock := c.clock + 1, slots := issued.1 }, r.2)
   match issued.2 with
-  | [] => .ok (tick (cellShift c none))
+  | [] => .ok (tick (cellShift c none 0))
   | [i] =>
     match cfg.kindAt p with
     | none => .error ⟨.noSlice, p, c.clock⟩
     | some kind =>
       match cellExec cfg kind rd c i with
-      | .ok (c', r) => .ok (tick (cellShift c' r))
+      | .ok (c', r) =>
+        if cellClash c' r (cfg.delayOf kind i) then .error ⟨.twoResults, p, c.clock⟩
+        else .ok (tick (cellShift c' r (cfg.delayOf kind i)))
       | .error k => .error ⟨k, p, c.clock⟩
   | _ => .error ⟨.twoInstructions, p, c.clock⟩
 
@@ -237,7 +259,7 @@ def CellState.init (cfg : Config) (prog : Program) (image : List (List (Word lan
       slots := (prog.entriesFor p).map Entry.start
       size := (image[p]?.getD []).length
       mem := ⟨(image[p]?.getD []).toArray, by simp⟩
-      depth := cfg.delay ((cfg.kinds[p]?).getD .vxm)
+      depth := cfg.maxDelay
       pipe := Vector.replicate _ none
       x := none
       acc := Vector.replicate lanes 0

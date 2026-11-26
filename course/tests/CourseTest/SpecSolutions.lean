@@ -142,8 +142,8 @@ def arrives (cfg : Config) (tr : Stream) (q u : Nat) : Nat × Nat × Instr → B
     | none => false
     | some kind =>
       match tr.dir with
-      | .east => p ≤ q && u == t + cfg.delay kind + 1 + (q - p)
-      | .west => q ≤ p && u == t + cfg.delay kind + 1 + (p - q)
+      | .east => p ≤ q && u == t + cfg.delayOf kind i + 1 + (q - p)
+      | .west => q ≤ p && u == t + cfg.delayOf kind i + 1 + (p - q)
 
 /-- Every operand of every instruction arrives on the cycle it is read. -/
 def onTime (c : Compiled) : Bool :=

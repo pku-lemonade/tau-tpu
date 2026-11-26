@@ -3,9 +3,9 @@ import Tau.Machine.CellLevel
 /-!
 # Test: operations, repeats and stored columns
 
-Small checks of the lane operations on real words, and of two machine
-features on hand-written programs: an instruction that repeats, and a matrix
-slice that stores its columns.
+Small checks of the lane operations on real words, and of three machine
+features on hand-written programs: an instruction that repeats, a matrix
+slice that stores its columns, and an operation with a delay of its own.
 -/
 
 namespace TauTest.Features
@@ -57,11 +57,19 @@ def words (rows : List (List Int)) : List (Word 2) := rows.map Word.ofInts
 
 /-- Run on both machines and return slice 3's memory, or `none` on a trap or
 if the two machines disagree. -/
-def run (prog : Program) (cycles : Nat) (image : List (List (Word 2))) :
+def run (prog : Program) (cycles : Nat) (image : List (List (Word 2))) (c : Config := cfg) :
     Option (List (List Int)) :=
-  match execute (wordSem 2) cfg prog cycles image, cellExecute cfg prog cycles image with
+  match execute (wordSem 2) c prog cycles image, cellExecute c prog cycles image with
   | .ok mem, .ok mem' =>
     if mem == mem' then some ((mem[3]?.getD []).map Word.toInts) else none
+  | _, _ => none
+
+/-- Run on both machines and return the trap, or `none` if there is none or
+the two machines disagree. -/
+def trapOn (c : Config) (prog : Program) (cycles : Nat) (image : List (List (Word 2))) :
+    Option Trap :=
+  match execute (wordSem 2) c prog cycles image, cellExecute c prog cycles image with
+  | .error t, .error t' => if t = t' then some t else none
   | _, _ => none
 
 /-! ## Repeat: copy three words with two instructions -/
@@ -110,5 +118,44 @@ def twice : Program :=
 #guard run twice 18
         [[], words [[1, 3], [2, 4], [10, 100], [1, 1]], [], words [[0, 0], [0, 0]]]
         == some [[210, 430], [3, 7]]
+
+/-! ## A delay of its own: a slow multiply -/
+
+/-- The machine above, with a multiply that takes three cycles. -/
+def slowMul : Config := { cfg with delays := [("mul", 3)] }
+
+/-- Slice 1 holds `a` and slice 3 holds `b`; each sends its word to slice 2
+on cycles 0 and 1, and the two arrive together on cycles 3 and 4. Slice 2
+multiplies on cycle 3 and adds on cycle 4. The add takes one cycle and the
+multiply three, so the sum reaches slice 3 on cycle 7, before the product,
+which arrives on cycle 8. -/
+def mulThenAdd : Program :=
+  [ { slice := 1, time := 0, instr := .read 0 (e 0), repeats := 1 },
+    { slice := 3, time := 0, instr := .read 0 (w 0), repeats := 1 },
+    .once 2 3 (.bin .mul (e 0) (w 0) (e 0)),
+    .once 2 4 (.bin .add (e 0) (w 0) (e 0)),
+    .once 3 7 (.write (e 0) 1),
+    .once 3 8 (.write (e 0) 0) ]
+
+def abImage : List (List (Word 2)) := [[], words [[2, 3]], [], words [[5, 7], [0, 0]]]
+
+#guard run mulThenAdd 9 abImage slowMul == some [[10, 21], [7, 10]]
+
+-- With a multiply of one cycle the product arrives on cycle 6, and the write
+-- on cycle 8 finds the stream empty.
+#guard trapOn cfg mulThenAdd 9 abImage == some ⟨.emptyRead, 3, 8⟩
+
+/-- A multiply on cycle 3 and an add on cycle 5 would both leave slice 2 on
+cycle 6 (Machine 3.4), even though they are for different streams. -/
+def clashing : Program :=
+  [ { slice := 1, time := 0, instr := .read 0 (e 0), repeats := 1, gap := 1 },
+    { slice := 3, time := 0, instr := .read 0 (w 0), repeats := 1, gap := 1 },
+    .once 2 3 (.bin .mul (e 0) (w 0) (e 0)),
+    .once 2 5 (.bin .add (e 0) (w 0) (e 1)) ]
+
+#guard trapOn slowMul clashing 9 abImage == some ⟨.twoResults, 2, 5⟩
+
+-- With a multiply of one cycle they leave on cycles 4 and 6.
+#guard trapOn cfg clashing 9 abImage == none
 
 end TauTest.Features

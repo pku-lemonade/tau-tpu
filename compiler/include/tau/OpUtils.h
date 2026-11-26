@@ -28,6 +28,10 @@ std::optional<int64_t> optIntAttr(mlir::Operation &op, llvm::StringRef name);
 void setIntAttr(mlir::Operation &op, llvm::StringRef name, int64_t value);
 /// The result of `op` that travels on a stream, if it has one.
 mlir::Value streamResult(mlir::Operation &op);
+/// The name a machine's `delays` give `op` (Formats 3): the `fn` of
+/// `tau.i.un` and `tau.i.bin`, and the instruction otherwise. Mirrors
+/// `Instr.name` in spec/Tau/Isa/Instr.lean.
+llvm::StringRef delayName(mlir::Operation &op);
 
 //===----------------------------------------------------------------------===//
 // Kernel operations

@@ -10,6 +10,7 @@
 #define TAU_MACHINE_H
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
 
@@ -30,6 +31,9 @@ struct Machine {
   int vxmDelay = 1;
   int sxmDelay = 1;
   int mxmDelay = 2;
+  /// Instructions and operations with a delay of their own, by the name
+  /// `tau::delayName` gives them.
+  llvm::StringMap<int> delays;
 
   /// A nine-slice machine: matrix, rearrangement, two memories, vector, two
   /// memories, rearrangement, matrix.
@@ -38,8 +42,12 @@ struct Machine {
   static llvm::Expected<Machine> fromFile(llvm::StringRef path);
   llvm::json::Value toJSON() const;
 
-  /// The number of cycles a result spends inside the slice at `pos`.
+  /// The delay of the kind of the slice at `pos`.
   int delayAt(int pos) const;
+  /// The number of cycles the result of the instruction `name` spends inside
+  /// the slice at `pos`: its own delay, or that of the slice's kind.
+  int delayOf(int pos, llvm::StringRef name) const;
+  /// The longest delay of the machine.
   int maxDelay() const;
 };
 

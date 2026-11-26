@@ -185,18 +185,24 @@ accumulators, or the held word and the stream, were confused.
 
 One project, for after everything else.
 
-Today every instruction of a slice spends the same number of cycles in it.
 Give each operation its own delay. Two results can then leave a slice on the
-same cycle, which the machine has no rule for.
+same cycle, which a machine with one delay per slice never had to decide.
+
+The repository has done this once (Machine 3.4, `Config.delayOf`), so this
+project has a solution, as the Specify exercises do. Start from the commit
+before it (`git log -S delayOf`), and read the solution only once your build
+is quiet.
 
 * Decide the rule. A trap is the simplest.
 * At the slice level the pipe becomes a row of slots that a result can enter
   part way along.
-* At the cell level you need a new block: a shift register with several
-  inputs. Write it, and its theorem, in the style of the block chapters
-  before using it.
-* The scheduler in `compiler/lib/Passes/Schedule.cpp` needs the new delays,
-  and `tau-place` needs to avoid the new conflict.
+* At the cell level you need a new block, a shift register with several
+  inputs, or a way to write one slot of the shift register you have. Say
+  which you chose and what the other would have cost.
+* The scheduler in `compiler/lib/Passes/Schedule.cpp` needs the new delays.
+  Decide whether a program without pins can make two results leave one slice
+  on one cycle, and so whether `tau-place` or `tau-schedule` has anything to
+  avoid.
 
 The chapters on the shift register, the slice-level machine and the
 cell-level machine each come back once in this project. If you finish it you

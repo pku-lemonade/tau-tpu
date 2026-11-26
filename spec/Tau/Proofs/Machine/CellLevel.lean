@@ -93,10 +93,38 @@ theorem last_shift {α : Type} (d : Nat) (s : Vector α d) (x dflt : α) :
     have hnil : s.toList = [] := List.eq_nil_of_length_eq_zero (by simp)
     simp [hnil]
 
-theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) :
-    absResult (cellShift c r) = shiftPipe c.abs r := by
-  simp only [cellShift, absResult, shiftPipe, shiftRegister_step, Cell.abs, toList_shift,
-    last_shift c.depth c.pipe r none]
+theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : Nat) :
+    absResult (cellShift c r d) = shiftPipe c.abs r d := by
+  -- A result that enters at the front is the register's input. One written
+  -- part way along is the same list as the slots with that place set.
+  have hlen : c.abs.pipe.length = c.depth := by simp [Cell.abs]
+  cases r with
+  | none =>
+    simp only [cellShift, absResult, shiftPipe, Slice.slots, shiftRegister_step, Cell.abs,
+      toList_shift, last_shift c.depth c.pipe none none]
+  | some x =>
+    by_cases hd : d < c.depth
+    · have h' : c.abs.pipe.length - d = c.depth - 1 - d + 1 := by rw [hlen]; omega
+      simp only [shiftPipe, Slice.slots, h', List.set_cons_succ]
+      simp only [cellShift, hd, ↓reduceIte, absResult, shiftRegister_step, Cell.abs,
+        toList_shift, last_shift c.depth _ none none, Vector.toList_setIfInBounds]
+    · have h' : c.abs.pipe.length - d = 0 := by rw [hlen]; omega
+      simp only [shiftPipe, Slice.slots, h', List.set_cons_zero]
+      simp only [cellShift, hd, ↓reduceIte, absResult, shiftRegister_step, Cell.abs,
+        toList_shift, last_shift c.depth c.pipe (some x) none]
+
+theorem cellClash_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : Nat) :
+    cellClash c r d = c.abs.clash r d := by
+  have hlen : c.abs.pipe.length = c.depth := by simp [Cell.abs]
+  cases r with
+  | none => rfl
+  | some x =>
+    simp only [cellClash, Slice.clash, hlen, Option.isSome_some, Bool.true_and]
+    by_cases hd : d < c.depth
+    · rw [show c.depth - d = c.depth - 1 - d + 1 by omega, List.getElem?_cons_succ]
+      simp [hd, Cell.abs]
+    · rw [show c.depth - d = 0 by omega]
+      simp [hd]
 
 /-! ## One instruction -/
 
@@ -246,13 +274,13 @@ theorem cellStep_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p 
       stepSlice (wordSem lanes) cfg prog (s.abs t) p c.abs := by
   -- The repeater, being in step, issues what the slice-level machine looks
   -- up (`cellRepeater_step`). Then split on how many instructions are due,
-  -- and use `cellExec_abs` and `cellShift_abs`.
+  -- and use `cellExec_abs`, `cellClash_abs` and `cellShift_abs`.
   have hseq := cellRepeater_step prog t p c hc
   have ht : (s.abs t).time = t := rfl
   unfold cellStep stepSlice
   simp only [hseq, ht, hc.1, CellState.sample_abs]
   cases prog.dueAt p t with
-  | nil => exact congrArg Except.ok (cellShift_abs c none)
+  | nil => exact congrArg Except.ok (cellShift_abs c none 0)
   | cons i rest =>
     cases rest with
     | cons j rest => rfl
@@ -266,7 +294,12 @@ theorem cellStep_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p 
         | error k => rfl
         | ok r =>
           obtain ⟨c', r⟩ := r
-          exact congrArg Except.ok (cellShift_abs c' r)
+          simp only [Except.map, absResult]
+          rw [← cellClash_abs]
+          by_cases hcl : cellClash c' r (cfg.delayOf kind i) = true
+          · simp only [hcl, ↓reduceIte]
+          · simp only [hcl, Bool.false_eq_true, ↓reduceIte]
+            exact congrArg Except.ok (cellShift_abs c' r _)
 
 /-- After one cycle a slice that was in step is in step with the next cycle. -/
 theorem cellStep_sync (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes))
@@ -282,7 +315,9 @@ theorem cellStep_sync (cfg : Config) (prog : Program) (rd : Stream → Option (W
   · split at h
     · cases h
     · split at h
-      · cases h; exact ⟨hclock, hseq⟩
+      · split at h
+        · cases h
+        · cases h; exact ⟨hclock, hseq⟩
       · cases h
   · cases h
 

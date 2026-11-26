@@ -114,6 +114,14 @@ def timed (j : Json) : Except String TimedEntry := do
     gap := natOr j "gap" 0
     stride := natOr j "stride" 0 }
 
+/-- The delays a machine gives instructions of its own: an object from names
+to numbers, which may be left out. -/
+def delays (j : Json) : Except String (List (String × Nat)) :=
+  match j.getObjVal? "delays" with
+  | .error _ => pure []
+  | .ok d => do
+    (← d.getObj?).toList.mapM fun (name, n) => do pure (name, ← n.getNat?)
+
 def config (j : Json) : Except String Config := do
   let ks ← (← arr j "kinds").mapM fun k => do kind (← k.getStr?)
   pure {
@@ -123,7 +131,8 @@ def config (j : Json) : Except String Config := do
     memDelay := ← nat j "memDelay"
     vxmDelay := ← nat j "vxmDelay"
     sxmDelay := ← nat j "sxmDelay"
-    mxmDelay := ← nat j "mxmDelay" }
+    mxmDelay := ← nat j "mxmDelay"
+    delays := ← delays j }
 
 def placement (j : Json) : Except String Placement := do
   pure ⟨← nat j "slice", ← nat j "base", ← nat j "size"⟩

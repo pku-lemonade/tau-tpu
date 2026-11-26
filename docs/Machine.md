@@ -195,9 +195,10 @@ last position in the east. Each slice is of one of four kinds.
 
 A machine is described by the kind of slice at each position, the number of
 streams in each direction, the number of columns a matrix slice can store,
-and one delay for each kind of slice. For example, a nine-slice machine has
-the row: matrix, rearrangement, two memories, vector, two memories,
-rearrangement, matrix.
+one delay for each kind of slice, and a delay of its own for any instruction
+or operation that takes a different number of cycles from the rest of its
+kind. For example, a nine-slice machine has the row: matrix, rearrangement,
+two memories, vector, two memories, rearrangement, matrix.
 
 ### 3.2 Streams
 
@@ -224,7 +225,7 @@ In every cycle each slice executes at most one instruction.
 1. The slice reads its operands from the stream slots at its position and
    computes a result.
 2. The result enters the slice's pipe. A result stays in the pipe for the
-   delay of the slice's kind and then comes out.
+   delay of its instruction and then comes out.
 3. Every stream moves one position. The results that came out of the pipes
    are placed on their streams, each at its slice's position.
 
@@ -235,8 +236,10 @@ the slice at position `q` on cycle
 
     t + delay + 1 + |q - p|
 
-and on no other cycle, where `delay` is the delay of the kind of the slice at
-`p`. The stream must run from `p` towards `q`.
+and on no other cycle, where `delay` is the delay of the instruction that
+computed it: its own delay if the machine gives it one, and otherwise the
+delay of the kind of the slice at `p`. The stream must run from `p` towards
+`q`.
 
 Three slices, memory, vector, memory, each with delay 1. The memory at
 position 0 reads a word on cycle 0 for a stream going east:
@@ -259,6 +262,13 @@ cycle   0:mem               1:vxm               2:mem
   3                         stream[1] ────────▶
   4                                             stream[2] ─▶ read
 ```
+
+A result with a short delay can catch up with an earlier result that has a
+longer one. Two results cannot leave one slice on one cycle: an instruction
+whose result would leave together with an earlier one makes the machine trap
+(3.7), on the cycle it is issued. On a vector slice where multiply has delay
+3 and add has delay 1, a multiply on cycle 0 and an add on cycle 2 would
+both leave on cycle 3, so the machine traps on cycle 2.
 
 ### 3.5 Instructions
 
@@ -309,6 +319,7 @@ The machine never guesses and never waits.
 | bad address | a memory address or a stored column was out of range |
 | wrong slice | an instruction was sent to a slice of the wrong kind |
 | two instructions | two instructions were due at one slice on one cycle |
+| two results | an instruction's result would leave its slice on the same cycle as an earlier result |
 | no operand | a matrix slice was told to multiply before it was given a vector |
 | no slice | the program names a slice the machine does not have |
 
@@ -405,7 +416,7 @@ from the components of section 2.
 | Part of a slice | Component |
 |---|---|
 | issuing the slice's instructions on their cycles | repeater (2.7) |
-| the pipe that holds results for the delay | shift register (2.1) |
+| the pipe that holds results for their delays | shift register (2.1), as deep as the longest delay of the machine; a result is written into the slot that leaves after its delay |
 | the stored words of a memory slice | memory (2.5) |
 | the accumulator of a matrix slice | multiply-accumulate cells (2.3), one per lane |
 | the stored columns of a matrix slice | a second, small memory (2.5) |

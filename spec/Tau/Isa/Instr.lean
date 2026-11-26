@@ -71,6 +71,23 @@ inductive Instr where
   | macw (j : Nat)
   deriving DecidableEq, Repr
 
+/-- The name of an instruction, as Formats 3 writes it: the operation of `un`
+and `bin`, and the instruction itself otherwise. A machine's own delays are
+given by these names. -/
+def Instr.name : Instr → String
+  | .read .. => "read"
+  | .write .. => "write"
+  | .un op .. => op.name
+  | .bin op .. => op.name
+  | .load .. => "load"
+  | .mac .. => "mac"
+  | .emit .. => "emit"
+  | .const .. => "const"
+  | .sel .. => "sel"
+  | .seed .. => "seed"
+  | .install .. => "install"
+  | .macw .. => "macw"
+
 /-- Add `k` to the address of a memory instruction or to the column index of a
 matrix instruction. Other instructions are unchanged. -/
 def Instr.bump (k : Nat) : Instr → Instr
@@ -137,16 +154,32 @@ structure Config where
   sxmDelay : Nat
   /-- The number of cycles a result spends inside a matrix slice. -/
   mxmDelay : Nat
+  /-- Instructions and operations whose result spends a different number of
+  cycles inside its slice from the rest of its kind: a name (`Instr.name`)
+  and that number. -/
+  delays : List (String × Nat) := []
   deriving Repr
 
-/-- The number of cycles a result spends inside a slice of kind `k`. A result
-computed at cycle `t` is on the stream, at the slice's position, at cycle
-`t + delay + 1`. -/
+/-- The delay of a slice of kind `k`: the number of cycles a result spends
+inside it, unless the machine gives its instruction a delay of its own. -/
 def Config.delay (cfg : Config) : Kind → Nat
   | .mem => cfg.memDelay
   | .vxm => cfg.vxmDelay
   | .sxm => cfg.sxmDelay
   | .mxm => cfg.mxmDelay
+
+/-- The number of cycles the result of `i` spends inside a slice of kind `k`:
+its own delay if the machine gives it one, and otherwise the delay of the
+kind. A result computed at cycle `t` is on the stream, at the slice's
+position, at cycle `t + delayOf k i + 1`. -/
+def Config.delayOf (cfg : Config) (k : Kind) (i : Instr) : Nat :=
+  ((cfg.delays.find? fun e => decide (e.1 = i.name)).map (·.2)).getD (cfg.delay k)
+
+/-- The longest delay of the machine. Every slice's pipe has this many
+slots. -/
+def Config.maxDelay (cfg : Config) : Nat :=
+  cfg.delays.foldr (fun e m => max e.2 m)
+    (max (max cfg.memDelay cfg.vxmDelay) (max cfg.sxmDelay cfg.mxmDelay))
 
 /-- The kind of slice at position `p`. -/
 def Config.kindAt (cfg : Config) (p : Nat) : Option Kind := cfg.kinds[p]?

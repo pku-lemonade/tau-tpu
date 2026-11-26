@@ -5,7 +5,8 @@ import Tau.Machine.SliceLevel
 
 `Tau.Machine.SliceLevel` defines one cycle of the machine. The timing
 rule is about many cycles: a result computed at slice `p` on cycle `t` is at
-slice `q` on cycle `t + delay + 1 + |q - p|`. To state it one needs names for
+slice `q` on cycle `t + delay + 1 + |q - p|`, where `delay` is the delay of
+its instruction. To state it one needs names for
 "the states of a run", "the result a slice computes in a cycle" and "what a
 slice places on a stream in a cycle". They are defined here.
 
@@ -26,7 +27,7 @@ def IsRun (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n 
 
 /-- A state has the shape of the machine: the right number of streams, every
 stream as long as the row of slices, one slice state per position, and in
-every slice a pipe as long as the delay of its kind. -/
+every slice a pipe as long as the longest delay of the machine. -/
 structure State.Shaped (cfg : Config) (s : State V) : Prop where
   /-- There are `cfg.streams` streams going east. -/
   east : s.east.length = cfg.streams
@@ -40,9 +41,8 @@ structure State.Shaped (cfg : Config) (s : State V) : Prop where
     s.west[id]? = some row → row.length = cfg.kinds.length
   /-- There is one slice state per position. -/
   slices : s.slices.length = cfg.kinds.length
-  /-- The pipe of every slice is as long as the delay of its kind. -/
-  pipe : ∀ (p : Nat) (sl : Slice V) (kind : Kind),
-    s.slices[p]? = some sl → cfg.kindAt p = some kind → sl.pipe.length = cfg.delay kind
+  /-- The pipe of every slice is as long as the longest delay of the machine. -/
+  pipe : ∀ (p : Nat) (sl : Slice V), s.slices[p]? = some sl → sl.pipe.length = cfg.maxDelay
 
 /-- The result that the slice at `p` computes in the cycle that starts in
 `s`, with the stream it is meant for. This is what `exec` returns, before the

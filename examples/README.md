@@ -130,6 +130,7 @@ Programs with pins and calls are at the top, neural-network layers under
 | `nn/maxpool` | MLIR | pooling over neighbouring lanes, using lane rotation |
 | `ops/elementwise` | Python & MLIR | a loop of add, subtract and max over four words |
 | `ops/axpy` | MLIR | scaled add, updating a buffer in place |
+| `ops/axpy-slow-mul` | MLIR | the same kernel on a machine whose multiply takes three cycles (`machines/tau9-slow-mul.json`) |
 | `ops/clip` | MLIR | clamping between two bounds |
 | `ops/leaky-relu` | MLIR | a constant word, a lane compare and a lane-wise select |
 | `ops/bitops` | MLIR | absolute value, negation, constant add and multiply, shifts, and, or, xor |

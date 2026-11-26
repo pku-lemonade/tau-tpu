@@ -89,7 +89,8 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
       bool east = true;
       if (!result.use_empty())
         east = tau::intAttr(*result.use_begin()->getOwner(), "slice") >= from;
-      int64_t land = *time + machine->delayAt(static_cast<int>(from)) + 1;
+      int delay = machine->delayOf(static_cast<int>(from), tau::delayName(op));
+      int64_t land = *time + delay + 1;
       int64_t slot = east ? from - land : from + land;
 
       std::set<int64_t> &numbers = taken[{east, slot}];

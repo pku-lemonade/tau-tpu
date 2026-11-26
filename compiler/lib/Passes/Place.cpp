@@ -61,6 +61,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #include <map>
 #include <optional>
@@ -174,10 +175,30 @@ private:
     loadPin[value].reset();
     return pin;
   }
-  /// The timing rule: how many cycles after an instruction at `from` the
-  /// instruction at `to` that uses its word is issued.
-  int64_t lag(int from, int to) const {
-    return machine.delayAt(from) + 1 + std::abs(to - from);
+  /// The timing rule: how many cycles after the instruction `name` at `from`
+  /// the instruction at `to` that uses its word is issued.
+  int64_t lag(StringRef name, int from, int to) const {
+    return machine.delayOf(from, name) + 1 + std::abs(to - from);
+  }
+  /// The name of the instruction that issues the word of `node`, for its
+  /// delay (Formats 3).
+  static StringRef issuer(const Node &node) {
+    switch (node.kind) {
+    case Node::Load:
+      return "read";
+    case Node::Store:
+      return "write";
+    case Node::Un:
+    case Node::Bin:
+      return node.fn;
+    case Node::MatVec:
+      return "emit";
+    case Node::Const:
+      return "const";
+    case Node::Sel:
+      return "sel";
+    }
+    llvm_unreachable("every kind of node is named above");
   }
 
   Error read();
@@ -547,7 +568,7 @@ Error Placer::placeComputed(int index) {
   auto readCycle = [&](const Member &member, size_t k, Clock clock) {
     const Node &node = nodes[member.index];
     return takes(node, k, clock) -
-           lag(valueLoc[node.args[k]]->slice, member.slice);
+           lag("read", valueLoc[node.args[k]]->slice, member.slice);
   };
 
   // The head. Its own pin comes first. A pinned load among its operands
@@ -588,8 +609,10 @@ Error Placer::placeComputed(int index) {
     Member member = place(next, chain.back().slice);
     if (member.slice < 0)
       break;
-    Clock nextClock = clockOf(
-        node, flight, clock.result + lag(chain.back().slice, member.slice));
+    Clock nextClock =
+        clockOf(node, flight,
+                clock.result + lag(issuer(nodes[chain.back().index]),
+                                   chain.back().slice, member.slice));
     std::optional<int64_t> wanted = start;
     bool agree = true;
     auto pinAt = [&](int64_t pin, int64_t cycle) {
@@ -728,7 +751,8 @@ Error Placer::placeComputed(int index) {
     target = bufLoc[nodes[next].buf];
     target.addr += nodes[next].base;
     // A pinned store takes the result directly only if its pin agrees.
-    int64_t written = clock.result + lag(chain.back().slice, target.slice);
+    int64_t written = clock.result + lag(issuer(nodes[last]),
+                                         chain.back().slice, target.slice);
     if (nodes[next].pin && start && *start != *nodes[next].pin - written)
       direct = false;
   }
@@ -816,7 +840,8 @@ Error Placer::run() {
       // A pinned load stored by a pinned store: one read and one write, a
       // fixed distance apart. If the two pins disagree, the word waits.
       if (loadPin[arg] && node.pin &&
-          *node.pin - *loadPin[arg] != lag(valueLoc[arg]->slice, cell.slice)) {
+          *node.pin - *loadPin[arg] !=
+              lag("read", valueLoc[arg]->slice, cell.slice)) {
         Loc scratch = newScratch({});
         emitWrite(emitRead(*valueLoc[arg], takePin(arg)), scratch);
         valueLoc[arg] = scratch;

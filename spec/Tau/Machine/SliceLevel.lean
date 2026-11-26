@@ -4,21 +4,25 @@ import Tau.Isa.Instr
 # The slice-level machine
 
 This is tau-tpu with each slice treated as one box: an instruction goes in at
-one cycle and its result comes out a fixed number of cycles later. What happens
-inside the box is the subject of `Tau.Machine.CellLevel`.
+one cycle and its result comes out a fixed number of cycles later, the delay
+of the instruction. What happens inside the box is the subject of
+`Tau.Machine.CellLevel`.
 
 One cycle of the machine (`step`) does three things.
 
 1. Each slice looks up the instruction due this cycle, reads its operands from
    the stream slots at its own position, and computes a result.
-2. The result enters the slice's pipe, and the result that entered `delay`
-   cycles ago comes out.
+2. The result enters the slice's pipe, at the slot from which it leaves
+   after its delay, and the result whose delay is up comes out. If that slot
+   already holds a result, the two would leave on one cycle, and the machine
+   traps.
 3. Every stream moves one position, and the results that came out are placed
    on their streams at the slice's position.
 
 So a result computed at slice `p` on cycle `t` can be read at slice `q` on
-cycle `t + delay + 1 + |q - p|`, and on no other cycle. A program that reads a
-slot on the wrong cycle finds it empty, and the machine traps.
+cycle `t + delay + 1 + |q - p|`, and on no other cycle, where `delay` is the
+delay of the instruction that computed it (`Config.delayOf`). A program that
+reads a slot on the wrong cycle finds it empty, and the machine traps.
 
 The machine is written for an arbitrary type `V` of values. See `Tau.Isa.Op`.
 
@@ -39,6 +43,9 @@ inductive TrapKind where
   | wrongSlice
   /-- Two instructions were due at one slice on one cycle. -/
   | twoInstructions
+  /-- An instruction's result would leave its slice on the same cycle as an
+  earlier result. -/
+  | twoResults
   /-- A matrix slice was told to multiply before it was given a vector. -/
   | noOperand
   /-- The program names a slice that does not exist. -/
@@ -67,7 +74,8 @@ structure Slice (V : Type) where
   acc : V
   /-- Matrix slices: the stored columns. -/
   weights : List V
-  /-- Results on their way out, newest first. -/
+  /-- Results on their way out. The last leaves in the cycle about to run,
+  the one before it a cycle later, and so on. -/
   pipe : List (Option (Stream × V))
 
 /-- The state of the whole machine at the start of a cycle. -/
@@ -173,24 +181,41 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
       | some _, none => .error .badAddress
       | some x, some w => .ok ({ sl with acc := S.mac j sl.acc x w }, none)
 
-/-- Push a result into a slice's pipe and take out the one that has been in it
-for the full delay. -/
-def shiftPipe (sl : Slice V) (entering : Option (Stream × V)) :
+/-- The slots of a slice's pipe in the cycle a result enters it: a free slot
+in front, then the pipe. The last slot leaves this cycle, the one before it
+on the next cycle, and so on; the result is written into the slot that
+leaves `d` cycles from now. -/
+def Slice.slots (sl : Slice V) (entering : Option (Stream × V)) (d : Nat) :
+    List (Option (Stream × V)) :=
+  match entering with
+  | none => none :: sl.pipe
+  | some r => (none :: sl.pipe).set (sl.pipe.length - d) (some r)
+
+/-- Whether a result that leaves `d` cycles from now finds its slot taken by
+an earlier result, which would then leave on the same cycle. -/
+def Slice.clash (sl : Slice V) (entering : Option (Stream × V)) (d : Nat) : Bool :=
+  entering.isSome && ((none :: sl.pipe)[sl.pipe.length - d]?.getD none).isSome
+
+/-- Put a result that leaves `d` cycles from now into a slice's pipe, and take
+out the result that leaves this cycle. -/
+def shiftPipe (sl : Slice V) (entering : Option (Stream × V)) (d : Nat) :
     Slice V × Option (Stream × V) :=
-  ({ sl with pipe := (entering :: sl.pipe).dropLast },
-   (entering :: sl.pipe).getLast?.getD none)
+  ({ sl with pipe := (sl.slots entering d).dropLast },
+   (sl.slots entering d).getLast?.getD none)
 
 /-- One cycle of the slice at position `p`. -/
 def stepSlice (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
     (sl : Slice V) : Except Trap (Slice V × Option (Stream × V)) :=
   match prog.dueAt p s.time with
-  | [] => .ok (shiftPipe sl none)
+  | [] => .ok (shiftPipe sl none 0)
   | [i] =>
     match cfg.kindAt p with
     | none => .error ⟨.noSlice, p, s.time⟩
     | some kind =>
       match exec S cfg kind (s.sample p) sl i with
-      | .ok (sl', r) => .ok (shiftPipe sl' r)
+      | .ok (sl', r) =>
+        if sl'.clash r (cfg.delayOf kind i) then .error ⟨.twoResults, p, s.time⟩
+        else .ok (shiftPipe sl' r (cfg.delayOf kind i))
       | .error k => .error ⟨k, p, s.time⟩
   | _ => .error ⟨.twoInstructions, p, s.time⟩
 
@@ -262,7 +287,7 @@ def State.init (S : Sem V) (cfg : Config) (image : List (List V)) : State V wher
       x := none
       acc := S.zero
       weights := List.replicate cfg.mxmWeights S.zero
-      pipe := List.replicate (cfg.delay ((cfg.kinds[p]?).getD .vxm)) none }
+      pipe := List.replicate cfg.maxDelay none }
 
 /-- The contents of every slice's memory. -/
 def State.memory (s : State V) : List (List V) := s.slices.map (·.words)

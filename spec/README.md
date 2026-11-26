@@ -283,7 +283,7 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | A Python program run on real numbers ends with the buffers, and issues the pinned words, that its trace does | tested, on the same examples | `scripts/check-examples.sh` |
 | What a Python file means | not stated; the trace of one run is the program | `compiler/python/tau/__init__.py` |
 | The other six passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing on the same cycles | |
-| The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
+| The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|`, where `delay` is the delay of its instruction | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
 | A pinned word is issued by the slice the user had in mind | not stated; a pin names a word and a cycle, not a slice | `Isa/Event.lean` |
 | The cell-level machine issues the words the slice-level machine issues, on the same cycles | not stated; only its final memory is compared | |

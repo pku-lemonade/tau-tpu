@@ -84,6 +84,33 @@ def UnOp.kind : UnOp → Kind
   | .relu | .requant _ | .neg | .abs | .shl _ | .addi _ | .muli _ => .vxm
   | .shift _ | .rotate _ | .reverse | .broadcast _ | .permute _ => .sxm
 
+/-- The name of a one-word operation, as Formats 3 writes it in `fn`. -/
+def UnOp.name : UnOp → String
+  | .relu => "relu"
+  | .requant _ => "requant"
+  | .neg => "neg"
+  | .abs => "abs"
+  | .shl _ => "shl"
+  | .addi _ => "addi"
+  | .muli _ => "muli"
+  | .shift _ => "shift"
+  | .rotate _ => "rotate"
+  | .reverse => "reverse"
+  | .broadcast _ => "broadcast"
+  | .permute _ => "permute"
+
+/-- The name of a two-word operation, as Formats 3 writes it in `fn`. -/
+def BinOp.name : BinOp → String
+  | .add => "add"
+  | .sub => "sub"
+  | .mul => "mul"
+  | .max => "max"
+  | .min => "min"
+  | .and => "and"
+  | .or => "or"
+  | .xor => "xor"
+  | .lt => "lt"
+
 /-- What the operations compute, over some type `V` of values. -/
 structure Sem (V : Type) where
   /-- What a one-word operation computes. -/

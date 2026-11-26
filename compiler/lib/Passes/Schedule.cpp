@@ -6,7 +6,7 @@
 // Two instructions connected by a value have a fixed distance in time:
 //
 //   * a word produced at slice p and used at slice q:
-//         time(use) = time(def) + delay(p) + 1 + |q - p|
+//         time(use) = time(def) + delay(def) + 1 + |q - p|
 //     This is the timing rule of spec/Tau/Machine/SliceLevel.lean. There is no
 //     slack: the word is at q on that cycle and on no other.
 //
@@ -29,8 +29,8 @@
 // and writes before it; and a matrix slice runs its instructions in the order
 // given.
 //
-// The pass fails if two instructions would be issued at one slice on one
-// cycle, if a pin cannot be met, or if a pin breaks that order.
+// The pass fails if two instructions issue, or two results leave, at one
+// slice on one cycle, if a pin cannot be met, or if a pin breaks that order.
 //
 // Last, every word is put on a stream of its own, going towards its user, and
 // the machine recorded on the function is widened to have as many streams as
@@ -90,11 +90,20 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
         return 1; // two instructions of one matrix-vector product
       int p = static_cast<int>(tau::intAttr(*def, "slice"));
       int q = static_cast<int>(tau::intAttr(*use, "slice"));
-      return machine->delayAt(p) + 1 + std::abs(q - p);
+      return machine->delayOf(p, tau::delayName(*def)) + 1 + std::abs(q - p);
     };
 
     llvm::DenseMap<Operation *, int64_t> relative;
     std::set<std::pair<int64_t, int64_t>> busy;
+    // The slice and cycle on which each result leaves its slice (Machine
+    // 3.4), and the instruction that computed it.
+    llvm::DenseMap<std::pair<int64_t, int64_t>, Operation *> leaving;
+    auto leaves = [&](Operation *op, int64_t time) {
+      int64_t slice = tau::intAttr(*op, "slice");
+      int delay =
+          machine->delayOf(static_cast<int>(slice), tau::delayName(*op));
+      return std::make_pair(slice, time + delay);
+    };
     int64_t now = 0;
 
     for (Operation *seed : instrs) {
@@ -151,12 +160,28 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
         pinnedBy = op;
       }
 
+      // A group with no pin cannot clash with an earlier group: every result
+      // of those has left its slice before their last instruction. Two
+      // results that leave one slice on one cycle come from a pin, or from
+      // the relative times of one group.
       for (Operation *op : group) {
         int64_t time = relative[op] - first + start;
         tau::setIntAttr(*op, "time", time);
         if (!busy.insert({tau::intAttr(*op, "slice"), time}).second) {
           op->emitError("two instructions at one slice on cycle ") << time;
           return signalPassFailure();
+        }
+        if (tau::streamResult(*op)) {
+          std::pair<int64_t, int64_t> exit = leaves(op, time);
+          auto [other, fresh] = leaving.try_emplace(exit, op);
+          if (!fresh) {
+            InFlightDiagnostic diag =
+                op->emitError("two results leave one slice on cycle ")
+                << exit.second;
+            diag.attachNote(other->second->getLoc())
+                << "the other result is computed here";
+            return signalPassFailure();
+          }
         }
       }
       int64_t end = start + last - first + 1;

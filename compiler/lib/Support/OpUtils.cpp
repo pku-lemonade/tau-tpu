@@ -1,4 +1,5 @@
 #include "tau/OpUtils.h"
+#include "tau/Dialect/TauDialect.h"
 
 #include "mlir/IR/Builders.h"
 
@@ -35,6 +36,14 @@ Value tau::streamResult(Operation &op) {
       name == "const" || name == "sel")
     return op.getResult(0);
   return Value();
+}
+
+StringRef tau::delayName(Operation &op) {
+  if (auto un = dyn_cast<tau::IUnOp>(op))
+    return un.getFn();
+  if (auto bin = dyn_cast<tau::IBinOp>(op))
+    return bin.getFn();
+  return instrName(op);
 }
 
 StringRef tau::kernelName(Operation &op) {

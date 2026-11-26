@@ -21,6 +21,7 @@ def showTrap (t : Trap) : String :=
     | .badAddress => "used a memory address that is out of range"
     | .wrongSlice => "was sent to a slice of the wrong kind"
     | .twoInstructions => "had two instructions due on the same cycle"
+    | .twoResults => "had two results due to leave on the same cycle"
     | .noOperand => "was told to multiply before it was given a vector"
     | .noSlice => "does not exist"
   s!"trap at cycle {t.time}: slice {t.slice} {what}"

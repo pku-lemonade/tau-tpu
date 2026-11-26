@@ -129,6 +129,10 @@ by slice; and `compiled.json` after `tau-fold`.
 - `cycles` is how long to run.
 - `mxmWeights` is the number of columns a matrix slice can store. It may be
   left out, and is then 8.
+- `delays` gives instructions and operations a delay of their own, in place
+  of their kind's, as an object such as `{"mul": 3, "read": 2}`. A key is the
+  `fn` of a `un` or `bin` instruction, or the `op` of any other. It may be
+  left out, and is then empty.
 - Instructions (`op`): `read`, `write`, `un`, `bin`, `const`, `sel`, `load`,
   `seed`, `mac`, `install`, `macw`, `emit`. Their fields are those of
   `Tau.Instr` in `spec/Tau/Isa/Instr.lean`.

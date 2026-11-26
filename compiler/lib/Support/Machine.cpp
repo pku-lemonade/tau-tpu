@@ -27,17 +27,34 @@ int tau::Machine::delayAt(int pos) const {
   return mxmDelay;
 }
 
+int tau::Machine::delayOf(int pos, StringRef name) const {
+  auto found = delays.find(name);
+  return found != delays.end() ? found->getValue() : delayAt(pos);
+}
+
 int tau::Machine::maxDelay() const {
-  return std::max({memDelay, vxmDelay, sxmDelay, mxmDelay});
+  int longest = std::max({memDelay, vxmDelay, sxmDelay, mxmDelay});
+  for (const auto &entry : delays)
+    longest = std::max(longest, entry.getValue());
+  return longest;
 }
 
 json::Value tau::Machine::toJSON() const {
-  return json::Object{
+  json::Object object{
       {"kinds", json::Array(kinds)}, {"streams", streams},
       {"mxmWeights", mxmWeights},
       {"memDelay", memDelay},        {"vxmDelay", vxmDelay},
       {"sxmDelay", sxmDelay},        {"mxmDelay", mxmDelay},
   };
+  // Left out when empty, as Formats 3 allows, so that a machine without
+  // delays of its own is written as before.
+  if (!delays.empty()) {
+    json::Object own;
+    for (const auto &entry : delays)
+      own[entry.getKey()] = entry.getValue();
+    object["delays"] = std::move(own);
+  }
+  return object;
 }
 
 Expected<tau::Machine> tau::Machine::fromJSON(const json::Value &value) {
@@ -76,6 +93,14 @@ Expected<tau::Machine> tau::Machine::fromJSON(const json::Value &value) {
   if (object->get("mxmWeights"))
     if (Error e = field("mxmWeights", machine.mxmWeights))
       return std::move(e);
+  if (const json::Object *own = object->getObject("delays"))
+    for (const auto &[name, value] : *own) {
+      std::optional<int64_t> number = value.getAsInteger();
+      if (!number || *number < 0)
+        return createStringError("machine: bad delay for '" + StringRef(name) +
+                                 "'");
+      machine.delays[name] = static_cast<int>(*number);
+    }
   return machine;
 }
 

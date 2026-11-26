@@ -137,29 +137,43 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     · rfl
     · cases sl.x <;> cases sl.weights[j]? <;> simp [Except.map, mapResult, Slice.map, h.mac]
 
-theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) :
-    shiftPipe (sl.map f) (r.map (Prod.map id f)) = mapResult f (shiftPipe sl r) := by
-  have hcons : r.map (Prod.map id f) :: (sl.map f).pipe =
-      (r :: sl.pipe).map (Option.map (Prod.map id f)) := rfl
+theorem slots_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
+    (sl.map f).slots (r.map (Prod.map id f)) d =
+      (sl.slots r d).map (Option.map (Prod.map id f)) := by
+  cases r <;> simp [Slice.slots, Slice.map, List.map_set]
+
+/-- Whether a result clashes depends only on which slots are full. -/
+theorem clash_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
+    (sl.map f).clash (r.map (Prod.map id f)) d = sl.clash r d := by
+  simp only [Slice.clash, Slice.map, Option.isSome_map, List.length_map]
+  congr 1
+  rw [show (none : Option (Stream × W)) :: sl.pipe.map (Option.map (Prod.map id f)) =
+    (none :: sl.pipe).map (Option.map (Prod.map id f)) from rfl, List.getElem?_map]
+  cases (none :: sl.pipe)[sl.pipe.length - d]? with
+  | none => rfl
+  | some o => cases o <;> rfl
+
+theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
+    shiftPipe (sl.map f) (r.map (Prod.map id f)) d = mapResult f (shiftPipe sl r d) := by
   unfold shiftPipe mapResult
-  rw [hcons]
+  rw [slots_map]
   simp only [List.getLast?_map, Slice.map]
   refine Prod.ext ?_ ?_
   · simp
-  · cases (r :: sl.pipe).getLast? <;> rfl
+  · cases (sl.slots r d).getLast? <;> rfl
 
 theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (prog : Program) (s : State V) (p : Nat) (sl : Slice V) :
     stepSlice T cfg prog (s.map f) p (sl.map f) =
       (stepSlice S cfg prog s p sl).map (mapResult f) := by
   -- The time is the same in both states, so the same instructions are due.
-  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `shiftPipe_map`.
-  -- Two or more: the same trap on both sides.
+  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `clash_map` and
+  -- `shiftPipe_map`. Two or more: the same trap on both sides.
   unfold stepSlice
   have ht : (s.map f).time = s.time := rfl
   rw [ht]
   cases prog.dueAt p s.time with
-  | nil => exact congrArg Except.ok (shiftPipe_map f sl none)
+  | nil => exact congrArg Except.ok (shiftPipe_map f sl none 0)
   | cons i rest =>
     cases rest with
     | cons j rest => rfl
@@ -174,7 +188,10 @@ theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg
         | error k => rfl
         | ok r =>
           obtain ⟨sl', r⟩ := r
-          exact congrArg Except.ok (shiftPipe_map f sl' r)
+          simp only [Except.map, mapResult, clash_map]
+          split
+          · rfl
+          · exact congrArg Except.ok (shiftPipe_map f sl' r _)
 
 theorem stepSlices_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (prog : Program) (s : State V) (p : Nat) (sls : List (Slice V)) :

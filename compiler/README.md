@@ -64,7 +64,8 @@ overlap in time when pins ask for it.
 The compiler refuses, with the line of the operation:
 
 - a pin too early for the instructions before it in its group;
-- two instructions at one slice on one cycle;
+- two instructions at one slice on one cycle, or two results that would
+  leave one slice on one cycle (Machine 3.4);
 - a read of memory put before the write it depends on, or a matrix slice
   given two products at once.
 

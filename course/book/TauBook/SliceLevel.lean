@@ -126,11 +126,13 @@ Why cycle 4? Follow the word.
 That is the timing rule from Machine 3.4 (also stated at the top of
 `spec/Tau/Machine/SliceLevel.lean`): a result computed at slice
 `p` on cycle `t` can be read at slice `q` on cycle
-`t + delay + 1 + |q - p|`. Here that is 0 + 1 + 1 + 2 = 4.
+`t + delay + 1 + |q - p|`, where `delay` is the delay of the instruction
+that computed it. Here that is 0 + 1 + 1 + 2 = 4.
 
 The definition of the machine does not contain this rule. `step` says what
-happens in one cycle: a result enters the pipe of its slice, the oldest entry
-of the pipe comes out, and every stream moves one position. The rule is what
+happens in one cycle: a result enters the pipe of its slice at the slot that
+leaves after its delay, the last slot of the pipe comes out, and every stream
+moves one position. The rule is what
 follows from that over many cycles, in the same way as `shiftRegister_outAt`
 follows from the one-cycle definition of the shift register. It is a theorem,
 in `spec/Tau/Proofs/Machine/Timing.lean`:
@@ -236,7 +238,9 @@ now.
    order can be seen from outside.
 4. Copy the tiny example above into your scratch file and change it: move the
    read to cycle 3, make the word travel west from slice 2 to slice 0, add a
-   `relu` at slice 1 on the way. Predict each result before you run it.
+   `relu` at slice 1 on the way. Then give `relu` a delay of its own, with
+   `{ tinyMachine with delays := [("relu", 3)] }`. Predict each result before
+   you run it.
 5. Work through the hand schedule in `spec/tests/TauTest/Linear.lean`.
 6. Read the statements of `out_delay`, `sample_step` and `arrives_east` in
    `spec/Tau/Proofs/Machine/Timing.lean`, and the outline of `arrives_east`.
