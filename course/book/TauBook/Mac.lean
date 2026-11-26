@@ -13,12 +13,12 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* multiply-accumulate, dot product, two's complement,
 overflow, SAT solver.
 
-*Read:* `Tau/Blocks/Mac.lean`, `Tau/Data/Word.lean`.
+*Read:* `spec/Tau/Blocks/Mac.lean`, `spec/Tau/Isa/Word.lean`.
 
-*In the doc:* `Tau/Docs/Machine.md`, sections 1 and 2.3.
+*In the doc:* `docs/Machine.md`, sections 1 and 2.3.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Mac.lean`,
-`Tau/Proofs/Data/Lane.lean`.
+*Solutions, not to be opened yet:* `spec/Tau/Proofs/Blocks/Mac.lean`,
+`spec/Tau/Proofs/Isa/Word.lean`.
 
 *Time:* one day.
 
@@ -65,14 +65,14 @@ once in the proof.
 
 So far the examples used `Nat`. Real hardware uses a fixed number of bits. A
 _lane_ in tau-tpu is a 32-bit value, the Lean type `BitVec 32`, and arithmetic
-wraps around on overflow. Read `Tau/Data/Word.lean` now. A _word_ is a fixed
+wraps around on overflow. Read `spec/Tau/Isa/Word.lean` now. A _word_ is a fixed
 number of lanes.
 
 The MAC theorem holds for lanes too, because it assumes nothing about
 addition. What changes is the meaning of the sum: it is the true dot product
 only if nothing overflowed.
 
-`Tau/Proofs/Data/Lane.lean` proves facts about single lanes in two ways.
+`spec/Tau/Proofs/Isa/Word.lean` proves facts about single lanes in two ways.
 
 The first way is by cases. `Lane.relu a` is `if a.slt 0 then 0 else a`, where
 `slt` is signed less-than. To prove something about it, split on the
@@ -107,10 +107,10 @@ being correct. The main theorems of this course avoid it for that reason.
 
 # How to work through it
 
-1. Read `Tau/Blocks/Mac.lean` and find where `mapIn` is defined.
-2. Do `Exercises/Blocks/Mac.lean`. Two short proofs.
-3. Read `Tau/Data/Word.lean`.
-4. Do `Exercises/Data/Lane.lean`. For each statement, decide first whether
+1. Read `spec/Tau/Blocks/Mac.lean` and find where `mapIn` is defined.
+2. Do `Prove/Blocks/Mac.lean`. Two short proofs.
+3. Read `spec/Tau/Isa/Word.lean`.
+4. Do `Prove/Isa/Word.lean`. For each statement, decide first whether
    you would split into cases or use `bv_decide`.
 
 # Lean you will need
@@ -124,7 +124,7 @@ being correct. The main theorems of this course avoid it for that reason.
 
 # Exercises
 
-*Prove.* `Exercises/Blocks/Mac.lean`, then `Exercises/Data/Lane.lean`.
+*Prove.* `Prove/Blocks/Mac.lean`, then `Prove/Isa/Word.lean`.
 
 *State.* State and prove a fact about `Lane.requant` that a user of it would
 want to know, other than its range. For example: with `k = 0`, an input that
@@ -151,6 +151,6 @@ For the lane facts proved by cases: `unfold` the operation, then
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Mac Exercises.Data.Lane` prints no `sorry`
+`lake build Prove.Blocks.Mac Prove.Isa.Word` prints no `sorry`
 warning. You can name two ways to prove a fact about 32-bit values and say
 what each costs.

@@ -5,11 +5,12 @@ writes a timed program for a tau-tpu machine, and its image.
 
 This page says how *this* compiler works and where it stops. What any
 compiler for the machine has to deliver, the forms a program takes and what
-every step must keep, is [`Tau/Docs/Compiler.md`](../Tau/Docs/Compiler.md).
+every step must keep, is [`docs/Compiler.md`](../docs/Compiler.md).
 The JSON formats it writes are in
-[`Tau/Docs/Formats.md`](../Tau/Docs/Formats.md).
+[`docs/Formats.md`](../docs/Formats.md).
 
 ```
+python/tau/              the Python tracing frontend (`python3 -m tau`)
 include/tau/Dialect/     the dialect: types, kernel operations, instructions,
                          entries
 lib/Dialect/             the dialect's C++
@@ -23,7 +24,7 @@ tools/tauc/              the compiler driver
 ## The passes
 
 One pass for each step of Compiler 4, but the last: the image is written
-from the result of `tau-fold` by `lib/Target/Emit.cpp`.
+from the result of `tau-fold` by `lib/Target/EmitMachine.cpp`.
 
 | Pass | Step | Method |
 |---|---|---|
@@ -77,20 +78,20 @@ Commands here are run from the repository folder, after building as in
 feeding the printed MLIR back in:
 
 ```bash
-compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place
-compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place \
+compiler/build/bin/tau-opt examples/nn/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place
+compiler/build/bin/tau-opt examples/nn/linear/kernel.mlir --tau-simplify --tau-unroll --tau-place \
   | compiler/build/bin/tau-opt --tau-schedule \
   | compiler/build/bin/tau-opt --tau-route \
   | compiler/build/bin/tau-opt --tau-slice --tau-fold
 ```
 
-`tau-place` takes the machine as an option: `--tau-place='chip=chips/tau9.json'`.
+`tau-place` takes the machine as an option: `--tau-place='machine=machines/tau9.json'`.
 
 `tauc` runs all eight passes and writes what each produced:
 
 ```bash
-compiler/build/bin/tauc examples/linear/kernel.mlir -o out
-compiler/build/bin/tauc examples/linear/kernel.mlir -o out --chip chips/tau9.json --print-mlir
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --machine machines/tau9.json --print-mlir
 ```
 
 The program is the last function of the file; the functions before it are
@@ -98,7 +99,7 @@ kernels it may call. The input can be written by hand or recorded from
 Python:
 
 ```bash
-PYTHONPATH=frontend python3 -m tau examples/paced/kernel.py -o out   # out/kernel.mlir
+PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out   # out/kernel.mlir
 compiler/build/bin/tauc out/kernel.mlir -o out
 ```
 
@@ -121,8 +122,7 @@ lake exe tau-check out/source.json out/image.json           # all of it at once
 ```
 
 If a pass has a bug, the result is a rejected file that names the pass, not
-a wrong answer. The checks and their theorems are listed in section 3 of
-[`Tau/Docs/README.md`](../Tau/Docs/README.md).
+a wrong answer. The checks and their theorems are listed in [`spec/README.md`](../spec/README.md#the-map).
 
 Two steps also have a copy in Lean, and the compiler is compared with the
 copy on every example:
@@ -133,7 +133,7 @@ lake exe tau-check --encode out/compiled.json out/image.json
 ```
 
 `tau-simplify` has no copy. Its three rewrites are the ones the checks apply
-to expressions before comparing them (`Tau/Check/Simplify.lean`), which is
+to expressions before comparing them (`spec/Tau/Check/Simplify.lean`), which is
 why its output is accepted.
 
 ## Limits

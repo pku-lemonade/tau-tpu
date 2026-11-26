@@ -1,6 +1,6 @@
 //===- tauc.cpp - the tau compiler ----------------------------------------===//
 //
-//   tauc kernel.mlir -o out [--chip chip.json] [--no-simplify] [--print-mlir]
+//   tauc kernel.mlir -o out [--machine machine.json] [--no-simplify] [--print-mlir]
 //
 // Runs the passes in order and writes what each one produced, so that each
 // can be checked on its own:
@@ -11,7 +11,7 @@
 //   unrolled.json    after tau-unroll     (a kernel)
 //   placed.json      after tau-place      (instructions in order)
 //   scheduled.json   after tau-schedule   (timed; one stream per word)
-//   routed.json      after tau-route      (timed, on the chip's streams)
+//   routed.json      after tau-route      (timed, on the machine's streams)
 //   sliced.json      after tau-slice      (entries, slice by slice)
 //   compiled.json    after tau-fold       (the finished program)
 //   image.json       the finished program as numbers
@@ -48,8 +48,8 @@ static cl::opt<std::string> inputFile(cl::Positional, cl::desc("<kernel.mlir>"),
                                       cl::Required);
 static cl::opt<std::string> outputDir("o", cl::desc("Output directory"),
                                       cl::value_desc("dir"), cl::init("."));
-static cl::opt<std::string> chipFile("chip", cl::desc("Chip description"),
-                                     cl::value_desc("chip.json"));
+static cl::opt<std::string> machineFile("machine", cl::desc("Machine description"),
+                                     cl::value_desc("machine.json"));
 static cl::opt<bool> noSimplify("no-simplify",
                                 cl::desc("Do not run tau-simplify"));
 static cl::opt<bool> printMLIR("print-mlir",
@@ -81,12 +81,12 @@ int main(int argc, char **argv) {
   InitLLVM init(argc, argv);
   cl::ParseCommandLineOptions(argc, argv, "tau compiler\n");
 
-  tau::Chip chip = tau::Chip::standard();
-  if (!chipFile.empty()) {
-    Expected<tau::Chip> read = tau::Chip::fromFile(chipFile);
+  tau::Machine machine = tau::Machine::standard();
+  if (!machineFile.empty()) {
+    Expected<tau::Machine> read = tau::Machine::fromFile(machineFile);
     if (!read)
-      return fail(chipFile + ": " + toString(read.takeError()));
-    chip = std::move(*read);
+      return fail(machineFile + ": " + toString(read.takeError()));
+    machine = std::move(*read);
   }
 
   mlir::MLIRContext context;
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
       !write("unrolled.json", tau::emitKernel(func)))
     return 1;
 
-  if (!run("tau-place", tau::createPlacePass(chip)) ||
+  if (!run("tau-place", tau::createPlacePass(machine)) ||
       !write("placed.json", tau::emitPlaced(func)))
     return 1;
 

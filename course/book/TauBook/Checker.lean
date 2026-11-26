@@ -13,21 +13,21 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The checker" =>
 *Terms to look up:* translation validation, symbolic execution, homomorphism.
 
-*Sources:* `Tau/Docs/Compiler.md`, sections 2, 4, 5 and 7;
+*Sources:* `docs/Compiler.md`, sections 2, 4, 5 and 7;
 `compiler/lib/Target/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
-for their opening comments; `Tau/Docs/Machine.md`, section 3.4.
+for their opening comments; `docs/Machine.md`, section 3.4.
 
-*Specify:* `course/Specs/OnTime.lean`.
+*Specify:* `course/Specify/OnTime.lean`.
 
-*Read:* `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean`,
-`Tau/Check/Checker.lean`, `Tau/IR/Placed.lean`, `Tau/Check/Passes.lean`.
+*Read:* `spec/Tau/IR/MemMap.lean`, `spec/Tau/IR/Compiled.lean`,
+`spec/Tau/Check/Checker.lean`, `spec/Tau/IR/Placed.lean`, `spec/Tau/Check/Passes.lean`.
 Leave out what these files say about pins, events and timelines: the next
 chapter is about them.
 
-*Proofs:* `Tau/Proofs/Check/Sound.lean` and `Tau/Proofs/Check/Passes.lean`:
-four short ones are exercises. `Tau/Proofs/SliceLevel/Map.lean`,
-`Tau/Proofs/IR/Map.lean`, `Tau/Proofs/IR/MemMap.lean` and
-`Tau/Proofs/IR/Placed.lean` are for reading.
+*Proofs:* `spec/Tau/Proofs/Check/Checker.lean` and `spec/Tau/Proofs/Check/Passes.lean`:
+four short ones are exercises. `spec/Tau/Proofs/Machine/Arch.lean`,
+`spec/Tau/Proofs/IR/Kernel.lean`, `spec/Tau/Proofs/IR/MemMap.lean` and
+`spec/Tau/Proofs/IR/Placed.lean` are for reading.
 
 *Time:* three days.
 
@@ -184,14 +184,14 @@ Program ───────────run on real words───────�
 
 # The proofs
 
-`Tau/Proofs/SliceLevel/Map.lean` proves `execute_map`. It is the longest
+`spec/Tau/Proofs/Machine/Arch.lean` proves `execute_map`. It is the longest
 proof file so far and the least clever. It has one lemma for each function in
 the machine, in the order in which they are defined, each saying that the
 function commutes with `f`. Most are a case split followed by `simp`. Proofs
 about real systems often look like this: long, shallow, and shaped exactly
 like the code.
 
-`Tau/Proofs/Check/Sound.lean` then assembles the theorem, in a few lemmas of
+`spec/Tau/Proofs/Check/Checker.lean` then assembles the theorem, in a few lemmas of
 a few lines each and one that puts them together.
 
 You are not asked to write `execute_map`. It is the kind of proof an agent
@@ -209,14 +209,14 @@ it is not the usual way to say what a pass must do. The usual specification
 of a compiler pass is: the output computes what the input computes.
 
 So the compiler writes a file after every pass, and
-`Tau/Check/Passes.lean` has one check for each pass. Each compares the
+`spec/Tau/Check/Passes.lean` has one check for each pass. Each compares the
 output of the pass with its input, in the same way as `check`: run both sides
 on names and compare the expressions.
 
 A program takes four forms on the way. A source program is a kernel with
 calls, and `tau-inline` makes a kernel of it. A kernel you know. `tau-place`
 produces instructions in order, with slices and addresses but no cycles and
-no streams; this form and its meaning are in `Tau/IR/Placed.lean`:
+no streams; this form and its meaning are in `spec/Tau/IR/Placed.lean`:
 
 {docstring Tau.Placed}
 
@@ -273,7 +273,7 @@ Run the compiler on an example and check the eight passes in order.
 `ACCEPT`.
 
 ```
-compiler/build/bin/tauc examples/residual/kernel.mlir -o out
+compiler/build/bin/tauc examples/nn/residual/kernel.mlir -o out
 lake exe tau-check out/source.json out/kernel.json
 lake exe tau-check out/kernel.json out/simplified.json
 lake exe tau-check out/simplified.json out/unrolled.json
@@ -284,7 +284,7 @@ lake exe tau-check out/routed.json out/sliced.json
 lake exe tau-check out/sliced.json out/compiled.json
 ```
 
-Without the compiler, use `examples/residual/stages` in place of `out`.
+Without the compiler, use `examples/nn/residual/stages` in place of `out`.
 
 A rejection names the faulty pass.
 
@@ -317,29 +317,29 @@ answers, chosen by heuristics that will change: the check does not care how
 the answer was found. A rule fits when somebody needs to be told what a right
 answer is, which is what the writer of a scheduler needs.
 
-`course/Specs/OnTime.lean` has you write one part of a rule for schedules:
+`course/Specify/OnTime.lean` has you write one part of a rule for schedules:
 every operand arrives on the cycle it is read. You do not prove it. You test
 it against the machine.
 
 # How to work through it
 
-1. Read `Tau/IR/MemMap.lean`, `Tau/IR/Compiled.lean` and
-   `Tau/Check/Checker.lean`. Redo the small example above in your scratch
+1. Read `spec/Tau/IR/MemMap.lean`, `spec/Tau/IR/Compiled.lean` and
+   `spec/Tau/Check/Checker.lean`. Redo the small example above in your scratch
    file with a program of your own.
 2. Read the statements of `execute_map` and `Kernel.run_map`, and the proof
-   of one case of `exec_map`, in `Tau/Proofs/SliceLevel/Map.lean`. Every
+   of one case of `exec_map`, in `spec/Tau/Proofs/Machine/Arch.lean`. Every
    other case is the same.
-3. In `Exercises/Check/Sound.lean`, read the statements of the four lemmas
+3. In `Prove/Check/Checker.lean`, read the statements of the four lemmas
    that are given: `agree_exprs`, `Source.run_of_exprs`, `execute_of_exprs`
    and `denote_of_sameExprs`. Then prove `check_sound` from them, and
    `check_safe`. Leave `check_pins` for the next chapter.
-4. Read `Tau/IR/Placed.lean` and `Tau/Check/Passes.lean`. In
-   `Exercises/Check/Passes.lean`, prove `checkKernels_sound` and
+4. Read `spec/Tau/IR/Placed.lean` and `spec/Tau/Check/Passes.lean`. In
+   `Prove/Check/Passes.lean`, prove `checkKernels_sound` and
    `passes_sound`.
 5. Run the eight per-pass commands above on an example.
 6. Read the opening comments of `Place.cpp`, `Schedule.cpp` and `Route.cpp`,
    and section 3.4 of `Machine.md`. Specify the rule in
-   `course/Specs/OnTime.lean`.
+   `course/Specify/OnTime.lean`.
 7. Do the exercise "Choose".
 
 # Lean you will need
@@ -358,7 +358,7 @@ it against the machine.
 
 # Exercises
 
-*Specify.* `course/Specs/OnTime.lean`.
+*Specify.* `course/Specify/OnTime.lean`.
 
 *State.* What would it mean for your rule to be right? State it: if the rule
 accepts a program, the machine does not trap with an empty read. Do not
@@ -373,10 +373,10 @@ are never read, a register allocator, a scheduler that calls an
 integer-program solver, and for one step it has and a later chapter covers:
 the encoder that turns the finished program into numbers. For the encoder,
 what is the property, and is it about one function or about two? Then read
-`course/Specs/Answers/Choose.md` and note where you disagree.
+`course/Specify/Answers/Choose.md` and note where you disagree.
 
-*Prove.* `check_sound` and `check_safe` in `Exercises/Check/Sound.lean`;
-`checkKernels_sound` and `passes_sound` in `Exercises/Check/Passes.lean`. The
+*Prove.* `check_sound` and `check_safe` in `Prove/Check/Checker.lean`;
+`checkKernels_sound` and `passes_sound` in `Prove/Check/Passes.lean`. The
 three proofs about pins in those files belong to the next chapter.
 
 *Claims.* Add to `course/Work/Claims.md` a row for your rule and a row for what
@@ -426,7 +426,7 @@ with `rw`.
 
 # Checkpoint
 
-`lake build Exercises.Check.Sound Exercises.Check.Passes` prints only the
+`lake build Prove.Check.Checker Prove.Check.Passes` prints only the
 three `sorry` warnings for `check_pins`, `checkKernels_pins` and
 `passes_pins`, which belong to the next chapter ("Pins"). Your rule agrees with the machine on the examples. You can say, in
 two sentences, why checking one run on names proves something about every

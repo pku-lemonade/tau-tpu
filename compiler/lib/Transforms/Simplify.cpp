@@ -9,8 +9,8 @@
 // A pinned operation is never removed: its word has to be issued on its
 // cycle, so there has to be an operation to issue it.
 //
-// Tau/Check/Simplify.lean applies the same rewrites to expressions, and
-// Tau/Proofs/Check/Simplify.lean proves they keep values. This C++ code is
+// spec/Tau/Check/Simplify.lean applies the same rewrites to expressions, and
+// spec/Tau/Proofs/Check/Simplify.lean proves they keep values. This C++ code is
 // not proved. Its output is checked on every compile by tau-check.
 //
 //===----------------------------------------------------------------------===//

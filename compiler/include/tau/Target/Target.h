@@ -11,8 +11,8 @@
 
 namespace tau {
 
-/// The shape of a chip. Mirrors `Tau.Config` in Tau/Isa/Instr.lean.
-struct Chip {
+/// The shape of a machine. Mirrors `Tau.Config` in spec/Tau/Isa/Instr.lean.
+struct Machine {
   /// The kind of slice at each position, west to east: "mem", "vxm", "sxm"
   /// or "mxm".
   std::vector<std::string> kinds;
@@ -24,11 +24,11 @@ struct Chip {
   int sxmDelay = 1;
   int mxmDelay = 2;
 
-  /// A nine-slice chip: matrix, rearrangement, two memories, vector, two
+  /// A nine-slice machine: matrix, rearrangement, two memories, vector, two
   /// memories, rearrangement, matrix.
-  static Chip standard();
-  static llvm::Expected<Chip> fromJSON(const llvm::json::Value &value);
-  static llvm::Expected<Chip> fromFile(llvm::StringRef path);
+  static Machine standard();
+  static llvm::Expected<Machine> fromJSON(const llvm::json::Value &value);
+  static llvm::Expected<Machine> fromFile(llvm::StringRef path);
   llvm::json::Value toJSON() const;
 
   /// The number of cycles a result spends inside the slice at `pos`.
@@ -40,9 +40,9 @@ struct Chip {
 // What `tau-place` records on the function for the later passes
 //===----------------------------------------------------------------------===//
 
-/// The chip, as recorded on a placed function.
-llvm::Expected<Chip> chipOf(mlir::func::FuncOp func);
-void setChip(mlir::func::FuncOp func, const Chip &chip);
+/// The machine, as recorded on a placed function.
+llvm::Expected<Machine> machineOf(mlir::func::FuncOp func);
+void setMachine(mlir::func::FuncOp func, const Machine &machine);
 
 //===----------------------------------------------------------------------===//
 // Instructions (the `tau.i.*` operations)
@@ -72,7 +72,7 @@ bool isBinaryKernelOp(mlir::Operation &op);
 bool isRearrangement(llvm::StringRef name);
 
 //===----------------------------------------------------------------------===//
-// Files for the Lean tools (Tau/Docs/Formats.md)
+// Files for the Lean tools (docs/Formats.md)
 //===----------------------------------------------------------------------===//
 
 /// A source or kernel file. Valid on a function before `tau-place`. With a
@@ -88,7 +88,7 @@ llvm::Expected<llvm::json::Value> emitPlaced(mlir::func::FuncOp func);
 ///
 /// With `idealRouting`, the streams chosen by `tau-route` are ignored (they
 /// need not exist yet): every travelling word gets a stream of its own and
-/// the chip is given as many streams as that takes. Checking this file tests
+/// the machine is given as many streams as that takes. Checking this file tests
 /// the schedule without testing the routing.
 llvm::Expected<llvm::json::Value> emitCompiled(mlir::func::FuncOp func,
                                                bool idealRouting);

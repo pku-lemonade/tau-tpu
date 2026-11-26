@@ -9,25 +9,25 @@ class Pass;
 
 namespace tau {
 
-struct Chip;
+struct Machine;
 
 /// Replaces every `tau.call` by the body of the kernel it calls and removes
 /// every function but the last. A pass on the module.
-/// Lean model of its input: Tau/IR/Source.lean.
+/// Lean model of its input: spec/Tau/IR/Source.lean.
 std::unique_ptr<mlir::Pass> createInlinePass();
 
 /// Rewrites `relu(relu a)` to `relu a`, and `max(a, a)` and `min(a, a)` to
-/// `a`. The same rewrites on expressions: Tau/Check/Simplify.lean.
+/// `a`. The same rewrites on expressions: spec/Tau/Check/Simplify.lean.
 std::unique_ptr<mlir::Pass> createSimplifyPass();
 
 /// Replaces every `tau.for` by one copy of its body per iteration.
-/// Lean model: Tau/Passes/Unroll.lean.
+/// Lean model: spec/Tau/IR/Unroll.lean.
 std::unique_ptr<mlir::Pass> createUnrollPass();
 
 /// Chooses a memory slice and address for every buffer and a slice for every
 /// operation, and rewrites the kernel into instructions (`tau.i.*`). Decides
 /// which values travel directly between slices and which wait in memory.
-std::unique_ptr<mlir::Pass> createPlacePass(const Chip &chip);
+std::unique_ptr<mlir::Pass> createPlacePass(const Machine &machine);
 
 /// Gives every instruction a cycle (`time`).
 std::unique_ptr<mlir::Pass> createSchedulePass();

@@ -12,13 +12,13 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The shift register" =>
 *Terms to look up:* flip-flop, register, shift register, clock cycle.
 
-*Read:* `Tau/Blocks/Basic.lean`, `Tau/Blocks/ShiftRegister.lean`.
+*Read:* `spec/Tau/Blocks/Basic.lean`, `spec/Tau/Blocks/ShiftRegister.lean`.
 
-*In the doc:* `Tau/Docs/Machine.md`, section 2.1. Read it after the definition,
+*In the doc:* `docs/Machine.md`, section 2.1. Read it after the definition,
 and see how much less it says.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Basic.lean`,
-`Tau/Proofs/Blocks/ShiftRegister.lean`.
+*Solutions, not to be opened yet:* `spec/Tau/Proofs/Blocks/Basic.lean`,
+`spec/Tau/Proofs/Blocks/ShiftRegister.lean`.
 
 *Time:* two days.
 
@@ -26,7 +26,7 @@ and see how much less it says.
 
 Every piece of hardware in this course is a _block_: something that holds a
 state, and on each clock cycle reads an input, writes an output and moves to a
-new state. The previous chapter used `Block` briefly; `Tau/Blocks/Basic.lean`
+new state. The previous chapter used `Block` briefly; `spec/Tau/Blocks/Basic.lean`
 gives its full definitions, alongside `Signal`, `stateAt` and `outAt`:
 
 {docstring Tau.Block}
@@ -43,7 +43,7 @@ a function from cycle numbers to values. `Signal α` is just another name for
 
 {docstring Tau.Block.outAt}
 
-Read their definitions in `Tau/Blocks/Basic.lean`. `stateAt` is by recursion
+Read their definitions in `spec/Tau/Blocks/Basic.lean`. `stateAt` is by recursion
 on the cycle: the state at cycle 0 is `init`, and the state at `t + 1` is one
 step from the state at `t`. That recursion is why proofs about blocks are by
 induction on the cycle.
@@ -135,17 +135,17 @@ know about the state at cycle `t`, and add it to the statement.
 
 # How to work through it
 
-1. Read `Tau/Blocks/Basic.lean` and `Tau/Blocks/ShiftRegister.lean`.
+1. Read `spec/Tau/Blocks/Basic.lean` and `spec/Tau/Blocks/ShiftRegister.lean`.
 2. In your scratch file, evaluate `stateAt` for depth 3 at cycles 0 to 4.
-3. Do `Exercises/Blocks/Basic.lean`. It has three proofs of a few lines each,
-   about two small definitions from `Tau/Blocks/Basic.lean` that later
+3. Do `Prove/Blocks/Basic.lean`. It has three proofs of a few lines each,
+   about two small definitions from `spec/Tau/Blocks/Basic.lean` that later
    chapters use. `b.mapIn f` is the block `b` with the function `f` applied
    to each input first. `sumTo zero x n` is `zero + x 0 + ... + x (n - 1)`.
    The first two proofs say what `mapIn` does to `stateAt` and `outAt`. The
    third says two sums are equal if their terms are.
 4. Read the statement of `shiftRegister_stateAt` and convince yourself it is
    true, using step 2.
-5. Do `Exercises/Blocks/ShiftRegister.lean`. Prove `shiftRegister_stateAt`
+5. Do `Prove/Blocks/ShiftRegister.lean`. Prove `shiftRegister_stateAt`
    first, then `shiftRegister_outAt` from it.
 
 # Lean you will need
@@ -168,8 +168,8 @@ know about the state at cycle `t`, and add it to the statement.
 
 # Exercises
 
-*Prove.* `Exercises/Blocks/Basic.lean`, then
-`Exercises/Blocks/ShiftRegister.lean`.
+*Prove.* `Prove/Blocks/Basic.lean`, then
+`Prove/Blocks/ShiftRegister.lean`.
 
 *Specify.* Define a register with an enable input. Its input is a pair of a
 Boolean and a value, and it keeps its old contents on cycles where the
@@ -214,6 +214,6 @@ For `shiftRegister_outAt`: split on whether `0 < n`. If so the output is slot
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Basic Exercises.Blocks.ShiftRegister` prints no
+`lake build Prove.Blocks.Basic Prove.Blocks.ShiftRegister` prints no
 `sorry` warning. You can explain, without looking, why the induction needs
 the statement about every slot.

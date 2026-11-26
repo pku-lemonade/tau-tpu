@@ -10,10 +10,10 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "End to end" =>
-*Read:* `Tau/Claims.lean`; `tests/TauTest/Axioms.lean`; `Tau/Docs/README.md`,
-sections 3 and 4, after you have finished your own.
+*Read:* `spec/Tau/Claims.lean`; `spec/spec/tests/TauTest/Axioms.lean`; `spec/README.md`
+("The map" and "Status"), after you have finished your own.
 
-*Proofs:* `Tau/Proofs/EndToEnd.lean`. All of them are exercises, and each is
+*Proofs:* `spec/Tau/Proofs/EndToEnd.lean`. All of them are exercises, and each is
 a few lines.
 
 *Time:* one day.
@@ -43,14 +43,14 @@ the slice-level machine, in what is computed and in when; the cell-level
 machine equals the slice-level machine; and real words obey the simplifier's
 laws.
 
-`Tau/Proofs/EndToEnd.lean` and `Tau/Claims.lean` also contain
+`spec/Tau/Proofs/EndToEnd.lean` and `spec/Tau/Claims.lean` also contain
 `end_to_end_passes`, which proves the same conclusion from the eight
 per-pass checks (`passes_sound` and `passes_pins`) from "The checker" and
 "Pins".
 
 # How to work through it
 
-1. Do `Exercises/EndToEnd.lean`. Each proof names the theorems from earlier
+1. Do `Prove/EndToEnd.lean`. Each proof names the theorems from earlier
    chapters and does nothing else. If you know what each earlier theorem
    says, this takes an hour.
 2. In your scratch file run `#print axioms Tau.end_to_end`.
@@ -62,7 +62,7 @@ per-pass checks (`passes_sound` and `passes_pins`) from "The checker" and
 `#print axioms Tau.end_to_end` lists three axioms that almost every Lean
 development uses, and nothing else. In particular there is no `sorryAx`,
 which is what an unfinished proof would leave behind. The file
-`tests/TauTest/Axioms.lean` makes the build fail if that list changes.
+`spec/tests/TauTest/Axioms.lean` makes the build fail if that list changes.
 
 # What it does not say
 
@@ -84,7 +84,7 @@ Being exact about the limits of a theorem is part of the skill.
   `extract` and `Compiled.image` are definitions somebody wrote. Read them and decide
   whether they mean what the sentence above claims.
 * It trusts the operations. `Lane.requant` is whatever
-  `Tau/Data/Word.lean` says it is. Nothing checks that against an intention.
+  `spec/Tau/Isa/Word.lean` says it is. Nothing checks that against an intention.
 * It says nothing about how a pass did its work. A check asks whether the
   output computes what the input computes. No Lean statement says what a
   valid placement, schedule or routing is.
@@ -94,13 +94,13 @@ Being exact about the limits of a theorem is part of the skill.
 
 # Exercises
 
-*Prove.* `Exercises/EndToEnd.lean`.
+*Prove.* `Prove/EndToEnd.lean`.
 
 *Claims.* Bring `course/Work/Claims.md` up to date: one row for everything
 you defined, stated, had proved, tested or decided in this course. Then
-compare it with `Tau/Claims.lean`, which has every main statement of the
-development as a named proposition, and with the table in section 4 of `Tau/Docs/README.md`,
-which also says what is not claimed. Which rows of
+compare it with `spec/Tau/Claims.lean`, which has every main statement of the
+development as a named proposition, and with the table under "Status" in
+`spec/README.md`, which also says what is not claimed. Which rows of
 that table did you not think of? The row about `source.json` is one that
 most people miss.
 
@@ -113,7 +113,7 @@ Lean. Then give it to someone and ask them what they think is guaranteed.
 * Write down, in Lean, what a valid schedule of a placed program is: the same
   instructions, each operand read on the cycle the timing rule gives, and no
   two words in one stream slot. Then prove that a valid schedule computes what
-  the placed program computes. `Tau/Proofs/SliceLevel/Timing.lean` is the
+  the placed program computes. `spec/Tau/Proofs/Machine/Timing.lean` is the
   first lemma. This is a large project.
 * Prove something about the scheduler itself, in Lean: for instance, that a
   schedule built by `tau-schedule` from the output of `tau-place` is always

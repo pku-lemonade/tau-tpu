@@ -8,12 +8,12 @@
 // For the number, think of a stream not as a row of fixed slots but as a row
 // of slots that move, one position per cycle. A word placed at position p on
 // cycle t going east sits in the moving slot numbered p - t, and stays in it
-// until it leaves the chip. Going west the slot is p + t. Two words on the
+// until it leaves the machine. Going west the slot is p + t. Two words on the
 // same stream can only interfere if they are in the same moving slot. So the
 // pass gives two words the same stream number only if their moving slots
 // differ.
 //
-// The pass fails if a word needs a stream number the chip does not have.
+// The pass fails if a word needs a stream number the machine does not have.
 //
 // Nothing here is proved. `tau-check kernel.json compiled.json` decides
 // whether the finished program computes what the kernel computes.
@@ -45,9 +45,9 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
 
   void runOnOperation() override {
     func::FuncOp func = getOperation();
-    Expected<tau::Chip> chip = tau::chipOf(func);
-    if (!chip) {
-      func.emitError(toString(chip.takeError()));
+    Expected<tau::Machine> machine = tau::machineOf(func);
+    if (!machine) {
+      func.emitError(toString(machine.takeError()));
       return signalPassFailure();
     }
     Builder builder(func.getContext());
@@ -78,15 +78,15 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
       bool east = true;
       if (!result.use_empty())
         east = tau::intAttr(*result.use_begin()->getOwner(), "slice") >= from;
-      int64_t land = *time + chip->delayAt(static_cast<int>(from)) + 1;
+      int64_t land = *time + machine->delayAt(static_cast<int>(from)) + 1;
       int64_t slot = east ? from - land : from + land;
 
       std::set<int64_t> &numbers = taken[{east, slot}];
       int64_t stream = 0;
       while (numbers.count(stream))
         ++stream;
-      if (stream >= chip->streams) {
-        op.emitError("the chip has too few streams for this program");
+      if (stream >= machine->streams) {
+        op.emitError("the machine has too few streams for this program");
         return signalPassFailure();
       }
       numbers.insert(stream);

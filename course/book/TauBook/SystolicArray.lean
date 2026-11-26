@@ -12,20 +12,20 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The systolic array" =>
 *Terms to look up:* systolic array, matrix-vector product.
 
-*Source:* `Tau/Docs/Machine.md`, section 2.8.
+*Source:* `docs/Machine.md`, section 2.8.
 
-*Specify:* `course/Specs/SystolicArray.lean`.
+*Specify:* `course/Specify/SystolicArray.lean`.
 
-*Read, after you have specified it:* `Tau/Blocks/SystolicArray.lean`.
+*Read, after you have specified it:* `spec/Tau/Blocks/SystolicArray.lean`.
 
-*Proofs:* `Tau/Proofs/Blocks/SystolicArray.lean`. One is an exercise.
+*Proofs:* `spec/Tau/Proofs/Blocks/SystolicArray.lean`. One is an exercise.
 
 *Time:* two days.
 
 # Specify it first
 
 Stop reading here. Open section 2.8 of `Machine.md` and
-`course/Specs/SystolicArray.lean`, and follow the steps at the top of the
+`course/Specify/SystolicArray.lean`, and follow the steps at the top of the
 file. Come back when the report says that all rows agree.
 
 The statement is the hard part of this one. The array computes a product
@@ -157,7 +157,7 @@ The assumption `hc` is a timetable.
 
 # Exercises
 
-*Specify.* `course/Specs/SystolicArray.lean`.
+*Specify.* `course/Specify/SystolicArray.lean`.
 
 *State.* `ComputesMatVec` in that file.
 
@@ -169,7 +169,7 @@ second, it needs a lemma relating a block's behaviour on a shifted signal to
 its behaviour on the original, and you should ask whether that lemma is
 true.
 
-*Prove.* `systolicArray_matvec` in `Exercises/Blocks/SystolicArray.lean`.
+*Prove.* `systolicArray_matvec` in `Prove/Blocks/SystolicArray.lean`.
 
 *Questions.* Section 2.8 leaves at least two things open.
 

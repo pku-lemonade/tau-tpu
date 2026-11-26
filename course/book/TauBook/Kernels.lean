@@ -13,18 +13,18 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* intermediate representation, SSA form, compiler pass,
 loop unrolling, MLIR.
 
-*Sources:* `Tau/Docs/Programs.md`, sections 1 to 3;
+*Sources:* `docs/Programs.md`, sections 1 to 3;
 `compiler/include/tau/Dialect/TauOps.td`,
 `compiler/lib/Transforms/Unroll.cpp`.
 
-*Specify:* `course/Specs/Kernel.lean`, `course/Specs/Unroll.lean`.
+*Specify:* `course/Specify/Kernel.lean`, `course/Specify/Unroll.lean`.
 
-*Read side by side:* `course/Specs/ReadCpp.lean`.
+*Read side by side:* `course/Specify/ReadCpp.lean`.
 
-*Read, after you have specified:* `Tau/IR/Kernel.lean`,
-`Tau/Passes/Unroll.lean`.
+*Read, after you have specified:* `spec/Tau/IR/Kernel.lean`,
+`spec/Tau/IR/Unroll.lean`.
 
-*Proofs:* `Tau/Proofs/Passes/Unroll.lean`. Three short ones are exercises.
+*Proofs:* `spec/Tau/Proofs/IR/Unroll.lean`. Three short ones are exercises.
 
 *Time:* two days.
 
@@ -44,8 +44,8 @@ Code differs from a doc in two ways that matter to you.
   computes" appears nowhere in the C++. You have to supply it.
 
 Read this chapter to the end of "What a kernel means" with
-`course/Specs/Kernel.lean` open, and write `execStmt` before you read
-`Stmt.exec`. Then read `Unroll.cpp` and write `course/Specs/Unroll.lean`
+`course/Specify/Kernel.lean` open, and write `execStmt` before you read
+`Stmt.exec`. Then read `Unroll.cpp` and write `course/Specify/Unroll.lean`
 before you read "A pass and its proof".
 
 # The idea
@@ -54,17 +54,17 @@ A kernel is the program a user writes. It loads words from buffers, computes,
 and stores words back. It says nothing about slices, streams or cycles.
 
 The compiler represents kernels in MLIR, in a dialect called `tau`. Read
-`examples/elementwise/kernel.mlir`. In it, `%a[0, 1]` means position
+`examples/ops/elementwise/kernel.mlir`. In it, `%a[0, 1]` means position
 `0 + 1 * i` of buffer `%a`, where `i` is the iteration of the enclosing loop.
 Then run:
 
 ```
-compiler/build/bin/tau-opt examples/elementwise/kernel.mlir --tau-unroll
+compiler/build/bin/tau-opt examples/ops/elementwise/kernel.mlir --tau-unroll
 ```
 
 The pass replaced the loop by four copies of its body, with positions
 `[0, 0]`, `[1, 0]`, `[2, 0]` and `[3, 0]`. Without the compiler, compare
-`examples/elementwise/stages/kernel.json` with `unrolled.json` in the same
+`examples/ops/elementwise/stages/kernel.json` with `unrolled.json` in the same
 folder: the same kernel before and after the pass, written as JSON.
 
 The last constructor of `Stmt` below, `pin`, and the third field of `Env`,
@@ -93,7 +93,7 @@ def reluKernel : Kernel :=
 
 `Kernel.run` gives the meaning: from the starting contents of the buffers to
 their final contents, or `none` if the kernel uses a variable that has no
-value or a position outside a buffer. Read it in `Tau/IR/Kernel.lean`, from
+value or a position outside a buffer. Read it in `spec/Tau/IR/Kernel.lean`, from
 `Stmt.exec` up to `Kernel.run`.
 
 Like the machine, it works for any `Sem`. Run on names, the kernel above ends
@@ -111,7 +111,7 @@ compiled program is right if it leaves in the buffers what `Kernel.run` says.
 
 # A pass and its proof
 
-`Tau/Passes/Unroll.lean` is the same transformation as the C++ pass, written
+`spec/Tau/IR/Unroll.lean` is the same transformation as the C++ pass, written
 in Lean.
 
 {docstring Tau.Kernel.unroll}
@@ -163,32 +163,32 @@ checker.
 
 # How to work through it
 
-1. Read `examples/elementwise/kernel.mlir` and run `tau-opt` on it as above.
+1. Read `examples/ops/elementwise/kernel.mlir` and run `tau-opt` on it as above.
 2. Read the descriptions of `tau.load`, `tau.store` and the operations in
    `TauOps.td`. Specify what a statement does, in
-   `course/Specs/Kernel.lean`.
-3. Read `Tau/IR/Kernel.lean` from `Stmt.exec` to `Kernel.run`. Write a kernel
+   `course/Specify/Kernel.lean`.
+3. Read `spec/Tau/IR/Kernel.lean` from `Stmt.exec` to `Kernel.run`. Write a kernel
    of your own in your scratch file and run it on names, as above.
 4. Read `Unroll.cpp` with a pencil. Mark each group of lines "about MLIR" or
    "about the kernel".
-5. Specify the pass, in `course/Specs/Unroll.lean`. One of its tests compares
+5. Specify the pass, in `course/Specify/Unroll.lean`. One of its tests compares
    your output with what the real compiler wrote.
-6. Read `Tau/Passes/Unroll.lean` beside the C++, and do
-   `course/Specs/ReadCpp.lean`: for each group of lines of the C++, what it
+6. Read `spec/Tau/IR/Unroll.lean` beside the C++, and do
+   `course/Specify/ReadCpp.lean`: for each group of lines of the C++, what it
    is about, and which Lean definition says the same.
-7. In `Exercises/Passes/Unroll.lean`, read the statements of the lemmas in
+7. In `Prove/IR/Unroll.lean`, read the statements of the lemmas in
    order: one for each layer of the definition. Prove the first two and the
    last one. The ones between are given.
 
 # Exercises
 
-*Specify.* `course/Specs/Kernel.lean`: what a statement does.
+*Specify.* `course/Specify/Kernel.lean`: what a statement does.
 
-*Specify.* `course/Specs/Unroll.lean`: a copy of the pass.
+*Specify.* `course/Specify/Unroll.lean`: a copy of the pass.
 
 *State.* `LoadAfterStore` and `KeepsWhatIsComputed` in those two files.
 
-*Read side by side.* `course/Specs/ReadCpp.lean`. For nine groups of lines of
+*Read side by side.* `course/Specify/ReadCpp.lean`. For nine groups of lines of
 `Unroll.cpp`, say whether the group is about MLIR, about the kernel, or a
 limit, and name the Lean definition that says the same. Then four questions
 about where the C++ and its copy differ. The file ends with what this
@@ -219,7 +219,7 @@ must make the choice explicit. Then give the proof to an agent and review
 what comes back.
 
 *Prove.* `Idx.eval_inst`, `Stmt.exec_inst` and `Kernel.run_unroll` in
-`Exercises/Passes/Unroll.lean`.
+`Prove/IR/Unroll.lean`.
 
 *Questions.* The descriptions in `TauOps.td` leave at least four things open
 about what a statement does.
@@ -243,6 +243,6 @@ lemmas just above it.
 # Checkpoint
 
 The reports of the three files say that all rows agree, and your copy of the
-pass gives the kernel the compiler gave. `lake build Exercises.Passes.Unroll` prints no
+pass gives the kernel the compiler gave. `lake build Prove.IR.Unroll` prints no
 `sorry` warning. You can say exactly what `Kernel.run_unroll` leaves
 unproved about the compiler.

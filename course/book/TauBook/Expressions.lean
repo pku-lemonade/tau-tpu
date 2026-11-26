@@ -15,11 +15,11 @@ optimization.
 
 *Source:* `compiler/lib/Transforms/Simplify.cpp`.
 
-*Specify:* `course/Specs/Simplify.lean`.
+*Specify:* `course/Specify/Simplify.lean`.
 
-*Read:* `Tau/IR/Expr.lean`, `Tau/Check/Simplify.lean`.
+*Read:* `spec/Tau/Check/Expr.lean`, `spec/Tau/Check/Simplify.lean`.
 
-*Proofs:* `Tau/Proofs/Check/Simplify.lean`. All of them are exercises, and
+*Proofs:* `spec/Tau/Proofs/Check/Simplify.lean`. All of them are exercises, and
 short.
 
 *Time:* one day.
@@ -60,13 +60,13 @@ example : (Expr.bin .max (.init 0 0) (.init 0 0)).simp = .init 0 0 := by
 ```
 
 The compiler's `tau-simplify` pass does the same rewrites on MLIR. See it
-work on `examples/linear/kernel.mlir`, which has a `relu` of a `relu`:
+work on `examples/nn/linear/kernel.mlir`, which has a `relu` of a `relu`:
 
 ```
-compiler/build/bin/tau-opt examples/linear/kernel.mlir --tau-simplify
+compiler/build/bin/tau-opt examples/nn/linear/kernel.mlir --tau-simplify
 ```
 
-Without the compiler, compare `examples/linear/stages/kernel.json` with
+Without the compiler, compare `examples/nn/linear/stages/kernel.json` with
 `simplified.json` in the same folder.
 
 # What to prove
@@ -99,14 +99,14 @@ number format untouched.
 
 # How to work through it
 
-1. Read `Tau/IR/Expr.lean` and `Tau/Check/Simplify.lean`.
+1. Read `spec/Tau/Check/Expr.lean` and `spec/Tau/Check/Simplify.lean`.
 2. In your scratch file, build an expression that `simp` reduces in two
    places, and check the result with `rfl`.
-3. Do `Exercises/Check/Simplify.lean`: first `denote_simpUn` and
+3. Do `Prove/Check/Simplify.lean`: first `denote_simpUn` and
    `denote_simpBin`, then `Expr.denote_simp` by induction on the expression.
 4. Read `compiler/lib/Transforms/Simplify.cpp`. It makes the same three
    rewrites, on a kernel.
-5. Specify that pass in Lean, in `course/Specs/Simplify.lean`. It is the
+5. Specify that pass in Lean, in `course/Specify/Simplify.lean`. It is the
    hardest "Specify" of the course.
 6. Compare what you wrote with `Expr.simp`. The same three rewrites take five
    lines on expressions and several times that on kernels. Say why.
@@ -122,9 +122,9 @@ number format untouched.
 
 # Exercises
 
-*Prove.* `Exercises/Check/Simplify.lean`.
+*Prove.* `Prove/Check/Simplify.lean`.
 
-*Specify.* `course/Specs/Simplify.lean`: a copy of `tau-simplify`, on
+*Specify.* `course/Specify/Simplify.lean`: a copy of `tau-simplify`, on
 kernels. One of its tests is the check of the next chapter, `checkKernels`,
 asked whether your output computes what your input computes.
 
@@ -137,9 +137,9 @@ you off: is `max` of two separate loads of the same word simplified?
 *Claims.* Add to `course/Work/Claims.md` a row for each thing you wrote in this
 chapter: what it is, and how it stands.
 
-The next two exercises change files under `Tau/`, which the rest of the
+The next two exercises change files under `spec/Tau/`, which the rest of the
 course leaves alone. Do them on a branch: run `git switch -c my-simplifier`
-first. While `Tau/Check/Simplify.lean` and its proofs disagree, `lake build`
+first. While `spec/Tau/Check/Simplify.lean` and its proofs disagree, `lake build`
 fails and every file that imports `Tau` shows errors; that is expected, and
 it stops when both proofs are repaired. To go back, commit or discard your
 changes and run `git switch main`.
@@ -149,7 +149,7 @@ changes and run `git switch main`.
 Before asking anyone to prove your law for words, state it for a single lane
 and try `bv_decide`. If the law is false you will get a counterexample in
 seconds. Then have an agent repair `denote_simpBin` and `wordSem_lawful`, in
-`Tau/Proofs/Check/Simplify.lean`, and review the change. It should touch
+`spec/Tau/Proofs/Check/Simplify.lean`, and review the change. It should touch
 those two proofs and nothing else.
 
 *State.* Add a rewrite that is wrong, for example `sub a a` becomes `a`. Find
@@ -175,14 +175,14 @@ For `Expr.denote_simp`: in the `un` and `bin` cases use the two lemmas and
 the induction hypotheses. The other cases are `rfl` or `simp only` with the
 definitions.
 
-For `course/Specs/Simplify.lean`: walk the statements in order and carry two
+For `course/Specify/Simplify.lean`: walk the statements in order and carry two
 things along, the values that were replaced and by what, and the values that
 are the result of a `relu`. Apply the replacements to the operands of every
 statement before you look at it.
 
 # Checkpoint
 
-`lake build Exercises.Check.Simplify` prints no `sorry` warning, and the
+`lake build Prove.Check.Simplify` prints no `sorry` warning, and the
 report for your copy of the pass says that all rows agree. You can say why
 the proof is split into a part about any operations that obey the laws and a
 part about one number format.

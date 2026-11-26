@@ -35,7 +35,7 @@ jobs:
       - name: Exercises are up to date and compile
         run: |
           python3 scripts/make-exercises.py --check
-          lake build Specs Exercises Work
+          lake build Specify Prove Work
       - name: Compiler
         run: |
           cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cmake/mlir

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Compile every example and check every pass of the compiler on it.
 #
-# An example is examples/<name>/kernel.mlir, or examples/<name>/kernel.py,
-# which the Python frontend records as a kernel.mlir first. For each, tauc
-# writes the program as written and one file per pass:
+# An example is examples/.../kernel.mlir, examples/.../kernel.py (which the
+# Python frontend records as a kernel.mlir first), or both (in which case
+# both must produce the same source.json). For each, tauc writes the program as
+# written and one file per pass:
 #
 #   source  kernel  simplified  unrolled  placed  scheduled  routed  sliced
 #   compiled  image
@@ -31,7 +32,7 @@
 #   - the program run in Python on real numbers must end with the buffers,
 #     and issue the pinned words, that tau-sim gives for source.json.
 #
-# `examples/linear/stages/` holds a copy of those files, so that the course
+# `examples/nn/linear/stages/` holds a copy of those files, so that the course
 # can be followed without building the compiler. The script fails if the copy
 # is stale; UPDATE_STAGES=1 refreshes it.
 #
@@ -42,7 +43,7 @@ cd "$(dirname "$0")/.."
 TAUC=compiler/build/bin/tauc
 SIM=.lake/build/bin/tau-sim
 CHECK=.lake/build/bin/tau-check
-FRONTEND="env PYTHONPATH=frontend python3 -m tau"
+FRONTEND="env PYTHONPATH=compiler/python python3 -m tau"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
@@ -113,9 +114,9 @@ PY
 }
 
 status=0
-for dir in examples/*/; do
-  dir=${dir%/}
-  name=$(basename "$dir")
+while IFS= read -r bfile; do
+  dir=$(dirname "$bfile")
+  name=${dir#examples/}
   out="$OUT/$name"
   failed=""
   mkdir -p "$out"
@@ -133,13 +134,13 @@ for dir in examples/*/; do
     continue
   fi
 
-  # An example may name the machine it is for in a file called `chip`.
-  chip=()
-  if [ -f "$dir/chip" ]; then
-    chip=(--chip "$(cat "$dir/chip")")
+  # An example may name the machine it is for in a file called `machine`.
+  machine=()
+  if [ -f "$dir/machine" ]; then
+    machine=(--machine "$(cat "$dir/machine")")
   fi
 
-  if ! "$TAUC" "$kernel" -o "$out" "${chip[@]}"; then
+  if ! "$TAUC" "$kernel" -o "$out" ${machine[@]+"${machine[@]}"}; then
     echo "FAIL $name: tauc failed"
     status=1
     continue
@@ -173,6 +174,16 @@ for dir in examples/*/; do
       failed="frontend: run in Python, the program ends with other buffers"
     elif ! same_json "$out/python.events" "$out/reference.events" events; then
       failed="frontend: run in Python, the program issues other pinned words"
+    fi
+  fi
+
+  # When an example provides both kernel.py and kernel.mlir, both must agree.
+  if [ -z "$failed" ] && [ -f "$dir/kernel.py" ] && [ -f "$dir/kernel.mlir" ]; then
+    mkdir -p "$out/from-mlir"
+    if ! "$TAUC" "$dir/kernel.mlir" -o "$out/from-mlir" ${machine[@]+"${machine[@]}"}; then
+      failed="kernel.mlir: tauc failed"
+    elif ! same_json "$out/from-mlir/source.json" "$out/source.json"; then
+      failed="kernel.mlir: its source.json differs from kernel.py"
     fi
   fi
 
@@ -230,5 +241,5 @@ for dir in examples/*/; do
     [ -f "$dir/kernel.py" ] && note="$note, frontend agrees"
     echo "ok   $name ($cycles cycles, $note)"
   fi
-done
+done < <(find examples -name buffers.json | sort)
 exit $status

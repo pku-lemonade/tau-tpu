@@ -6,7 +6,7 @@
 //
 //   * a word produced at slice p and used at slice q:
 //         time(use) = time(def) + delay(p) + 1 + |q - p|
-//     This is the timing rule of Tau/SliceLevel/Machine.lean. There is no
+//     This is the timing rule of spec/Tau/Machine/Arch.lean. There is no
 //     slack: the word is at q on that cycle and on no other.
 //
 //   * two instructions of one matrix-vector product: one cycle apart.
@@ -63,9 +63,9 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
 
   void runOnOperation() override {
     func::FuncOp func = getOperation();
-    Expected<tau::Chip> chip = tau::chipOf(func);
-    if (!chip) {
-      func.emitError(toString(chip.takeError()));
+    Expected<tau::Machine> machine = tau::machineOf(func);
+    if (!machine) {
+      func.emitError(toString(machine.takeError()));
       return signalPassFailure();
     }
 
@@ -80,7 +80,7 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
         return 1; // two instructions of one matrix-vector product
       int p = static_cast<int>(tau::intAttr(*def, "slice"));
       int q = static_cast<int>(tau::intAttr(*use, "slice"));
-      return chip->delayAt(p) + 1 + std::abs(q - p);
+      return machine->delayAt(p) + 1 + std::abs(q - p);
     };
 
     llvm::DenseMap<Operation *, int64_t> relative;
@@ -152,7 +152,7 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
       int64_t end = start + last - first + 1;
       // A result nobody reads is still inside its slice; let it leave.
       if (unusedResult)
-        end += chip->maxDelay() + 1;
+        end += machine->maxDelay() + 1;
       now = std::max(now, end);
     }
 
@@ -181,7 +181,7 @@ struct SchedulePass : PassWrapper<SchedulePass, OperationPass<func::FuncOp>> {
           lastWrite[cell] = time;
         int64_t &use = lastUse.try_emplace(cell, time).first->second;
         use = std::max(use, time);
-      } else if (chip->kinds[slice] == "mxm") {
+      } else if (machine->kinds[slice] == "mxm") {
         auto found = lastMatrix.find(slice);
         if (found != lastMatrix.end() && found->second >= time) {
           op->emitError("issued on cycle ")

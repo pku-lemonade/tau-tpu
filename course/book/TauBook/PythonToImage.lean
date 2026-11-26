@@ -12,18 +12,18 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* embedded domain-specific language, tracing,
 metaprogramming, function inlining, assembler, instruction encoding.
 
-*Sources:* the opening comment of `frontend/tau/__init__.py`; the description
+*Sources:* the opening comment of `compiler/python/tau/__init__.py`; the description
 of `tau.call` in `compiler/include/tau/Dialect/TauOps.td`; the opening
 comments of `compiler/lib/Transforms/Inline.cpp`, `compiler/lib/Target/Slice.cpp`
-and `Fold.cpp`; `Tau/Docs/Programs.md`, sections 4 and 7;
-`Tau/Docs/Compiler.md`; `Tau/Docs/Machine.md`, section 3.10.
+and `Fold.cpp`; `docs/Programs.md`, sections 4 and 7;
+`docs/Compiler.md`; `docs/Machine.md`, section 3.10.
 
-*Specify:* `course/Specs/Encode.lean`.
+*Specify:* `course/Specify/Encode.lean`.
 
-*Read:* `Tau/IR/Source.lean`, `Tau/Isa/Encode.lean`.
+*Read:* `spec/Tau/IR/Source.lean`, `spec/Tau/Isa/Encode.lean`.
 
-*Proofs:* none are exercises. `Tau/Proofs/IR/Source.lean` and
-`Tau/Proofs/Isa/Encode.lean` are for reading.
+*Proofs:* none are exercises. `spec/Tau/Proofs/IR/Source.lean` and
+`spec/Tau/Proofs/Isa/Encode.lean` are for reading.
 
 *Time:* two days.
 
@@ -46,11 +46,11 @@ kernel.py -> kernel.mlir -> source -> kernel -> ... -> routed -> sliced -> compi
 
 # The front end records
 
-Read the comment at the top of `frontend/tau/__init__.py`, then
-`examples/conv-taps/kernel.py`, and run:
+Read the comment at the top of `compiler/python/tau/__init__.py`, then
+`examples/nn/conv-taps/kernel.py`, and run:
 
 ```
-PYTHONPATH=frontend python3 -m tau examples/conv-taps/kernel.py -o out
+PYTHONPATH=compiler/python python3 -m tau examples/nn/conv-taps/kernel.py -o out
 ```
 
 Open `out/kernel.mlir`. The Python has a loop over three taps inside a
@@ -84,7 +84,7 @@ compiler and nothing in Lean.
 
 There are two languages here, and only one has a specification.
 
-The record is a _source program_. `Source` in `Tau/IR/Source.lean` says what
+The record is a _source program_. `Source` in `spec/Tau/IR/Source.lean` says what
 it is, `Source.run` what it computes and `Source.timeline` when. Every
 theorem of the last two chapters starts from it.
 
@@ -103,8 +103,8 @@ Both are in `scripts/check-examples.sh`. Run by hand:
 
 ```
 compiler/build/bin/tauc out/kernel.mlir -o out
-PYTHONPATH=frontend python3 -m tau examples/conv-taps/kernel.py --run examples/conv-taps/buffers.json
-lake exe tau-sim out/source.json examples/conv-taps/buffers.json
+PYTHONPATH=compiler/python python3 -m tau examples/nn/conv-taps/kernel.py --run examples/nn/conv-taps/buffers.json
+lake exe tau-sim out/source.json examples/nn/conv-taps/buffers.json
 ```
 
 # Calls
@@ -175,7 +175,7 @@ the compiler still holds them as one function, in which an instruction is
 joined to the instructions it feeds by the words it passes on. Run:
 
 ```
-compiler/build/bin/tauc examples/linear/kernel.mlir -o out --print-mlir
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --print-mlir
 ```
 
 and compare what is printed after `tau-route` with what is printed after
@@ -206,7 +206,7 @@ rewrite belongs in a pass, with a file before it and a file after.
 # The image
 
 The last step writes the entries of each slice as numbers. Read section 3.10
-of `Machine.md` and do `course/Specs/Encode.lean` now.
+of `Machine.md` and do `course/Specify/Encode.lean` now.
 
 {docstring Tau.Timed.encode}
 
@@ -260,21 +260,21 @@ the compiled program that `Image.decode` reads out of it.
 
 # How to work through it
 
-1. Read the top of `frontend/tau/__init__.py` and the four examples written
+1. Read the top of `compiler/python/tau/__init__.py` and the four examples written
    in Python. Record each and read its MLIR.
-2. Read `Tau/IR/Source.lean`. Redo the example of the two calls in your
+2. Read `spec/Tau/IR/Source.lean`. Redo the example of the two calls in your
    scratch file, with a third call.
 3. Run `tauc` with `--print-mlir` on `examples/paced/kernel.py` after
    recording it, and follow one instruction from `tau-route` through
    `tau-slice` and `tau-fold` into `out/image.json`.
-4. Do `course/Specs/Encode.lean`, with its questions.
-5. Read `Tau/Isa/Encode.lean` and the statements in
-   `Tau/Proofs/Isa/Encode.lean`. Each layer has the same statement; say what
+4. Do `course/Specify/Encode.lean`, with its questions.
+5. Read `spec/Tau/Isa/Encode.lean` and the statements in
+   `spec/Tau/Proofs/Isa/Encode.lean`. Each layer has the same statement; say what
    it is.
 
 # Exercises
 
-*Specify.* `course/Specs/Encode.lean`.
+*Specify.* `course/Specify/Encode.lean`.
 
 *State.* In the same file: the two directions, and which one the compiler
 relies on.
@@ -294,10 +294,10 @@ record is the program"?
 `scripts/check-examples.sh` you expect to fail. One of the four is not caught
 by anything. Say why, and write the example that would catch it.
 
-1. In `frontend/tau/__init__.py`, in the table `_BIN`, make `sub` compute
+1. In `compiler/python/tau/__init__.py`, in the table `_BIN`, make `sub` compute
    `b - a`.
 2. In the same file, in `_Tracer.stmt`, record a pin one cycle late.
-3. In `compiler/lib/Target/Emit.cpp`, in `encodeEntry`, write `gap` before
+3. In `compiler/lib/Target/EmitMachine.cpp`, in `encodeEntry`, write `gap` before
    `repeats`.
 4. In `compiler/lib/Target/Fold.cpp`, set `gap` to `period` and not
    `period - 1`.

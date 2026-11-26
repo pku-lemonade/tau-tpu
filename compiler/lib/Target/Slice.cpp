@@ -5,7 +5,7 @@
 // Up to here an instruction is joined to the instructions it feeds by the
 // words it passes on: its result is their operand. The machine has no such
 // thing. A slice is told which streams to read and which stream to write
-// (`Tau.Timed` in Tau/Isa/Instr.lean), and each slice has its own program.
+// (`Tau.Timed` in spec/Tau/Isa/Instr.lean), and each slice has its own program.
 //
 // The pass therefore replaces every instruction by a `tau.entry`:
 //
@@ -15,7 +15,7 @@
 //   * the cycle stays,
 //
 // and puts the entries of the slice at position p, in order of time, into a
-// `tau.slice p`. Every position of the chip gets one, even if it is empty.
+// `tau.slice p`. Every position of the machine gets one, even if it is empty.
 // A pin is dropped: the entry's cycle is the pin, and tau-check has the pin
 // in the placed file to compare with.
 //
@@ -51,9 +51,9 @@ struct SlicePass : PassWrapper<SlicePass, OperationPass<func::FuncOp>> {
 
   void runOnOperation() override {
     func::FuncOp func = getOperation();
-    Expected<tau::Chip> chip = tau::chipOf(func);
-    if (!chip) {
-      func.emitError(toString(chip.takeError()));
+    Expected<tau::Machine> machine = tau::machineOf(func);
+    if (!machine) {
+      func.emitError(toString(machine.takeError()));
       return signalPassFailure();
     }
     Block &block = func.getBody().front();
@@ -119,7 +119,7 @@ struct SlicePass : PassWrapper<SlicePass, OperationPass<func::FuncOp>> {
     }
 
     builder.setInsertionPoint(block.getTerminator());
-    for (int64_t p = 0, n = chip->kinds.size(); p < n; ++p) {
+    for (int64_t p = 0, n = machine->kinds.size(); p < n; ++p) {
       auto &list = entries[p];
       std::stable_sort(list.begin(), list.end(),
                        [](const auto &x, const auto &y) {

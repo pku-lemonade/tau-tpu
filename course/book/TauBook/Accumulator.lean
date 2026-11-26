@@ -12,11 +12,11 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The accumulator" =>
 *Terms to look up:* accumulator, register with enable.
 
-*Read:* `Tau/Blocks/Accumulator.lean`.
+*Read:* `spec/Tau/Blocks/Accumulator.lean`.
 
-*In the doc:* `Tau/Docs/Machine.md`, section 2.2.
+*In the doc:* `docs/Machine.md`, section 2.2.
 
-*Solutions, not to be opened yet:* `Tau/Proofs/Blocks/Accumulator.lean`.
+*Solutions, not to be opened yet:* `spec/Tau/Proofs/Blocks/Accumulator.lean`.
 
 *Time:* one day.
 
@@ -85,10 +85,10 @@ specification, not the proof.
 
 # How to work through it
 
-1. Read `Tau/Blocks/Accumulator.lean`.
+1. Read `spec/Tau/Blocks/Accumulator.lean`.
 2. In your scratch file, run the accumulator on a signal of your own with a
    `hold` in it.
-3. Do `Exercises/Blocks/Accumulator.lean`, in the order of the file.
+3. Do `Prove/Blocks/Accumulator.lean`, in the order of the file.
 
 # Lean you will need
 
@@ -100,7 +100,7 @@ specification, not the proof.
 
 # Exercises
 
-*Prove.* `Exercises/Blocks/Accumulator.lean`.
+*Prove.* `Prove/Blocks/Accumulator.lean`.
 
 *State.* The theorem covers only the case where every command is `add`. State
 what the total is when the commands are arbitrary. One way is to define the
@@ -135,5 +135,5 @@ before it.
 
 # Checkpoint
 
-`lake build Exercises.Blocks.Accumulator` prints no `sorry` warning. You can
+`lake build Prove.Blocks.Accumulator` prints no `sorry` warning. You can
 say why the proof needs no law about addition.

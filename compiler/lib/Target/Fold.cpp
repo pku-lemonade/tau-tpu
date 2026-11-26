@@ -5,7 +5,7 @@
 // A slice's repeater can issue one entry several times: `repeats` more times
 // after the first, `gap` idle cycles apart, with the address of a memory
 // instruction or the column of a matrix instruction growing by `stride` each
-// time (Tau/Blocks/Repeater.lean, `Tau.Timed` in Tau/Isa/Instr.lean). Reading
+// time (spec/Tau/Blocks/Repeater.lean, `Tau.Timed` in spec/Tau/Isa/Instr.lean). Reading
 // the columns of a matrix on consecutive cycles is one such entry, and so is
 // what a slice does once per iteration of a loop that is pinned to a fixed
 // spacing.

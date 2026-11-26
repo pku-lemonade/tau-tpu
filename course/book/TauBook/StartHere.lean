@@ -65,7 +65,7 @@ Flow:
 ```
 
 The machine, its programs, and what a compiler must deliver are described in
-`Tau/Docs/README.md` and its companion files (`Machine.md`, `Programs.md`,
+`docs/README.md` and its companion files (`Machine.md`, `Programs.md`,
 `Compiler.md`). This design follows the tensor streaming processors described
 by Abts and others at ISCA 2020 and ISCA 2022.
 
@@ -80,7 +80,7 @@ is `[9, -19]`, and `relu` leaves `[9, 0]`.
 In a terminal in the repository folder:
 
 ```
-compiler/build/bin/tauc examples/linear/kernel.mlir -o out --print-mlir
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --print-mlir
 ```
 
 It prints the program after each of the compiler's eight passes and writes
@@ -103,7 +103,7 @@ reports a trap: slice 4 read a stream slot that held nothing. (Change the
 `time` back afterwards.)
 
 ```
-lake exe tau-sim out/compiled.json examples/linear/buffers.json
+lake exe tau-sim out/compiled.json examples/nn/linear/buffers.json
 ```
 
 This runs the program and prints the buffers. The last buffer is `[[9, 0]]`,
@@ -111,7 +111,7 @@ matching `relu([9, -19])`. The simulator is not a separate piece of software.
 It is the Lean specification of the machine, compiled.
 
 If you have not built the compiler, skip the first command and copy
-`examples/linear/stages/` to `out/` (`cp -r examples/linear/stages out`)
+`examples/nn/linear/stages/` to `out/` (`cp -r examples/nn/linear/stages out`)
 before inspecting or editing `out/compiled.json`. Six chapters run the
 compiler or inspect its output: start here, kernels, expressions, the
 checker, pins, and from Python to an image. The first four each name a
@@ -130,15 +130,15 @@ on the checker, and see how much more they say.
 The course moves through five phases: two introductory chapters, three warmup
 chapters where you read existing definitions and write short proofs yourself,
 "Writing a specification" setting out the method, ten specification chapters
-where you specify from prose or C++ before reading `Tau/`, and finally two
+where you specify from prose or C++ before reading `spec/Tau/`, and finally two
 proof-reading chapters plus "Extending the machine".
 
 When a chapter introduces new Lean code or exercises, it uses these parts:
 
 * *Terms to look up*. Look them up in the reading list.
 * *Source*: what you specify from. A section of a doc, such as
-  `Tau/Docs/Machine.md`, or a C++ file of the compiler.
-* *Specify*: the file under `course/Specs/` in which you write your
+  `docs/Machine.md`, or a C++ file of the compiler.
+* *Specify*: the file under `course/Specify/` in which you write your
   definition.
 * *Read*: the definition files of the repository. In the three block warmup
   chapters you open them at once. From the chapter "Writing a specification"
@@ -155,16 +155,16 @@ The exercises come in three main kinds (some chapters also omit `Prove` and
 use hand-written programs or proof reading instead):
 
 * *Specify.* You write a definition from the source, in a file under
-  `course/Specs/`. Tests in the file say which rows of the source's table
+  `course/Specify/`. Tests in the file say which rows of the source's table
   your definition gets right. Then you list what the source did not say.
 * *State.* You write, as a proposition, a property the thing you defined
   should have. There is nothing to check a statement against except your
   judgement, the statement in the repository, and an agent's attempt to
   prove it.
-* *Prove.* A file under `course/Exercises/` in which a few proofs have been
+* *Prove.* A file under `course/Prove/` in which a few proofs have been
   replaced by `sorry`. They are the short proofs that show what a
   specification means. The solution is the file of the same name under
-  `Tau/Proofs/`.
+  `spec/Tau/Proofs/`.
 
 Do every "Specify" and every "State". Do the "Prove" exercises of the first
 three component chapters (through "Multiply-accumulate") yourself. After
@@ -176,18 +176,18 @@ Some chapters add a *Challenge*, which is larger and optional.
 # How the Lean code is laid out
 
 Definitions and theorems live in separate trees.
-`Tau/Blocks/ShiftRegister.lean` says what a shift register is.
-`Tau/Proofs/Blocks/ShiftRegister.lean` says what is true of it. When you want
+`spec/Tau/Blocks/ShiftRegister.lean` says what a shift register is.
+`spec/Tau/Proofs/Blocks/ShiftRegister.lean` says what is true of it. When you want
 to know what something does, read the first kind of file. It contains no
 proofs.
 
 That split is also the split of the work. A person writes and judges what is
-outside `Tau/Proofs/`. What is inside it, Lean checks, and an agent can
+outside `spec/Tau/Proofs/`. What is inside it, Lean checks, and an agent can
 write. Every proof of the development is there, for the whole machine and
 the whole compiler, whether or not the course asks you for it.
 
-`Tau/Docs/README.md` says in a few pages what the parts are and names the
-doc section, the definition and the theorem for each. Beside it are the
+`spec/README.md` says in a few pages what the parts are and names the
+doc section, the definition and the theorem for each. In `docs/` are the
 docs that the chapters specify from: `Machine.md` for the hardware chapters,
 `Programs.md` and `Compiler.md` for the later ones.
 
@@ -219,7 +219,7 @@ times.
   want.
 
 If you fall behind, skip challenge exercises first, then "Prove" exercises
-after day 5. Do not skip a "Specify" by reading the definition in `Tau/`.
+after day 5. Do not skip a "Specify" by reading the definition in `spec/Tau/`.
 The tests tell you how far you are, and that is worth more than the
 answer.
 

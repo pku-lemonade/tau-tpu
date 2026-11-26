@@ -12,13 +12,13 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The repeater" =>
 *Terms to look up:* down counter, loop counter.
 
-*Source:* `Tau/Docs/Machine.md`, section 2.7.
+*Source:* `docs/Machine.md`, section 2.7.
 
-*Specify:* `course/Specs/Repeater.lean`.
+*Specify:* `course/Specify/Repeater.lean`.
 
-*Read, after you have specified it:* `Tau/Blocks/Repeater.lean`.
+*Read, after you have specified it:* `spec/Tau/Blocks/Repeater.lean`.
 
-*Proofs:* `Tau/Proofs/Blocks/Repeater.lean`. Two short ones are exercises.
+*Proofs:* `spec/Tau/Proofs/Blocks/Repeater.lean`. Two short ones are exercises.
 The invariant is for reading.
 
 *Time:* two days.
@@ -26,7 +26,7 @@ The invariant is for reading.
 # Specify it first
 
 Stop reading here. Open section 2.7 of `Machine.md` and
-`course/Specs/Repeater.lean`, and follow the steps at the top of the file.
+`course/Specify/Repeater.lean`, and follow the steps at the top of the file.
 
 This one is harder than the memory, because the doc describes the
 repeater twice: by what it issues on each cycle, and by the registers it is
@@ -139,7 +139,7 @@ statement says "there is a `k`", and the proof supplies it.
 # How to work through it
 
 1. Specify the repeater from the doc, as above.
-2. Read `Tau/Blocks/Repeater.lean`. In your scratch file define an entry of
+2. Read `spec/Tau/Blocks/Repeater.lean`. In your scratch file define an entry of
    your own and evaluate `timeAt`, `dueAt` and `slotAt` at several cycles.
 3. Which of the two descriptions did you write, the one with registers or the
    one without? The repository has both, and the theorem says they agree.
@@ -147,13 +147,13 @@ statement says "there is a `k`", and the proof supplies it.
    to each, the `k` of the invariant. This is how you read an invariant
    somebody else proved: check it on one run.
 5. Read the statement and the outline of `Entry.slotAt_spec` in
-   `Tau/Proofs/Blocks/Repeater.lean`. Do not work through its steps.
-6. In `Exercises/Blocks/Repeater.lean`, prove `repeater_stateAt` and
+   `spec/Tau/Proofs/Blocks/Repeater.lean`. Do not work through its steps.
+6. In `Prove/Blocks/Repeater.lean`, prove `repeater_stateAt` and
    `repeater_outAt`. Everything above them is given.
 
 # Exercises
 
-*Specify.* `course/Specs/Repeater.lean`.
+*Specify.* `course/Specify/Repeater.lean`.
 
 *State.* `IssuesWhatIsDue` in that file: the description without registers,
 and the statement that the block agrees with it.
@@ -179,7 +179,7 @@ step function, and the invariant that connects them. It is simpler than the
 one in this chapter.
 
 *Prove.* `repeater_stateAt` and `repeater_outAt` in
-`Exercises/Blocks/Repeater.lean`.
+`Prove/Blocks/Repeater.lean`.
 
 *Questions.* Section 2.7 leaves at least three things open.
 
@@ -199,6 +199,6 @@ For `repeater_outAt`: unfold `Block.outAt`, then rewrite with
 
 # Checkpoint
 
-The report says that all rows agree. `lake build Exercises.Blocks.Repeater`
+The report says that all rows agree. `lake build Prove.Blocks.Repeater`
 prints no `sorry` warning. You can say what an invariant is, and why this one
 mentions a number the registers do not hold.

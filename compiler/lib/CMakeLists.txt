@@ -27,9 +27,9 @@ add_mlir_library(TauTransforms
 )
 
 add_mlir_library(TauTarget
-  Target/Chip.cpp
-  Target/Emit.cpp
-  Target/EmitKernel.cpp
+  Target/Machine.cpp
+  Target/EmitMachine.cpp
+  Target/EmitSource.cpp
   Target/Fold.cpp
   Target/Place.cpp
   Target/Route.cpp

@@ -185,7 +185,7 @@ state and output. A `Signal` gives one input per cycle (`Nat → α`).
 
 {docstring Tau.Block.outAt}
 
-In `Tau/Blocks/Basic.lean` (read in full in the next chapter), `stateAt`
+In `spec/Tau/Blocks/Basic.lean` (read in full in the next chapter), `stateAt`
 starts at `b.init` at cycle `0` and steps with `(b.step (b.stateAt inp t)
 (inp t)).1` at `t + 1`; `outAt` at cycle `t` is `(b.step (b.stateAt inp t)
 (inp t)).2`.
@@ -332,7 +332,7 @@ method is the same. Open it and find the first `sorry`.
    from a terminal, for example:
 
 ```
-lake build Exercises.Blocks.Basic
+lake build Prove.Blocks.Basic
 ```
 
 A finished file prints no warning about `sorry`.
@@ -359,7 +359,7 @@ Work down this list. Do not skip to the last item.
    come back and prove `h`.
 6. *Test the statement.* If nothing works, the statement may be false. Put
    concrete numbers in and evaluate both sides with `#eval`.
-7. *Look at one line.* Open the solution under `Tau/Proofs/`, read the first
+7. *Look at one line.* Open the solution under `spec/Tau/Proofs/`, read the first
    tactic of the proof, and close the file. Repeat only if you are stuck
    again after a quarter of an hour.
 

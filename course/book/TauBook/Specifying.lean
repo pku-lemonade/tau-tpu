@@ -10,11 +10,11 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "Writing a specification" =>
-*Read:* `Tau/Docs/Machine.md`, sections 1 and 2.1 to 2.3; `Tau/Docs/README.md`,
-section 2.4, "The words".
+*Read:* `docs/Machine.md`, sections 1 and 2.1 to 2.3; `spec/README.md`,
+"The words".
 
-*Work in:* `course/Specs/Candidates.lean`, `course/Specs/Review.lean`,
-`course/Specs/Repair.lean`, `course/Specs/Provable.lean`.
+*Work in:* `course/Specify/Candidates.lean`, `course/Specify/Review.lean`,
+`course/Specify/Repair.lean`, `course/Specify/Provable.lean`.
 
 *Time:* one day.
 
@@ -38,8 +38,8 @@ judge whether a definition says the right thing.
 Every specification chapter from here on goes through the same seven steps.
 
 1. *Read the source.* For hardware it is a section of
-   `Tau/Docs/Machine.md`. For a compiler pass it is a C++ file.
-2. *Write the definition.* In a file under `course/Specs/`, in place of a
+   `docs/Machine.md`. For a compiler pass it is a C++ file.
+2. *Write the definition.* In a file under `course/Specify/`, in place of a
    `todo`.
 3. *Run the tests.* Each file has `#eval report` lines that compare your
    definition with the table in the source.
@@ -47,14 +47,14 @@ Every specification chapter from here on goes through the same seven steps.
    the source left open. Write them down as questions for the architect.
 5. *State the property.* Write, as a proposition, what a user of the
    component relies on.
-6. *Compare.* Only now open the definition and the theorem in `Tau/`.
+6. *Compare.* Only now open the definition and the theorem in `spec/Tau/`.
 7. *Hand the proof over, and review what comes back.*
 
 Steps 2, 4 and 5 are the ones that need you.
 
 # The source
 
-`Tau/Docs/Machine.md` describes the machine the way an architect would: a paragraph
+`docs/Machine.md` describes the machine the way an architect would: a paragraph
 per component, and a table of what goes in and what comes out on each cycle.
 Read section 2.2 now. It is the accumulator you already know.
 
@@ -69,7 +69,7 @@ A block is a state, a starting value for it, and a step. The doc tells
 you the inputs and the outputs. It does not tell you the state. That is
 yours to choose.
 
-The files under `course/Specs/` leave it open on purpose:
+The files under `course/Specify/` leave it open on purpose:
 
 ```
 abbrev State : Type := Unit
@@ -98,7 +98,7 @@ Put the cursor on the line. It prints how many rows agree and lists the rows
 that do not.
 
 A table is a handful of inputs. A definition can give every row and still be
-wrong. `course/Specs/Candidates.lean` shows this on the three components you
+wrong. `course/Specify/Candidates.lean` shows this on the three components you
 know. For each it has three definitions. All three give every row of the
 doc's table, and two of them are wrong.
 
@@ -116,10 +116,10 @@ the architect has to hear about. Write each as a question:
 * What does a read of an address outside the memory return?
 * What does a write to an address outside the memory do?
 
-Keep the list in `course/Work/Questions.md`. Each file under `course/Specs/`
+Keep the list in `course/Work/Questions.md`. Each file under `course/Specify/`
 has a second `#eval` line, commented out, for the cases the source leaves
 open. Remove the `--` after you have your own list. It shows what the
-specification in `Tau/` decided. Where it differs from your definition,
+specification in `spec/Tau/` decided. Where it differs from your definition,
 neither is wrong: the source did not say.
 
 Finding these is the part of the job that most often changes a design.
@@ -170,7 +170,7 @@ Then one of three things happens.
   Check the input with `#eval`. Then the statement is wrong, or the
   definition is.
 * *The agent is stuck.* Ask for the goal it is stuck on. A goal that cannot
-  be proved tells you which case you forgot. `course/Specs/Repair.lean` has
+  be proved tells you which case you forgot. `course/Specify/Repair.lean` has
   three statements that sound right and are false, each with the goal an
   agent got stuck on.
 
@@ -199,7 +199,7 @@ looks.
 5. *Was the definition changed?* Look at the difference in the definition
    file, not only at the proof.
 
-`course/Specs/Review.lean` has five theorems that came back. Four should not
+`course/Specify/Review.lean` has five theorems that came back. Four should not
 be accepted.
 
 # What makes a specification provable
@@ -209,7 +209,7 @@ difference is decided when the definition is written. tau-tpu follows a few
 rules. Each is visible in the code.
 
 * *Never decide anything from what a value holds.* The machine and the
-  kernel take the operations as a parameter (`Sem` in `Tau/Isa/Op.lean`) and
+  kernel take the operations as a parameter (`Sem` in `spec/Tau/Isa/Op.lean`) and
   never look inside a word. This is what lets one run on names stand for
   every run on numbers. The chapter on the checker depends on it.
 * *Make sizes parameters.* A shift register has depth `n`, not depth 4. A
@@ -220,11 +220,11 @@ rules. Each is visible in the code.
 * *Define one step. Derive many.* `step` says what one cycle does. What
   happens over many cycles is a theorem, such as the timing rule.
 * *Keep definitions and proofs apart.* Everything a person has to read and
-  judge is under `Tau/`, outside `Tau/Proofs/`. The main statements are
-  there too, as named propositions in `Tau/Claims.lean`.
+  judge is under `spec/Tau/`, outside `spec/Tau/Proofs/`. The main statements are
+  there too, as named propositions in `spec/Tau/Claims.lean`.
 
 A rule is easier to believe after seeing what happens without it.
-`course/Specs/Provable.lean` takes the first three rules. For each it gives a
+`course/Specify/Provable.lean` takes the first three rules. For each it gives a
 definition that breaks the rule and asks you for the input on which that
 goes wrong.
 
@@ -242,18 +242,18 @@ in `course/Work/Claims.md`.
 ```
 
 The chapter "End to end" compares your table with the one in the
-repository's `Tau/Docs/README.md`, section 4.
+repository's `spec/README.md` ("Status").
 
 # How to work through it
 
-1. Read `Tau/Docs/README.md`, section 2.4, "The words", and sections 1
-   and 2.1 to 2.3 of `Machine.md`.
-2. Do `course/Specs/Candidates.lean`.
-3. Do `course/Specs/Review.lean`. Then read
-   `course/Specs/Answers/Review.md`.
-4. Do `course/Specs/Repair.lean`.
-5. Do `course/Specs/Provable.lean`.
-6. Read `Tau/Claims.lean` from top to the end of "The components". These are
+1. Read "The words" in `spec/README.md`, and sections 1
+   and 2.1 to 2.3 of `docs/Machine.md`.
+2. Do `course/Specify/Candidates.lean`.
+3. Do `course/Specify/Review.lean`. Then read
+   `course/Specify/Answers/Review.md`.
+4. Do `course/Specify/Repair.lean`.
+5. Do `course/Specify/Provable.lean`.
+6. Read `spec/Tau/Claims.lean` from top to the end of "The components". These are
    the statements about the three components you know, written the way the
    course asks you to write yours.
 7. Start `course/Work/Questions.md` and `course/Work/Claims.md`. Both have a
@@ -261,7 +261,7 @@ repository's `Tau/Docs/README.md`, section 4.
 
 # Exercises
 
-*Specify.* `course/Specs/Candidates.lean`. For each of the three components,
+*Specify.* `course/Specify/Candidates.lean`. For each of the three components,
 find the right candidate and an input that gives each wrong one away. For
 each wrong candidate, say whether it contradicts a sentence of the doc or
 settles something the doc does not say. Those are different kinds of
@@ -271,22 +271,22 @@ mistake: the first is a bug, the second is a question nobody asked.
 right candidate satisfies and one wrong candidate does not. Show that the
 wrong one fails by giving the input.
 
-*Review.* `course/Specs/Review.lean`. Decide for each of the five whether to
+*Review.* `course/Specify/Review.lean`. Decide for each of the five whether to
 accept it, and which of the five looks told you.
 
-*Repair.* `course/Specs/Repair.lean`. For each of the three statements, find
+*Repair.* `course/Specify/Repair.lean`. For each of the three statements, find
 an input that makes it false, then change it so that it is true and still
 useful.
 
-*Break a rule.* `course/Specs/Provable.lean`. Three definitions, each of which
+*Break a rule.* `course/Specify/Provable.lean`. Three definitions, each of which
 breaks one rule of "What makes a specification provable". For each, give the
-input on which it goes wrong, and find the place in `Tau/` that the task
+input on which it goes wrong, and find the place in `spec/Tau/` that the task
 names.
 
 *Questions.* Read sections 2.1 to 2.3 of `Machine.md` once more and write down
 everything they leave open. There are at least six such things across the
 three sections. The rows of the three `Decisions` tables in
-`course/Specs/Tables.lean` are some of them.
+`course/Specify/Tables.lean` are some of them.
 
 # Checkpoint
 

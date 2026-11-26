@@ -12,11 +12,11 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The cell-level machine" =>
 *Terms to look up:* refinement, simulation relation, abstraction function.
 
-*Source:* `Tau/Docs/Machine.md`, section 4.
+*Source:* `docs/Machine.md`, section 4.
 
-*Read:* `Tau/CellLevel/Machine.lean`.
+*Read:* `spec/Tau/Machine/Circuit.lean`.
 
-*Proofs:* `Tau/Proofs/CellLevel/Refine.lean`. For reading. It is the largest
+*Proofs:* `spec/Tau/Proofs/Machine/Circuit.lean`. For reading. It is the largest
 proof of the development.
 
 *Time:* one day.
@@ -27,7 +27,7 @@ Section 4 of `Machine.md` ends with the sentence "A machine built this way
 behaves exactly as section 3 says."
 
 Before you read on, write that sentence as a Lean proposition, in
-`course/Work/`. `cellExecute` in `Tau/CellLevel/Machine.lean` runs the
+`course/Work/`. `cellExecute` in `spec/Tau/Machine/Circuit.lean` runs the
 machine built from blocks, and `execute` runs the one you know. Decide what
 "exactly" means: for which machines, which programs, how many cycles, which
 starting memory? And what should hold when the simple machine traps?
@@ -41,7 +41,7 @@ course:
 {docstring Tau.Cell}
 
 The step function calls the step functions of those blocks. Open
-`Tau/CellLevel/Machine.lean` and `Tau/SliceLevel/Machine.lean` side by side
+`spec/Tau/Machine/Circuit.lean` and `spec/Tau/Machine/Arch.lean` side by side
 and compare `cellExec` with `exec`, and `cellStep` with `stepSlice`. They
 have the same shape. The differences are these.
 
@@ -130,10 +130,10 @@ replaced by a different implementation with the same step behaviour.
 # How to work through it
 
 1. Read section 4 of `Machine.md` and state its last sentence, as above.
-2. Read `Tau/CellLevel/Machine.lean` beside the slice-level machine. Every
+2. Read `spec/Tau/Machine/Circuit.lean` beside the slice-level machine. Every
    field of `Cell` is the state of a block you specified.
 3. Compare your statement with `cellExecute_eq`.
-4. In `Tau/Proofs/CellLevel/Refine.lean`, read `Cell.abs`, `Cell.InSync` and
+4. In `spec/Tau/Proofs/Machine/Circuit.lean`, read `Cell.abs`, `Cell.InSync` and
    `Synced`, then the statements of `CellState.step_abs` and
    `CellState.run_abs`, then the outline of `cellExecute_eq`. Draw the
    square.

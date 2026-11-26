@@ -12,19 +12,19 @@ set_option verso.code.warnLineLength 100
 *Terms to look up:* timing constraint, initiation interval, pipelining,
 observable behaviour.
 
-*Sources:* `Tau/Docs/Programs.md`, sections 5 and 6; `Tau/Docs/Machine.md`,
+*Sources:* `docs/Programs.md`, sections 5 and 6; `docs/Machine.md`,
 section 3.9; the opening comments of `compiler/lib/Target/Place.cpp` and
 `Schedule.cpp`, for what they say about pins.
 
-*Specify:* `course/Specs/Pins.lean`.
+*Specify:* `course/Specify/Pins.lean`.
 
-*Read:* `Tau/Isa/Event.lean`, `Tau/SliceLevel/Issues.lean`; the `pin` case of
-`Stmt.exec` in `Tau/IR/Kernel.lean`; `covers` and `agree` in
-`Tau/Check/Checker.lean`.
+*Read:* `spec/Tau/Isa/Event.lean`, `spec/Tau/Machine/Issues.lean`; the `pin` case of
+`Stmt.exec` in `spec/Tau/IR/Kernel.lean`; `covers` and `agree` in
+`spec/Tau/Check/Checker.lean`.
 
 *Proofs:* three short ones are exercises: `check_pins` in
-`Exercises/Check/Sound.lean`, `checkKernels_pins` and `passes_pins` in
-`Exercises/Check/Passes.lean`. `Tau/Proofs/SliceLevel/Issues.lean` is for
+`Prove/Check/Checker.lean`, `checkKernels_pins` and `passes_pins` in
+`Prove/Check/Passes.lean`. `spec/Tau/Proofs/Machine/Issues.lean` is for
 reading.
 
 *Time:* two days.
@@ -49,7 +49,7 @@ _pin_.
 # What a pin claims
 
 A pin is attached to one operation and names a cycle. Read section 5 of
-`Tau/Docs/Programs.md`, and do the first part of `course/Specs/Pins.lean` now, before you
+`docs/Programs.md`, and do the first part of `course/Specify/Pins.lean` now, before you
 read on.
 
 What a pin claims is an _event_.
@@ -217,7 +217,7 @@ or which instruction. Two consequences:
 * If two operations compute the same word and one is pinned, the compiler may
   issue either one on that cycle.
 
-Both are decisions, made in `Tau/Isa/Event.lean`. A stronger claim would have
+Both are decisions, made in `spec/Tau/Isa/Event.lean`. A stronger claim would have
 to say which instruction of the compiled program stands for which operation
 of the source. No check in tau-tpu knows that, by design: a check does not
 look at how a pass got from its input to its output.
@@ -242,7 +242,7 @@ Without pins, groups run one after another. With them, groups may overlap.
 `examples/paced/kernel.py` pins a loop to one iteration every four cycles:
 
 ```
-PYTHONPATH=frontend python3 -m tau examples/paced/kernel.py -o out
+PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out
 compiler/build/bin/tauc out/kernel.mlir -o out
 lake exe tau-sim --timeline out/source.json examples/paced/buffers.json
 lake exe tau-check out/source.json out/compiled.json
@@ -264,14 +264,14 @@ iter 3:                          R───────V─────W
 
 # How to work through it
 
-1. Do `course/Specs/Pins.lean`, including the four questions under "Judge".
-2. Read `Tau/Isa/Event.lean` and `Tau/SliceLevel/Issues.lean`. Redo the small
+1. Do `course/Specify/Pins.lean`, including the four questions under "Judge".
+2. Read `spec/Tau/Isa/Event.lean` and `spec/Tau/Machine/Issues.lean`. Redo the small
    example above in your scratch file with a pin on the store.
 3. Read `covers` and `agree`. Then prove `check_pins` in
-   `Exercises/Check/Sound.lean`, and `checkKernels_pins` and `passes_pins` in
-   `Exercises/Check/Passes.lean`.
+   `Prove/Check/Checker.lean`, and `checkKernels_pins` and `passes_pins` in
+   `Prove/Check/Passes.lean`.
 4. Read the statement of `issues_map` in
-   `Tau/Proofs/SliceLevel/Issues.lean`, and the proof of `State.issue_map`.
+   `spec/Tau/Proofs/Machine/Issues.lean`, and the proof of `State.issue_map`.
 5. Run the four commands above. Then do the exercises "By hand".
 
 # Lean you will need
@@ -286,7 +286,7 @@ iter 3:                          R───────V─────W
 
 # Exercises
 
-*Specify.* `course/Specs/Pins.lean`.
+*Specify.* `course/Specify/Pins.lean`.
 
 *State.* In the same file: what it means for a compiled program to keep the
 pins of a source program.
@@ -341,7 +341,7 @@ one `have` for each.
 
 # Checkpoint
 
-`lake build Exercises.Check.Sound Exercises.Check.Passes` prints no `sorry`
+`lake build Prove.Check.Checker Prove.Check.Passes` prints no `sorry`
 warning. You can say what an event is, why a compiled program has more of
 them than its source, and what a pin leaves undecided. You can say why the
 cycle on which the machine issues a word cannot depend on the buffers.

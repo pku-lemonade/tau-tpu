@@ -2,8 +2,8 @@
 //
 // The tau dialect describes a kernel: words are loaded from buffers, combined
 // by lane-wise operations, and stored back. It says nothing about slices or
-// streams. Tau/IR/Kernel.lean is the Lean model of this dialect, and
-// Tau/IR/Source.lean of a module in which kernels call each other.
+// streams. spec/Tau/IR/Kernel.lean is the Lean model of this dialect, and
+// spec/Tau/IR/Source.lean of a module in which kernels call each other.
 //
 // The dialect has three groups of operations, for the three shapes a program
 // takes in the compiler:
@@ -67,7 +67,7 @@ class Tau_Op<string mnemonic, list<Trait> traits = []>
 // Any operation may be pinned: `at t` says that its word is issued on cycle
 // `t`, counted from the start of its kernel. For an operation with a result
 // the word is the result; for a store it is the word stored. Inside a loop,
-// `at t every d` means cycle `t + d * i`. Tau/Isa/Event.lean says what a pin
+// `at t every d` means cycle `t + d * i`. spec/Tau/Isa/Event.lean says what a pin
 // claims.
 
 def Tau_LoadOp : Tau_Op<"load"> {
@@ -248,7 +248,7 @@ def Tau_CallOp : Tau_Op<"call"> {
 //
 // After `tau-place` a function no longer holds kernel operations. It holds
 // instructions: one operation per machine instruction, in the order the
-// kernel needs them to take effect. Tau/IR/Placed.lean is the Lean model.
+// kernel needs them to take effect. spec/Tau/IR/Placed.lean is the Lean model.
 //
 // A `!tau.word` value is now a word travelling on a stream from the slice
 // that produces it to the one slice that uses it. A `!tau.acc` value links
@@ -396,9 +396,9 @@ def Tau_IEmitOp : Tau_Instr<"emit"> {
 //===----------------------------------------------------------------------===//
 //
 // After `tau-slice` a function holds one `tau.slice` for each slice of the
-// chip, and in it the entries of that slice's repeater. An entry no longer
+// machine, and in it the entries of that slice's repeater. An entry no longer
 // has operands and results: it names the streams it reads and writes, as the
-// machine's instructions do (`Tau.Timed` in Tau/Isa/Instr.lean). This is the
+// machine's instructions do (`Tau.Timed` in spec/Tau/Isa/Instr.lean). This is the
 // form the image is written from.
 //
 // A stream is written "e3" or "w0": east or west, and its number.

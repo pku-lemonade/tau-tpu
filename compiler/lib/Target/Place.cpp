@@ -6,7 +6,7 @@
 // Words of memory beyond the buffers are scratch space.
 //
 // Placement of operations. An operation runs on a slice of the kind it
-// needs. Where the chip has several, it takes the one nearest to where its
+// needs. Where the machine has several, it takes the one nearest to where its
 // operand comes from.
 //
 // Stored matrices. A matrix slice can keep the columns of a matrix. When the
@@ -44,7 +44,7 @@
 // can wait: a pinned load is read on its cycle into a scratch word, and a
 // chain ends before a pinned operation that disagrees.
 //
-// The pass records the chip, the memory map and the memory sizes on the
+// The pass records the machine, the memory map and the memory sizes on the
 // function. It does not choose cycles or streams.
 //
 // Nothing here is proved. `tau-check kernel.json placed.json` decides whether
@@ -125,14 +125,14 @@ struct MatMode {
 
 class Placer {
 public:
-  Placer(func::FuncOp func, const tau::Chip &chip)
-      : func(func), chip(chip), builder(func.getContext()) {}
+  Placer(func::FuncOp func, const tau::Machine &machine)
+      : func(func), machine(machine), builder(func.getContext()) {}
 
   Error run();
 
 private:
   func::FuncOp func;
-  const tau::Chip &chip;
+  const tau::Machine &machine;
   OpBuilder builder;
   Type word;
   Type acc;
@@ -176,7 +176,7 @@ private:
   /// The timing rule: how many cycles after an instruction at `from` the
   /// instruction at `to` that uses its word is issued.
   int64_t lag(int from, int to) const {
-    return chip.delayAt(from) + 1 + std::abs(to - from);
+    return machine.delayAt(from) + 1 + std::abs(to - from);
   }
 
   Error read();
@@ -390,7 +390,7 @@ MatMode Placer::decide(int index, int from) const {
     if (entry.second == matrix)
       return {entry.first, true, false};
   int slice = nearest(mxms, from);
-  if (node.n <= chip.mxmWeights && usedAgain(index))
+  if (node.n <= machine.mxmWeights && usedAgain(index))
     return {slice, true, true};
   return {slice, false, false};
 }
@@ -483,7 +483,7 @@ Error Placer::placeComputed(int index) {
   const Node &head = nodes[index];
   Member first = place(index, origin(head));
   if (first.slice < 0)
-    return createStringError("the chip has no slice for an operation");
+    return createStringError("the machine has no slice for an operation");
   std::set<int> readSlices;
   for (int attempt = 0; !admit(head, -1, first.mode, readSlices); ++attempt) {
     if (attempt >= 3)
@@ -508,7 +508,7 @@ Error Placer::placeComputed(int index) {
     Loc to = newScratch(taken);
     if (to.slice < 0)
       return createStringError(
-          "an operation needs more memory slices than the chip has");
+          "an operation needs more memory slices than the machine has");
     emitWrite(emitRead(*valueLoc[victim], takePin(victim)), to);
     valueLoc[victim] = to;
     readSlices.clear();
@@ -569,7 +569,7 @@ Error Placer::placeComputed(int index) {
     Loc to = newScratch(avoid);
     if (to.slice < 0)
       return createStringError(
-          "a pinned load needs more memory slices than the chip has");
+          "a pinned load needs more memory slices than the machine has");
     emitWrite(emitRead(*valueLoc[arg], takePin(arg)), to);
     valueLoc[arg] = to;
     readSlices.insert(to.slice);
@@ -613,7 +613,7 @@ Error Placer::placeComputed(int index) {
 
   for (const Member &member : chain)
     if (member.slice < 0)
-      return createStringError("the chip has no slice for an operation");
+      return createStringError("the machine has no slice for an operation");
 
   // Columns to be stored are installed first, in a group of their own, on
   // consecutive cycles.
@@ -748,9 +748,9 @@ Error Placer::run() {
   if (Error e = read())
     return e;
 
-  int positions = static_cast<int>(chip.kinds.size());
+  int positions = static_cast<int>(machine.kinds.size());
   for (int p = 0; p < positions; ++p) {
-    const std::string &kind = chip.kinds[p];
+    const std::string &kind = machine.kinds[p];
     if (kind == "mem")
       mems.push_back(p);
     else if (kind == "sxm")
@@ -761,7 +761,7 @@ Error Placer::run() {
       vxm = p;
   }
   if (mems.empty())
-    return createStringError("the chip has no memory slice");
+    return createStringError("the machine has no memory slice");
 
   // Buffers: spread over the memory slices in turn.
   used.assign(positions, 0);
@@ -832,7 +832,7 @@ Error Placer::run() {
     (*it)->erase();
 
   // Record what the later passes and the emitters need.
-  tau::setChip(func, chip);
+  tau::setMachine(func, machine);
   func->setAttr("tau.mem_sizes", builder.getI64ArrayAttr(used));
   SmallVector<Attribute> map;
   for (size_t b = 0; b < bufSizes.size(); ++b)
@@ -845,22 +845,22 @@ Error Placer::run() {
 struct PlacePass : PassWrapper<PlacePass, OperationPass<func::FuncOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PlacePass)
 
-  PlacePass(const tau::Chip &chip) : chip(chip) {}
-  PlacePass(const PlacePass &other) : PassWrapper(other), chip(other.chip) {}
+  PlacePass(const tau::Machine &machine) : machine(machine) {}
+  PlacePass(const PlacePass &other) : PassWrapper(other), machine(other.machine) {}
 
   StringRef getArgument() const final { return "tau-place"; }
   StringRef getDescription() const final {
     return "Choose slices and memory addresses and lower to instructions";
   }
 
-  Option<std::string> chipFile{
-      *this, "chip",
-      llvm::cl::desc("Chip description (JSON); default: the standard chip")};
+  Option<std::string> machineFile{
+      *this, "machine",
+      llvm::cl::desc("Machine description (JSON); default: the standard machine")};
 
   void runOnOperation() override {
-    tau::Chip target = chip;
-    if (!chipFile.empty()) {
-      Expected<tau::Chip> read = tau::Chip::fromFile(chipFile);
+    tau::Machine target = machine;
+    if (!machineFile.empty()) {
+      Expected<tau::Machine> read = tau::Machine::fromFile(machineFile);
       if (!read) {
         getOperation().emitError(toString(read.takeError()));
         return signalPassFailure();
@@ -874,11 +874,11 @@ struct PlacePass : PassWrapper<PlacePass, OperationPass<func::FuncOp>> {
     }
   }
 
-  tau::Chip chip;
+  tau::Machine machine;
 };
 
 } // namespace
 
-std::unique_ptr<Pass> tau::createPlacePass(const Chip &chip) {
-  return std::make_unique<PlacePass>(chip);
+std::unique_ptr<Pass> tau::createPlacePass(const Machine &machine) {
+  return std::make_unique<PlacePass>(machine);
 }

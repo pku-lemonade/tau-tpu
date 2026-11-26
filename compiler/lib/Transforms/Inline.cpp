@@ -13,7 +13,7 @@
 // calls left by the time it is copied into another. The pass fails on a call
 // inside a `tau.for`, and on a call that passes one buffer twice: the copy
 // would then let the kernel see through one buffer what it stored to the
-// other, which a called kernel may not do (Tau/IR/Source.lean).
+// other, which a called kernel may not do (spec/Tau/IR/Source.lean).
 //
 // Nothing here is proved. `tau-check source.json kernel.json` decides whether
 // the kernel computes what the source program computes and keeps its pins.

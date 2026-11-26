@@ -5,8 +5,8 @@
 // `[base + stride * k, 0]` in copy number k. A pin is filled in the same way:
 // `at t every d` becomes `at t + d * k`.
 //
-// Tau/Passes/Unroll.lean is a copy of this pass in Lean, and
-// Tau/Proofs/Passes/Unroll.lean proves the copy keeps what a kernel
+// spec/Tau/IR/Unroll.lean is a copy of this pass in Lean, and
+// spec/Tau/Proofs/IR/Unroll.lean proves the copy keeps what a kernel
 // computes. This C++ code is not proved. Its output is checked on every
 // compile by tau-check, and compared with the copy's by
 // scripts/check-examples.sh.

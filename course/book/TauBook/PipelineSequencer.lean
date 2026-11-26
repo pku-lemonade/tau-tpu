@@ -12,15 +12,15 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Pipeline and sequencer" =>
 *Terms to look up:* pipelining, latency, program counter, static scheduling.
 
-*Source:* `Tau/Docs/Machine.md`, sections 2.4 and 2.6.
+*Source:* `docs/Machine.md`, sections 2.4 and 2.6.
 
-*Specify:* `course/Specs/Pipeline.lean`, `course/Specs/Sequencer.lean`.
+*Specify:* `course/Specify/Pipeline.lean`, `course/Specify/Sequencer.lean`.
 
-*Read, after you have specified them:* `Tau/Blocks/Pipeline.lean`,
-`Tau/Blocks/Sequencer.lean`.
+*Read, after you have specified them:* `spec/Tau/Blocks/Pipeline.lean`,
+`spec/Tau/Blocks/Sequencer.lean`.
 
-*Proofs:* `Tau/Proofs/Blocks/Pipeline.lean`,
-`Tau/Proofs/Blocks/Sequencer.lean`. All of them are exercises.
+*Proofs:* `spec/Tau/Proofs/Blocks/Pipeline.lean`,
+`spec/Tau/Proofs/Blocks/Sequencer.lean`. All of them are exercises.
 
 *Time:* one day.
 
@@ -29,7 +29,7 @@ set_option verso.code.warnLineLength 100
 These are your first two specifications. Stop reading here.
 
 Open sections 2.4 and 2.6 of `Machine.md`, and the two files under
-`course/Specs/`. Follow the steps at the top of each file: choose the state,
+`course/Specify/`. Follow the steps at the top of each file: choose the state,
 write the block, read the report, list what the doc does not say. Come
 back when both reports say that all rows agree.
 
@@ -93,19 +93,19 @@ the one tau-tpu uses.
 # How to work through it
 
 1. Specify the pipeline and the sequencer from the doc, as above.
-2. Read both definition files in `Tau/Blocks/`. Compare the states. The
+2. Read both definition files in `spec/Tau/Blocks/`. Compare the states. The
    repository builds the pipeline out of the shift register and `mapIn`, so
    its state is the shift register's. The state of its sequencer is the
    cycle count. Were yours the same? If not, are both right?
 3. Compare your two statements with `pipeline_outAt` and `sequencer_outAt`.
-4. Do `Exercises/Blocks/Pipeline.lean`. One proof of two lines.
-5. Do `Exercises/Blocks/Sequencer.lean` without looking at any hint. The
+4. Do `Prove/Blocks/Pipeline.lean`. One proof of two lines.
+5. Do `Prove/Blocks/Sequencer.lean` without looking at any hint. The
    state theorem is about as small as an induction can be. If you can do it
    alone, the first week has worked.
 
 # Exercises
 
-*Specify.* `course/Specs/Pipeline.lean` and `course/Specs/Sequencer.lean`.
+*Specify.* `course/Specify/Pipeline.lean` and `course/Specify/Sequencer.lean`.
 
 *State.* `OutputIsDelayed` and `IssuesWhatIsDue` in those two files.
 
@@ -123,7 +123,7 @@ at most one element. Give the proof to an agent, or prove it yourself. You
 have just written a small check and the statement that it can be trusted.
 The chapter on the checker does this for the whole compiler.
 
-*Prove.* `Exercises/Blocks/Pipeline.lean`, `Exercises/Blocks/Sequencer.lean`.
+*Prove.* `Prove/Blocks/Pipeline.lean`, `Prove/Blocks/Sequencer.lean`.
 
 *Questions.* Sections 2.4 and 2.6 leave at least four things open. Find them
 before you look at the `Decisions` tables.
@@ -149,7 +149,7 @@ For `sequencer_outAt`: unfold `Block.outAt`, rewrite with
 
 # Checkpoint
 
-Both reports say that all rows agree. `lake build Exercises.Blocks.Pipeline
-Exercises.Blocks.Sequencer` prints no `sorry` warning, and you did the
+Both reports say that all rows agree. `lake build Prove.Blocks.Pipeline
+Prove.Blocks.Sequencer` prints no `sorry` warning, and you did the
 sequencer proofs without help. `course/Work/Questions.md` has four more
 entries, and `course/Work/Claims.md` has a row for each thing you wrote.

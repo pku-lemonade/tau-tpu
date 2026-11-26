@@ -12,20 +12,20 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "Memory" =>
 *Terms to look up:* random-access memory, address, read port, write port.
 
-*Source:* `Tau/Docs/Machine.md`, section 2.5.
+*Source:* `docs/Machine.md`, section 2.5.
 
-*Specify:* `course/Specs/Memory.lean`.
+*Specify:* `course/Specify/Memory.lean`.
 
-*Read, after you have specified it:* `Tau/Blocks/Memory.lean`.
+*Read, after you have specified it:* `spec/Tau/Blocks/Memory.lean`.
 
-*Proofs:* `Tau/Proofs/Blocks/Memory.lean`. One of them is an exercise.
+*Proofs:* `spec/Tau/Proofs/Blocks/Memory.lean`. One of them is an exercise.
 
 *Time:* one day.
 
 # Specify it first
 
 Stop reading here. Open section 2.5 of `Machine.md` and
-`course/Specs/Memory.lean`, and follow the steps at the top of the file.
+`course/Specify/Memory.lean`, and follow the steps at the top of the file.
 Come back when the report says that all rows agree.
 
 # The idea
@@ -93,18 +93,18 @@ there.
 # How to work through it
 
 1. Specify the memory from the doc, as above.
-2. Read `Tau/Blocks/Memory.lean`. Evaluate `lastWrite` on a signal of your
+2. Read `spec/Tau/Blocks/Memory.lean`. Evaluate `lastWrite` on a signal of your
    own, including one with no write to the address.
 3. Compare your statement with `memory_outAt_read`. Did you need a function
    like `lastWrite`? Does your statement have the hypothesis that the
    address is valid? Without it the statement is false: this is the third
-   statement of `course/Specs/Repair.lean`.
-4. In `Exercises/Blocks/Memory.lean`, read the statement and the outline of
+   statement of `course/Specify/Repair.lean`.
+4. In `Prove/Blocks/Memory.lean`, read the statement and the outline of
    `memory_stateAt`, which is given. Then prove `memory_outAt_read` from it.
 
 # Exercises
 
-*Specify.* `course/Specs/Memory.lean`.
+*Specify.* `course/Specify/Memory.lean`.
 
 *State.* `ReadsLastWrite` in that file.
 
@@ -115,7 +115,7 @@ case. State its read theorem. Then say, in a comment, what a read returns if
 the same address is written on the cycle in between, and check your claim by
 running your definition. The doc would have to say this too.
 
-*Prove.* `memory_outAt_read` in `Exercises/Blocks/Memory.lean`.
+*Prove.* `memory_outAt_read` in `Prove/Blocks/Memory.lean`.
 
 *Questions.* Section 2.5 leaves at least three things open.
 
@@ -136,6 +136,6 @@ the hypothesis that the command is a read, then `simp` with `ha` and
 
 # Checkpoint
 
-The report says that all rows agree. `lake build Exercises.Blocks.Memory`
+The report says that all rows agree. `lake build Prove.Blocks.Memory`
 prints no `sorry` warning. You can say why `lastWrite` belongs to the
 specification and is not a helper for the proof.

@@ -12,16 +12,16 @@ set_option verso.code.warnLineLength 100
 #doc (Manual) "The slice-level machine" =>
 *Terms to look up:* instruction set architecture, SIMD.
 
-*Source:* `Tau/Docs/Machine.md`, section 3.
+*Source:* `docs/Machine.md`, section 3.
 
-*Specify:* `course/Specs/Machine.lean`.
+*Specify:* `course/Specify/Machine.lean`.
 
-*Read:* `Tau/Isa/Op.lean` and `Tau/Isa/Instr.lean` now.
-`Tau/SliceLevel/Machine.lean` and `tests/TauTest/Linear.lean` after you have
+*Read:* `spec/Tau/Isa/Op.lean` and `spec/Tau/Isa/Instr.lean` now.
+`spec/Tau/Machine/Arch.lean` and `spec/tests/TauTest/Linear.lean` after you have
 specified.
 
-*Proofs:* `Tau/Proofs/SliceLevel/Timing.lean`,
-`Tau/Proofs/SliceLevel/Map.lean`. For reading.
+*Proofs:* `spec/Tau/Proofs/Machine/Timing.lean`,
+`spec/Tau/Proofs/Machine/Arch.lean`. For reading.
 
 *Time:* three days.
 
@@ -31,13 +31,13 @@ then program the machine by hand.
 
 # Specify two parts of it first
 
-Read section 3 of `Machine.md`, all of it. Then read `Tau/Isa/Op.lean`,
-`Tau/Isa/Instr.lean`, and the first eighty lines of
-`Tau/SliceLevel/Machine.lean`, down to the definition of `State`. Those are
+Read section 3 of `Machine.md`, all of it. Then read `spec/Tau/Isa/Op.lean`,
+`spec/Tau/Isa/Instr.lean`, and the first eighty lines of
+`spec/Tau/Machine/Arch.lean`, down to the definition of `State`. Those are
 the types: operations, instructions, traps, the state of a slice. Stop
 there.
 
-The whole machine is too large to write in a day. `course/Specs/Machine.lean`
+The whole machine is too large to write in a day. `course/Specify/Machine.lean`
 asks for the two parts that everything else follows from: how a stream moves
 in one cycle, and what four of the instructions do, traps included. Follow
 the steps at the top of the file and come back when the three reports say
@@ -67,7 +67,7 @@ Its state is the contents of every stream slot and of every slice.
 
 {docstring Tau.State}
 
-One cycle is the function `step`. Read it in `Tau/SliceLevel/Machine.lean`
+One cycle is the function `step`. Read it in `spec/Tau/Machine/Arch.lean`
 together with the comment at the top of the file. Read the functions in the
 order they are defined: `exec`, `shiftPipe`, `stepSlice`, `stepSlices`,
 `inject`, `advanceRow`, `advance`, `step`.
@@ -124,7 +124,7 @@ Why cycle 4? Follow the word.
 * Cycle 4: it is at position 2, where slice 2 is told to write it.
 
 That is the timing rule from Machine 3.4 (also stated at the top of
-`Tau/SliceLevel/Machine.lean`): a result computed at slice
+`spec/Tau/Machine/Arch.lean`): a result computed at slice
 `p` on cycle `t` can be read at slice `q` on cycle
 `t + delay + 1 + |q - p|`. Here that is 0 + 1 + 1 + 2 = 4.
 
@@ -133,7 +133,7 @@ happens in one cycle: a result enters the pipe of its slice, the oldest entry
 of the pipe comes out, and every stream moves one position. The rule is what
 follows from that over many cycles, in the same way as `shiftRegister_outAt`
 follows from the one-cycle definition of the shift register. It is a theorem,
-in `Tau/Proofs/SliceLevel/Timing.lean`:
+in `spec/Tau/Proofs/Machine/Timing.lean`:
 
 {docstring Tau.arrives_east}
 
@@ -217,7 +217,7 @@ course.
 
 # A real program
 
-`tests/TauTest/Linear.lean` contains a quantized linear layer scheduled by
+`spec/tests/TauTest/Linear.lean` contains a quantized linear layer scheduled by
 hand on a nine-slice machine, with a comment on each instruction. Follow one
 value through it: the word `x` leaves slice 2 on cycle 0 and is used by slice
 0 on cycle 4. Check that against the rule: 0 + 1 + 1 + 2 = 4. Then check the
@@ -229,27 +229,27 @@ now.
 # How to work through it
 
 1. Read section 3 of `Machine.md`, and the types, as above.
-2. Specify streams and instructions in `course/Specs/Machine.lean`.
-3. Read `Tau/SliceLevel/Machine.lean` top to bottom. Compare `advanceRow` and
+2. Specify streams and instructions in `course/Specify/Machine.lean`.
+3. Read `spec/Tau/Machine/Arch.lean` top to bottom. Compare `advanceRow` and
    `exec` with yours. In which order does the repository's `exec` make its
    checks? The doc does not say, and the `Decisions` table shows that the
    order can be seen from outside.
 4. Copy the tiny example above into your scratch file and change it: move the
    read to cycle 3, make the word travel west from slice 2 to slice 0, add a
    `relu` at slice 1 on the way. Predict each result before you run it.
-5. Work through the hand schedule in `tests/TauTest/Linear.lean`.
+5. Work through the hand schedule in `spec/tests/TauTest/Linear.lean`.
 6. Read the statements of `out_delay`, `sample_step` and `arrives_east` in
-   `Tau/Proofs/SliceLevel/Timing.lean`, and the outline of `arrives_east`.
+   `spec/Tau/Proofs/Machine/Timing.lean`, and the outline of `arrives_east`.
    Compare `sample_step` with your own statement about one cycle.
 7. Do the exercises.
 
 # Exercises
 
-*Specify.* `course/Specs/Machine.lean`.
+*Specify.* `course/Specify/Machine.lean`.
 
 *State.* `MovesOnePosition` in that file.
 
-*By hand.* On the nine-slice machine of `tests/TauTest/Linear.lean`, write a
+*By hand.* On the nine-slice machine of `spec/tests/TauTest/Linear.lean`, write a
 schedule that adds a word held in slice 2 to a word held in slice 3 and
 stores the sum in slice 5. Make a file `course/Work/Add.lean` that starts
 with the machine and the helpers of that test, and fill in the four times:

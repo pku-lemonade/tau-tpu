@@ -3,20 +3,20 @@
 
 The course asks for few proofs: the short ones that show what a
 specification says. `EXERCISES` below lists them. Each listed file under
-Tau/Proofs/ becomes a file under course/Exercises/ in which the listed
+spec/Tau/Proofs/ becomes a file under course/Prove/ in which the listed
 proofs are replaced by `sorry`. Statements, doc comments and imports are
 kept, and so are the proofs that are not listed, which the student may use.
 The finished file is the solution.
 
-A file under Tau/Proofs/ that is not listed has no exercise file. Its proofs
+A file under spec/Tau/Proofs/ that is not listed has no exercise file. Its proofs
 are for reading.
 
 A comment at the top level of a proof (two spaces, then `-- `) is kept in the
 exercise as an outline. Write such comments in long proofs to say what each
 part does.
 
-    scripts/make-exercises.py           write course/Exercises/
-    scripts/make-exercises.py --check   fail if course/Exercises/ is out of date
+    scripts/make-exercises.py           write course/Prove/
+    scripts/make-exercises.py --check   fail if course/Prove/ is out of date
 
 An exercise file imports the finished library, not other exercise files, so
 each one can be done on its own.
@@ -27,8 +27,8 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "Tau" / "Proofs"
-TARGET = ROOT / "course" / "Exercises"
+SOURCE = ROOT / "spec" / "Tau" / "Proofs"
+TARGET = ROOT / "course" / "Prove"
 
 HEADER = """\
 /-
@@ -57,15 +57,15 @@ EXERCISES: dict[str, set[str] | None] = {
     "Blocks/ShiftRegister.lean": ALL,
     "Blocks/Accumulator.lean": ALL,
     "Blocks/Mac.lean": ALL,
-    "Data/Lane.lean": ALL,
+    "Isa/Word.lean": ALL,
     "Blocks/Pipeline.lean": ALL,
     "Blocks/Sequencer.lean": ALL,
     "Blocks/Memory.lean": {"memory_outAt_read"},
     "Blocks/Repeater.lean": {"repeater_stateAt", "repeater_outAt"},
     "Blocks/SystolicArray.lean": {"systolicArray_matvec"},
-    "Passes/Unroll.lean": {"Idx.eval_inst", "Stmt.exec_inst", "Kernel.run_unroll"},
+    "IR/Unroll.lean": {"Idx.eval_inst", "Stmt.exec_inst", "Kernel.run_unroll"},
     "Check/Simplify.lean": ALL,
-    "Check/Sound.lean": {"check_sound", "check_pins", "check_safe"},
+    "Check/Checker.lean": {"check_sound", "check_pins", "check_safe"},
     "Check/Passes.lean": {"checkKernels_sound", "checkKernels_pins", "passes_sound",
                           "passes_pins"},
     "EndToEnd.lean": ALL,
@@ -141,7 +141,7 @@ def generate() -> dict[pathlib.Path, str]:
     for name, only in EXERCISES.items():
         source = SOURCE / name
         rel = source.relative_to(SOURCE)
-        module = "Exercises." + ".".join(rel.with_suffix("").parts)
+        module = "Prove." + ".".join(rel.with_suffix("").parts)
         body, count = blank_proofs(source.read_text(), only)
         if count != (len(only) if only is not None else count) or count == 0:
             raise SystemExit(f"{name}: expected to blank {only}, blanked {count}")
