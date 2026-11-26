@@ -161,7 +161,7 @@ In MLIR the program is the last function of the file and the kernels it
 calls are the functions before it.
 
 In Python the program is not the text of the function. The function is run
-once and the statements it calls are recorded; the record is the program.
+once and the statements it calls are traced; the trace is the program.
 Whatever else the function does while it runs, a Python loop, a test on an
 integer, a helper function, leaves only the statements it called. `T`
 stands for the start cycle of the enclosing kernel, so `at=T + 6 + 4 * i`

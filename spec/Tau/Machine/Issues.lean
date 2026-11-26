@@ -1,10 +1,10 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.Isa.Event
 
 /-!
 # What the machine issues, and when
 
-`Tau.Machine.Arch` says what the memories hold after a run. This
+`Tau.Machine.SliceLevel` says what the memories hold after a run. This
 file says what happened on the way: on which cycle each slice issued which
 word. A slice *issues* a word when it runs an instruction that has a result,
 or one that writes a word to memory.
@@ -25,7 +25,7 @@ variable {V : Type}
 /-- The word an instruction issues, given what the instruction read and what
 `exec` returned for it: the result, or for a write the word written. With the
 address, for a write. -/
-def issued (rd : Track → Option V) (i : Instr) (r : Option (Track × V)) :
+def issued (rd : Stream → Option V) (i : Instr) (r : Option (Stream × V)) :
     Option (Option Nat × V) :=
   match r, i with
   | some (_, v), _ => some (none, v)

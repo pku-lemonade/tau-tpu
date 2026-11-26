@@ -71,7 +71,7 @@ Being exact about the limits of a theorem is part of the skill.
 * It says nothing about the C++ compiler. If the compiler is wrong, its
   output is rejected. The theorem is about accepted programs only.
 * It says nothing about Python. The source program is what the frontend
-  recorded on one run. That the record is what the author of the Python file
+  traced on one run. That the trace is what the author of the Python file
   meant is tested on examples and not stated anywhere.
 * Its last line is about the slice-level machine. The cell-level machine is
   proved to end with the same memory. That it issues the same words on the

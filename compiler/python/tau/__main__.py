@@ -1,7 +1,7 @@
 """The command line of the frontend.
 
     python3 -m tau kernel.py -o out
-        Record the program and write out/kernel.mlir, the input of `tauc`,
+        Trace the program and write out/kernel.mlir, the input of `tauc`,
         and out/traced.json, the same program as a source file.
 
     python3 -m tau kernel.py --run buffers.json

@@ -1,4 +1,4 @@
-import Tau.Sim.Json
+import Tau.Tools.Json
 import Tau.IR.Unroll
 
 /-!
@@ -9,15 +9,15 @@ compiler stage and `timelineOf` gives its events. `checkPair` picks the check
 for two stage files, and `explainPair` says why it rejected.
 -/
 
-namespace Tau.Sim
+namespace Tau.Tools
 
-def showTrack (tr : Track) : String :=
+def showStream (tr : Stream) : String :=
   (match tr.dir with | .east => "east" | .west => "west") ++ s!" stream {tr.id}"
 
 def showTrap (t : Trap) : String :=
   let what := match t.kind with
     | .emptyRead => "read a stream slot that held nothing"
-    | .badTrack => "named a stream that does not exist"
+    | .badStream => "named a stream that does not exist"
     | .badAddress => "used a memory address that is out of range"
     | .wrongSlice => "was sent to a slice of the wrong kind"
     | .twoInstructions => "had two instructions due on the same cycle"
@@ -256,4 +256,4 @@ program `c`. -/
 def sameImage (c : Compiled) (img : Image) : Bool :=
   c.prog.encode c.cfg.kinds.length == img
 
-end Tau.Sim
+end Tau.Tools

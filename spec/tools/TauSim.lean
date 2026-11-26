@@ -1,4 +1,4 @@
-import Tau.Sim.Run
+import Tau.Tools.Run
 
 /-!
 # tau-sim
@@ -34,9 +34,9 @@ def main (args : List String) : IO UInt32 := do
   | ["--timeline", spath, bpath] =>
     let st ← Json.orFail spath (Json.stage (← Json.readFile spath))
     let (lanes, bufs) ← Json.orFail bpath (Json.buffers (← Json.readFile bpath))
-    match Sim.runStage st lanes bufs with
+    match Tools.runStage st lanes bufs with
     | .ok _ =>
-      IO.println (Json.ofTimeline (Sim.timelineOf st lanes bufs)).pretty
+      IO.println (Json.ofTimeline (Tools.timelineOf st lanes bufs)).pretty
       pure 0
     | .error e =>
       IO.eprintln e
@@ -44,7 +44,7 @@ def main (args : List String) : IO UInt32 := do
   | [spath, bpath] =>
     let st ← Json.orFail spath (Json.stage (← Json.readFile spath))
     let (lanes, bufs) ← Json.orFail bpath (Json.buffers (← Json.readFile bpath))
-    match Sim.runStage st lanes bufs with
+    match Tools.runStage st lanes bufs with
     | .ok out =>
       IO.println (Json.ofBuffers lanes out).pretty
       pure 0

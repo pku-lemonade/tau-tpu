@@ -7,7 +7,15 @@
   "postCreateCommand": "lake build",
   "customizations": {
     "vscode": {
-      "extensions": ["leanprover.lean4"]
+      "extensions": ["leanprover.lean4", "editorconfig.editorconfig"],
+      "settings": {
+        "files.watcherExclude": {
+          "**/.lake/**": true,
+          "compiler/build/**": true,
+          "course/book/_out/**": true
+        },
+        "editor.rulers": [100]
+      }
     }
   }
 }

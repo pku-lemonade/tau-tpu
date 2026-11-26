@@ -44,7 +44,7 @@ ways is used.
 kernel.py -> kernel.mlir -> source -> inlined -> ... -> routed -> sliced -> compiled -> image
 ```
 
-# The front end records
+# The front end traces
 
 Read the comment at the top of `compiler/python/tau/__init__.py`, then
 `examples/nn/conv-taps/kernel.py`, and run:
@@ -60,14 +60,14 @@ gone, and so is `enumerate`, the tuple of taps and the test `if total is
 None`.
 
 The frontend did not translate the function. It ran it. Every operation the
-function called wrote one line into a record, and the record is the program.
+function called wrote one line into a trace, and the trace is the program.
 Whatever else the function did while running, it did in Python, and none of
-it is in the record. This is called _tracing_.
+it is in the trace. This is called _tracing_.
 
 Two things make this sound for a machine like tau-tpu.
 
 * A word is a handle with no operators. Python cannot add two words, compare
-  them, or use one in an `if`. So what a function records cannot depend on
+  them, or use one in an `if`. So what a function traces cannot depend on
   the data, and one run stands for all. This is the property of the machine
   that the checker rests on, met again at the other end of the flow.
 * A `tau.loop` is the one loop that is not Python's. Its body is run once,
@@ -84,7 +84,7 @@ compiler and nothing in Lean.
 
 There are two languages here, and only one has a specification.
 
-The record is a _source program_. `Source` in `spec/Tau/IR/Source.lean` says what
+The trace is a _source program_. `Source` in `spec/Tau/IR/Source.lean` says what
 it is, `Source.run` what it computes and `Source.timeline` when. Every
 theorem of the last two chapters starts from it.
 
@@ -92,12 +92,12 @@ The Python around the calls has none. Nothing in Lean says what a Python file
 means, and nothing could without a specification of Python. What can be said
 is narrower, and each part is a test:
 
-* The frontend writes the record twice: as MLIR for the compiler, and
+* The frontend writes the trace twice: as MLIR for the compiler, and
   directly as a source file, `traced.json`. The compiler writes its own
   source file from the MLIR. The two must be equal.
 * The same Python function can be run on real numbers, with the operations
-  computing instead of recording. Its buffers and its events must be the ones
-  `tau-sim` gives for the record.
+  computing instead of tracing. Its buffers and its events must be the ones
+  `tau-sim` gives for the trace.
 
 Both are in `scripts/check-examples.sh`. Run by hand:
 
@@ -110,7 +110,7 @@ lake exe tau-sim out/source.json examples/nn/conv-taps/buffers.json
 # Calls
 
 A kernel may call another. `examples/two-layer/kernel.py` calls one layer
-twice. In the record a call is one item.
+twice. In the trace a call is one item.
 
 {docstring Tau.Source}
 
@@ -208,7 +208,7 @@ rewrite belongs in a pass, with a file before it and a file after.
 The last step writes the entries of each slice as numbers. Read section 3.10
 of `Machine.md` and do `course/Specify/Isa/Encode.lean` now.
 
-{docstring Tau.Timed.encode}
+{docstring Tau.TimedEntry.encode}
 
 {docstring Tau.Image.decode}
 
@@ -253,7 +253,7 @@ the compiled program that `Image.decode` reads out of it.
 
 | Step | Specified by | Evidence |
 |---|---|---|
-| recording a Python function | nothing; the record is the program | two writers agree; a run in Python agrees with the Lean tools |
+| tracing a Python function | nothing; the trace is the program | two writers agree; a run in Python agrees with the Lean tools |
 | `tau-inline` | `Source.run`, `Source.timeline` | a check, proved sound |
 | `tau-slice`, `tau-fold` | the machine | a check, proved sound |
 | `tau-encode` | `Image.decode` | a copy, proved to be undone by `decode`; and a check on the decoded image |
@@ -261,11 +261,11 @@ the compiled program that `Image.decode` reads out of it.
 # How to work through it
 
 1. Read the top of `compiler/python/tau/__init__.py` and the four examples written
-   in Python. Record each and read its MLIR.
+   in Python. Trace each and read its MLIR.
 2. Read `spec/Tau/IR/Source.lean`. Redo the example of the two calls in your
    scratch file, with a third call.
 3. Run `tauc` with `--print-mlir` on `examples/paced/kernel.py` after
-   recording it, and follow one instruction from `tau-route` through
+   tracing it, and follow one instruction from `tau-route` through
    `tau-slice`, `tau-fold` and `tau-encode` into `out/image.json`.
 4. Do `course/Specify/Isa/Encode.lean`, with its questions.
 5. Read `spec/Tau/Isa/Encode.lean` and the statements in
@@ -280,15 +280,15 @@ the compiled program that `Image.decode` reads out of it.
 relies on.
 
 *By hand.* Write a program in Python that uses a helper function, a Python
-loop and a `tau.loop`. Before you record it, write down the MLIR you expect.
+loop and a `tau.loop`. Before you trace it, write down the MLIR you expect.
 Then make the helper take a Python `bool` that decides whether it applies a
-relu, and say what is in the record.
+relu, and say what is in the trace.
 
 *By hand.* Try to make what a kernel does depend on its data: use a word in
 an `if`, compare two words, add an integer to a word. Read each error. Then
-find one thing a function can do that makes two runs record different
+find one thing a function can do that makes two runs trace different
 programs, without touching a word. What does that say about the sentence "the
-record is the program"?
+trace is the program"?
 
 *By hand.* Break one thing at each end, and say first which line of
 `scripts/check-examples.sh` you expect to fail. One of the four is not caught
@@ -296,7 +296,7 @@ by anything. Say why, and write the example that would catch it.
 
 1. In `compiler/python/tau/__init__.py`, in the table `_BIN`, make `sub` compute
    `b - a`.
-2. In the same file, in `_Tracer.stmt`, record a pin one cycle late.
+2. In the same file, in `_Tracer.stmt`, put a pin into the trace one cycle late.
 3. In `compiler/lib/Passes/Encode.cpp`, in `encodeEntry`, write `gap` before
    `repeats`.
 4. In `compiler/lib/Passes/Fold.cpp`, set `gap` to `period` and not
@@ -309,11 +309,11 @@ above, and one for what a Python file means.
 Python file as text and translate its `for` and `if` into the program. Write
 half a page: what would have to be specified in Lean for that, which
 programs in `examples/` could still be written, and which property of the
-machine makes recording enough.
+machine makes tracing enough.
 
 # Checkpoint
 
-You can say what the frontend records and what it leaves out, what a call
+You can say what the frontend traces and what it leaves out, what a call
 means and why it may not pass a buffer twice, why slicing is a step for the
 compiler and not for the machine, and why a statement about an encoder is a
 statement about a decoder too.

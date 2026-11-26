@@ -54,20 +54,20 @@ In dependency order. A small feature touches only the first few.
 1. `spec/Tau/Isa/Word.lean`: what it does to a lane or a word.
 2. `spec/Tau/Isa/Op.lean`: its name as an operation, and its meaning in `wordSem`.
    `spec/Tau/Isa/Encode.lean`: its number in the image, both ways.
-3. `spec/Tau/Isa/Instr.lean` and `spec/Tau/Machine/Arch.lean`: its instruction,
+3. `spec/Tau/Isa/Instr.lean` and `spec/Tau/Machine/SliceLevel.lean`: its instruction,
    and what `exec` does with it. `spec/Tau/Machine/Issues.lean` if it issues a
    word in a new way. `spec/Tau/Isa/Encode.lean` again, for the instruction.
-4. `spec/Tau/Proofs/Machine/Arch.lean`: the machine still does not look at its
+4. `spec/Tau/Proofs/Machine/SliceLevel.lean`: the machine still does not look at its
    values.
 5. `spec/Tau/IR/Kernel.lean`, `spec/Tau/Check/Expr.lean` and their proofs, if kernels can
    say it.
 6. `spec/Tau/IR/Placed.lean` and its proof: the placed IR.
-7. `spec/Tau/Machine/Circuit.lean` and `spec/Tau/Proofs/Machine/Circuit.lean`: how
+7. `spec/Tau/Machine/CellLevel.lean` and `spec/Tau/Proofs/Machine/CellLevel.lean`: how
    the slice does it with blocks, and that this is the same thing.
-8. `spec/Tau/Sim/Json.lean`: reading it from a file.
+8. `spec/Tau/Tools/Json.lean`: reading it from a file.
 9. `compiler/`: the dialect, the passes, and `encodeEntry` in
    `compiler/lib/Passes/Encode.cpp`. `compiler/python/tau/__init__.py`: a function for
-   it that records and one that computes. Optional: without them, write your
+   it that traces and one that computes. Optional: without them, write your
    test programs by hand as Lean values, as `spec/tests/TauTest/Features.lean`
    does.
 10. A test in `spec/tests/TauTest/`, and an example under `examples/`.
@@ -121,7 +121,7 @@ Pick one.
 
 Steps: `spec/Tau/Isa/Word.lean` if it needs a helper, then `spec/Tau/Isa/Op.lean`,
 then `spec/Tau/Isa/Encode.lean`, where it needs a number that no other operation
-has, in `encode` and in `decode`, then `spec/Tau/Sim/Json.lean`. Add `#guard` lines to `spec/tests/TauTest/Features.lean`
+has, in `encode` and in `decode`, then `spec/Tau/Tools/Json.lean`. Add `#guard` lines to `spec/tests/TauTest/Features.lean`
 with inputs for which you worked the answer out by hand, including a
 negative lane.
 

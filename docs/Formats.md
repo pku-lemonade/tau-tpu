@@ -4,10 +4,10 @@
 |---|---|
 | Describes | The JSON formats that the frontend, the compiler and the Lean tools exchange: source/kernel, placed, compiled, image, buffers and timeline, and which tool writes which. |
 | Does not describe | What the contents mean: a statement and a pin ([`Programs.md`](Programs.md)), an instruction and the numbers of an image ([`Machine.md`](Machine.md)), an IR ([`Compiler.md`](Compiler.md)). |
-| Specified in | `spec/Tau/Sim/Json.lean` |
+| Specified in | `spec/Tau/Tools/Json.lean` |
 | Tables tested by | none; `scripts/check-examples.sh` reads every kind of file on every example |
 
-The reader, `spec/Tau/Sim/Json.lean`, is the specification. The writers are
+The reader, `spec/Tau/Tools/Json.lean`, is the specification. The writers are
 `compiler/lib/Emit/` and, for source files, also `compiler/python/tau/`.
 Each IR of a program (Compiler 2) has a file. The Lean tools tell the kind
 of a file from the fields present.

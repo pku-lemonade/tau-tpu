@@ -191,13 +191,13 @@ inductive Outcome where
   /-- The slice trapped. -/
   | trap (kind : TrapKind)
   /-- The stored words afterwards, and the result. -/
-  | done (words : List Expr) (result : Option (Track × Expr))
+  | done (words : List Expr) (result : Option (Stream × Expr))
   deriving DecidableEq, Repr
 
 /-- The type of `exec` when words are names. -/
 abbrev ExecFn :=
-  Sem Expr → Config → Kind → (Track → Option Expr) → Slice Expr → Instr →
-    Except TrapKind (Slice Expr × Option (Track × Expr))
+  Sem Expr → Config → Kind → (Stream → Option Expr) → Slice Expr → Instr →
+    Except TrapKind (Slice Expr × Option (Stream × Expr))
 
 /-- A machine for the rows below: memory, vector, memory; one stream each way. -/
 def tinyMachine : Config where
@@ -209,10 +209,10 @@ def tinyMachine : Config where
   mxmDelay := 1
 
 /-- Stream 0 going east, and going west. -/
-def e0 : Track := ⟨.east, 0⟩
+def e0 : Stream := ⟨.east, 0⟩
 
 @[inherit_doc e0]
-def w0 : Track := ⟨.west, 0⟩
+def w0 : Stream := ⟨.west, 0⟩
 
 /-- A slice holding two words, named `a` and `b` below. -/
 def twoWords : Slice Expr where
@@ -224,7 +224,7 @@ def twoWords : Slice Expr where
 
 /-- The streams at the slice: east holds a word named `u`, west holds a word
 named `v`, every other stream is empty. -/
-def reads (tr : Track) : Option Expr :=
+def reads (tr : Stream) : Option Expr :=
   if tr = e0 then some (.init 1 0) else if tr = w0 then some (.init 1 1) else none
 
 /-- Run one instruction with `ex` at a slice of the given kind. -/
@@ -255,7 +255,7 @@ def exec (ex : ExecFn) : List Row :=
     row "trap: reverse, a rearrangement, sent to a vector slice"
       (try1 ex .vxm (.un .reverse e0 w0)) (.trap .wrongSlice),
     row "trap: result to stream 1, which the machine does not have"
-      (try1 ex .mem (.read 0 ⟨.east, 1⟩)) (.trap .badTrack),
+      (try1 ex .mem (.read 0 ⟨.east, 1⟩)) (.trap .badStream),
     row "trap: write from an empty stream" (try1 ex .mem (.write ⟨.east, 1⟩ 0))
       (.trap .emptyRead),
     row "trap: add with one operand missing"
@@ -264,14 +264,14 @@ def exec (ex : ExecFn) : List Row :=
 /-- What sections 3.5 and 3.7 leave open: which trap is reported when an
 instruction is wrong in two ways. -/
 def execDecisions (ex : ExecFn) : List Row :=
-  [ row "wrong slice and bad track: wrong slice is reported"
+  [ row "wrong slice and bad stream: wrong slice is reported"
       (try1 ex .vxm (.read 0 ⟨.east, 1⟩)) (.trap .wrongSlice),
-    row "bad track and bad address: bad track is reported"
-      (try1 ex .mem (.read 2 ⟨.east, 1⟩)) (.trap .badTrack),
+    row "bad stream and bad address: bad stream is reported"
+      (try1 ex .mem (.read 2 ⟨.east, 1⟩)) (.trap .badStream),
     row "bad address and empty stream on a write: bad address is reported"
       (try1 ex .mem (.write ⟨.east, 1⟩ 2)) (.trap .badAddress),
-    row "bad track and empty stream on a relu: bad track is reported"
-      (try1 ex .vxm (.un .relu ⟨.east, 3⟩ ⟨.west, 1⟩)) (.trap .badTrack) ]
+    row "bad stream and empty stream on a relu: bad stream is reported"
+      (try1 ex .vxm (.un .relu ⟨.east, 3⟩ ⟨.west, 1⟩)) (.trap .badStream) ]
 
 /-! ## Kernels -/
 
@@ -399,11 +399,11 @@ def issued (f : IssuesFn) : List Row :=
 /-! ## The image -/
 
 /-- Machine 3.10: streams and integers as numbers. -/
-def numbers (track : Track → Nat) (int : Int → Nat) : List Row :=
-  [ row "stream 0 going east" (track ⟨.east, 0⟩) 0,
-    row "stream 0 going west" (track ⟨.west, 0⟩) 1,
-    row "stream 3 going east" (track ⟨.east, 3⟩) 6,
-    row "stream 3 going west" (track ⟨.west, 3⟩) 7,
+def numbers (stream : Stream → Nat) (int : Int → Nat) : List Row :=
+  [ row "stream 0 going east" (stream ⟨.east, 0⟩) 0,
+    row "stream 0 going west" (stream ⟨.west, 0⟩) 1,
+    row "stream 3 going east" (stream ⟨.east, 3⟩) 6,
+    row "stream 3 going west" (stream ⟨.west, 3⟩) 7,
     row "the integer 0" (int 0) 0,
     row "the integer 1" (int 1) 2,
     row "the integer -1" (int (-1)) 1,
@@ -411,11 +411,11 @@ def numbers (track : Track → Nat) (int : Int → Nat) : List Row :=
     row "the integer -5" (int (-5)) 9 ]
 
 /-- The same table read the other way. -/
-def numbersBack (track : Nat → Track) (int : Nat → Int) : List Row :=
-  [ row "0 as a stream" (track 0) ⟨.east, 0⟩,
-    row "1 as a stream" (track 1) ⟨.west, 0⟩,
-    row "6 as a stream" (track 6) ⟨.east, 3⟩,
-    row "7 as a stream" (track 7) ⟨.west, 3⟩,
+def numbersBack (stream : Nat → Stream) (int : Nat → Int) : List Row :=
+  [ row "0 as a stream" (stream 0) ⟨.east, 0⟩,
+    row "1 as a stream" (stream 1) ⟨.west, 0⟩,
+    row "6 as a stream" (stream 6) ⟨.east, 3⟩,
+    row "7 as a stream" (stream 7) ⟨.west, 3⟩,
     row "0 as an integer" (int 0) 0,
     row "2 as an integer" (int 2) 1,
     row "1 as an integer" (int 1) (-1),
@@ -424,8 +424,8 @@ def numbersBack (track : Nat → Track) (int : Nat → Int) : List Row :=
 
 /-- Machine 3.10: entries as numbers. The slice of an entry is not stored;
 these are all at slice 0. -/
-def entries (enc : Timed → List Nat) : List Row :=
-  let w1 : Track := ⟨.west, 0⟩
+def entries (enc : TimedEntry → List Nat) : List Row :=
+  let w1 : Stream := ⟨.west, 0⟩
   [ row "read address 0 to east 0 on cycle 2"
       (enc (.once 0 2 (.read 0 e0))) [2, 0, 0, 0, 0, 0, 0],
     row "the same, 3 more times, 3 idle cycles apart, address growing by 1"
@@ -446,7 +446,7 @@ def entries (enc : Timed → List Nat) : List Row :=
 
 /-- Two lists of statements that differ only in how values are numbered. -/
 def sameUpToNumbering (a b : List Stmt) : Bool :=
-  match Sim.renumber [] 0 a, Sim.renumber [] 0 b with
+  match Tools.renumber [] 0 a, Tools.renumber [] 0 b with
   | some x, some y => x == y
   | _, _ => false
 
@@ -525,7 +525,7 @@ def issues (c : Compiled) : List (Nat × Nat × Instr) :=
       (c.prog.dueAt p t).map fun i => (p, t, i)
 
 /-- The streams an instruction reads. -/
-def operands : Instr → List Track
+def operands : Instr → List Stream
   | .read _ _ => []
   | .write src _ => [src]
   | .un _ src _ => [src]
@@ -540,7 +540,7 @@ def operands : Instr → List Track
   | .macw _ => []
 
 /-- The stream an instruction places its result on, if it has a result. -/
-def result : Instr → Option Track
+def result : Instr → Option Stream
   | .read _ dst => some dst
   | .un _ _ dst => some dst
   | .bin _ _ _ dst => some dst

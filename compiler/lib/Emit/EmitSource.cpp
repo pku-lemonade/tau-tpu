@@ -1,7 +1,7 @@
 //===- EmitSource.cpp - write a function as a source or kernel file -------===//
 //
 // Writes a function of kernel operations in the JSON form that the Lean tools
-// read (spec/Tau/Sim/Json.lean). Buffers are numbered by argument position and
+// read (spec/Tau/Tools/Json.lean). Buffers are numbered by argument position and
 // values in order of definition.
 //
 // A `tau.call` is written with the body of the kernel it calls inside it,

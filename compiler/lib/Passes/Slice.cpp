@@ -5,7 +5,7 @@
 // Up to here an instruction is joined to the instructions it feeds by the
 // words it passes on: its result is their operand. The machine has no such
 // thing. A slice is told which streams to read and which stream to write
-// (`Tau.Timed` in spec/Tau/Isa/Instr.lean), and each slice has its own program.
+// (`Tau.TimedEntry` in spec/Tau/Isa/Instr.lean), and each slice has its own program.
 //
 // The pass therefore replaces every instruction by a `tau.entry`:
 //

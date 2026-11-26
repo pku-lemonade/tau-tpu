@@ -2,10 +2,10 @@
 
     y[i] = requant(taps[0] * x[i] + taps[1] * x[i + 1] + taps[2] * x[i + 2], 2)
 
-The Python `for` over the taps runs while the program is recorded: it leaves
+The Python `for` over the taps runs while the program is traced: it leaves
 three loads, three multiplications and two additions in the body of the
 `tau.loop`, and no trace of itself. `TAPS` and `N` are constants of the
-kernel, fixed by `specialize` before recording.
+kernel, fixed by `specialize` before tracing.
 """
 
 import tau

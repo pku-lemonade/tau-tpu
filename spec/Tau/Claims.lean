@@ -8,7 +8,7 @@ import Tau.Blocks.Repeater
 import Tau.Blocks.SystolicArray
 import Tau.Machine.Timing
 import Tau.Isa.Encode
-import Tau.Machine.Circuit
+import Tau.Machine.CellLevel
 import Tau.IR.Unroll
 import Tau.Check.Passes
 

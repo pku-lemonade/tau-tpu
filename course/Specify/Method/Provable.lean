@@ -35,7 +35,7 @@ def giveaway : List Int := todo
 
 /-! This is why the machine and the kernel are written for an arbitrary
 `Sem` (`spec/Tau/Isa/Op.lean`), which has no way to compare two values. Look at
-the type of `exec` in `spec/Tau/Machine/Arch.lean`: nothing in it lets
+the type of `exec` in `spec/Tau/Machine/SliceLevel.lean`: nothing in it lets
 `exec` test a word. If one instruction did, `execute_map` could not be
 proved, and every check in `spec/Tau/Check/` would accept programs that are
 wrong on some input. -/

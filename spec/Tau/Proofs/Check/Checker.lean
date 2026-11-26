@@ -1,5 +1,5 @@
 import Tau.Check.Checker
-import Tau.Proofs.Machine.Arch
+import Tau.Proofs.Machine.SliceLevel
 import Tau.Proofs.IR.Kernel
 import Tau.Proofs.IR.Source
 import Tau.Proofs.IR.Compiled

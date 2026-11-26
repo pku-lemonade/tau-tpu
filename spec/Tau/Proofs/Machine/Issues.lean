@@ -1,11 +1,11 @@
 import Tau.Machine.Issues
-import Tau.Proofs.Machine.Arch
+import Tau.Proofs.Machine.SliceLevel
 import Tau.Proofs.Isa.Event
 
 /-!
 # When the machine issues a word does not depend on its values
 
-`Tau.Proofs.Machine.Arch` shows that a function `f` that respects the
+`Tau.Proofs.Machine.SliceLevel` shows that a function `f` that respects the
 operations commutes with a run. This file shows the same for what the run
 issues: the cycles, slices and addresses are the same, and the words are the
 words of the other run with `f` applied.
@@ -18,8 +18,8 @@ namespace Tau
 
 variable {V W : Type}
 
-theorem issued_map (f : V → W) (rd : Track → Option V) (rd' : Track → Option W)
-    (hrd : ∀ tr, rd' tr = (rd tr).map f) (i : Instr) (r : Option (Track × V)) :
+theorem issued_map (f : V → W) (rd : Stream → Option V) (rd' : Stream → Option W)
+    (hrd : ∀ tr, rd' tr = (rd tr).map f) (i : Instr) (r : Option (Stream × V)) :
     issued rd' i (r.map (Prod.map id f)) = (issued rd i r).map (Prod.map id f) := by
   cases r with
   | some tv => rfl

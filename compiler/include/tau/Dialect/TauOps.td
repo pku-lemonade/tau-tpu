@@ -398,7 +398,7 @@ def Tau_IEmitOp : Tau_Instr<"emit"> {
 // After `tau-slice` a function holds one `tau.slice` for each slice of the
 // machine, and in it the entries of that slice's repeater. An entry no longer
 // has operands and results: it names the streams it reads and writes, as the
-// machine's instructions do (`Tau.Timed` in spec/Tau/Isa/Instr.lean).
+// machine's instructions do (`Tau.TimedEntry` in spec/Tau/Isa/Instr.lean).
 // `tau-encode` then replaces each `tau.slice` by a `tau.image`.
 //
 // A stream is written "e3" or "w0": east or west, and its number.

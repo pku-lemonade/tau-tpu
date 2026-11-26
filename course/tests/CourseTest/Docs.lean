@@ -69,8 +69,8 @@ def runSource (s : Source) (bufs : List (List Expr)) :
 
 #guard passes (Tables.calls runSource)
 #guard passes (Tables.issued (issues exprSem))
-#guard passes (Tables.numbers Track.encode encodeInt)
-#guard passes (Tables.numbersBack Track.decode decodeInt)
-#guard passes (Tables.entries Timed.encode)
+#guard passes (Tables.numbers Stream.encode encodeInt)
+#guard passes (Tables.numbersBack Stream.decode decodeInt)
+#guard passes (Tables.entries TimedEntry.encode)
 
 end CourseTest.Docs

@@ -1,4 +1,4 @@
-import Tau.Machine.Circuit
+import Tau.Machine.CellLevel
 import Tau.Proofs.Blocks.ShiftRegister
 import Tau.Proofs.Blocks.Memory
 import Tau.Proofs.Blocks.Repeater
@@ -42,8 +42,8 @@ def CellState.abs (t : Nat) (s : CellState lanes) : State (Word lanes) where
   west := s.west
   slices := s.cells.map Cell.abs
 
-def absResult (r : Cell lanes × Option (Track × Word lanes)) :
-    Slice (Word lanes) × Option (Track × Word lanes) :=
+def absResult (r : Cell lanes × Option (Stream × Word lanes)) :
+    Slice (Word lanes) × Option (Stream × Word lanes) :=
   (r.1.abs, r.2)
 
 /-! ## The multiply-accumulate cells compute `Word.mac` -/
@@ -93,14 +93,14 @@ theorem last_shift {α : Type} (d : Nat) (s : Vector α d) (x dflt : α) :
     have hnil : s.toList = [] := List.eq_nil_of_length_eq_zero (by simp)
     simp [hnil]
 
-theorem cellShift_abs (c : Cell lanes) (r : Option (Track × Word lanes)) :
+theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) :
     absResult (cellShift c r) = shiftPipe c.abs r := by
   simp only [cellShift, absResult, shiftPipe, shiftRegister_step, Cell.abs, toList_shift,
     last_shift c.depth c.pipe r none]
 
 /-! ## One instruction -/
 
-theorem cellExec_abs (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
+theorem cellExec_abs (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
     (c : Cell lanes) (i : Instr) :
     (cellExec cfg kind rd c i).map absResult = exec (wordSem lanes) cfg kind rd c.abs i := by
   -- One case per instruction. Unfold both machines' functions, turn each
@@ -269,8 +269,8 @@ theorem cellStep_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p 
           exact congrArg Except.ok (cellShift_abs c' r)
 
 /-- After one cycle a slice that was in step is in step with the next cycle. -/
-theorem cellStep_sync (cfg : Config) (prog : Program) (rd : Track → Option (Word lanes))
-    (t p : Nat) (c : Cell lanes) (r : Cell lanes × Option (Track × Word lanes))
+theorem cellStep_sync (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes))
+    (t p : Nat) (c : Cell lanes) (r : Cell lanes × Option (Stream × Word lanes))
     (hc : c.InSync prog t p) (h : cellStep cfg prog rd p c = .ok r) :
     r.1.InSync prog (t + 1) p := by
   have hseq := congrArg Prod.fst (cellRepeater_step prog t p c hc)
@@ -309,7 +309,7 @@ theorem cellSteps_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p
 
 theorem cellSteps_synced (cfg : Config) (prog : Program) (s : CellState lanes) (t p : Nat)
     (cells : List (Cell lanes)) (h : Synced prog t p cells)
-    (rs : List (Cell lanes × Option (Track × Word lanes)))
+    (rs : List (Cell lanes × Option (Stream × Word lanes)))
     (hr : cellSteps cfg prog s p cells = .ok rs) :
     Synced prog (t + 1) p (rs.map (·.1)) := by
   induction cells generalizing p rs with

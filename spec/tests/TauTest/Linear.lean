@@ -1,15 +1,15 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.Check.Passes
 import Tau.IR.Unroll
-import Tau.Sim.Run
-import Tau.Machine.Circuit
+import Tau.Tools.Run
+import Tau.Machine.CellLevel
 
 /-!
 # Test: a quantized linear layer, scheduled by hand
 
 Computes `y = relu (requant (W * x + b))` with two lanes on a nine-slice machine.
 The schedule below was worked out by hand from the timing rule in
-`Tau.Machine.Arch`.
+`Tau.Machine.SliceLevel`.
 -/
 
 namespace TauTest.Linear
@@ -26,8 +26,8 @@ def cfg : Config where
   sxmDelay := 1
   mxmDelay := 2
 
-def e (id : Nat) : Track := ⟨.east, id⟩
-def w (id : Nat) : Track := ⟨.west, id⟩
+def e (id : Nat) : Stream := ⟨.east, id⟩
+def w (id : Nat) : Stream := ⟨.west, id⟩
 
 /-- Slice 2 holds `x` at address 0 and `b` at address 1. Slice 3 holds the two
 columns of `W`. Slice 5 receives `y` at address 0. -/
@@ -124,11 +124,11 @@ def swapped : Program :=
 
 -- The comparison the examples script makes between the compiler's unrolled
 -- kernel and the Lean model's: equal up to the numbering of values.
-#guard Sim.sameUnroll
+#guard Tools.sameUnroll
   [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .store 1 1 ⟨0, 1⟩]]
   [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.store 1 1 ⟨0, 0⟩),
    .stmt (.load 2 0 ⟨1, 0⟩), .stmt (.un 3 .relu 2), .stmt (.store 3 1 ⟨1, 0⟩)]
-#guard !Sim.sameUnroll
+#guard !Tools.sameUnroll
   [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .store 1 1 ⟨0, 1⟩]]
   [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.store 1 1 ⟨0, 0⟩),
    .stmt (.load 2 0 ⟨1, 0⟩), .stmt (.un 3 .relu 2), .stmt (.store 1 1 ⟨1, 0⟩)]

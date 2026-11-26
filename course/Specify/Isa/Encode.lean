@@ -7,7 +7,7 @@ set_option linter.unusedVariables false
 
 Source: `docs/Machine.md`, section 3.10.
 
-The types are `Track`, `Instr` and `Timed` in `spec/Tau/Isa/Instr.lean`.
+The types are `Stream`, `Instr` and `TimedEntry` in `spec/Tau/Isa/Instr.lean`.
 
 The steps are the ones in `course/Specify/IR/Kernel.lean`. Here there is no second
 table: the doc's tables decide everything these four functions do. What
@@ -19,10 +19,10 @@ namespace Specify.Encode
 open Tau Specify
 
 /-- A stream as a number. -/
-def encodeTrack (tr : Track) : Nat := todo
+def encodeStream (tr : Stream) : Nat := todo
 
 /-- The stream a number stands for. -/
-def decodeTrack (n : Nat) : Track := todo
+def decodeStream (n : Nat) : Stream := todo
 
 /-- A signed integer as a number. -/
 def encodeSigned (z : Int) : Nat := todo
@@ -30,13 +30,13 @@ def encodeSigned (z : Int) : Nat := todo
 /-- The signed integer a number stands for. -/
 def decodeSigned (n : Nat) : Int := todo
 
-#eval report "streams and integers" (Tables.numbers encodeTrack encodeSigned)
-#eval report "and back" (Tables.numbersBack decodeTrack decodeSigned)
+#eval report "streams and integers" (Tables.numbers encodeStream encodeSigned)
+#eval report "and back" (Tables.numbersBack decodeStream decodeSigned)
 
 /-- An entry as numbers. Write the cases for `read` and `write`, with your
-`encodeTrack`. The other instructions are given by `Instr.encode`, the
+`encodeStream`. The other instructions are given by `Instr.encode`, the
 finished encoding, so that the remaining rows of the table can agree. -/
-def encodeEntry (e : Timed) : List Nat :=
+def encodeEntry (e : TimedEntry) : List Nat :=
   match e.instr with
   | .read addr dst => todo
   | .write src addr => todo
@@ -48,10 +48,10 @@ def encodeEntry (e : Timed) : List Nat :=
 
 /-- The property of your first two functions that the compiler relies on:
 what it writes can be read back. -/
-def TrackSurvives : Prop := todo
+def StreamSurvives : Prop := todo
 
 /-- The other direction: every number is the number of a stream. -/
-def EveryNumberIsATrack : Prop := todo
+def EveryNumberIsAStream : Prop := todo
 
 /-! ## Judge
 
@@ -70,7 +70,7 @@ Answer in `course/Work/Questions.md`.
 ## Compare
 
 The definitions are in `spec/Tau/Isa/Encode.lean`. The statements are
-`Track.decode_encode` and, for the whole image, `Image.decode_encode` in
+`Stream.decode_encode` and, for the whole image, `Image.decode_encode` in
 `spec/Tau/Proofs/Isa/Encode.lean`; the second is `DecodeInvertsEncode` in
 `spec/Tau/Claims.lean`. Nothing in `spec/Tau/` states the other direction.
 

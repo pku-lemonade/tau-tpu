@@ -16,9 +16,9 @@ calls the operations of this module on them:
     kernel = scale
 
 The function is not translated. It is *run*, once, and each operation it
-calls is recorded. What is recorded is a source program: `Source` in
+calls is traced. The trace is a source program: `Source` in
 spec/Tau/IR/Source.lean says what it computes and when. So Python is the language
-the program is written with, and the record is the program.
+the program is written with, and the trace is the program.
 
 What follows from that:
 
@@ -26,18 +26,18 @@ What follows from that:
     test one, so what a program does cannot depend on its data. That is the
     property the machine has, and the one every check rests on.
   * A Python `for` over a `range`, an `if` on an integer, a helper function,
-    a list of words: all of it runs while recording and leaves only the
+    a list of words: all of it runs while tracing and leaves only the
     operations it called. `dense` below is such a helper.
-  * A `tau.loop` is different: its body is recorded once, with an index `i`
+  * A `tau.loop` is different: its body is traced once, with an index `i`
     that stands for every iteration. Positions and pins may depend on `i`,
     by `+`, `-` and `*` with integers only.
-  * A kernel that calls another kernel is recorded as a call.
+  * A kernel that calls another kernel is traced as a call.
   * `at=T + c` pins an operation: its word is issued on cycle `c`, counted
     from the start of its kernel. spec/Tau/Isa/Event.lean says what a pin claims.
 
 The same function can also be run on real numbers (`run`), with the
-operations computing instead of recording. scripts/check-examples.sh compares
-that run with what the Lean tools compute from the record.
+operations computing instead of tracing. scripts/check-examples.sh compares
+that run with what the Lean tools compute from the trace.
 
     python3 -m tau kernel.py -o out        write out/kernel.mlir, out/traced.json
     python3 -m tau kernel.py --run b.json  run on the buffers in b.json
@@ -63,7 +63,7 @@ __all__ = [
 
 
 class TauError(Exception):
-    """A program that cannot be recorded."""
+    """A program that cannot be traced."""
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ class Index:
 
     def __bool__(self):
         raise TauError("a loop index cannot be tested: the body of a tau.loop "
-                       "is recorded once, for every iteration")
+                       "is traced once, for every iteration")
 
 
 class Time:
@@ -156,7 +156,7 @@ def _pin(at):
 # ---------------------------------------------------------------------------
 
 class Word:
-    """One word. While recording it is a name; in a run it holds lanes.
+    """One word. While tracing it is a name; in a run it holds lanes.
     Either way Python cannot look inside it."""
 
     __slots__ = ("frame", "id", "lanes", "scope")
@@ -206,7 +206,7 @@ class Kernel:
     """A function marked `@tau.kernel`, with values for its constants.
 
     The positional parameters of the function are its buffers. Its
-    keyword-only parameters are constants: integers fixed before recording.
+    keyword-only parameters are constants: integers fixed before tracing.
     `specialize` fixes them; so do keyword arguments at a call."""
 
     def __init__(self, fn, consts=None):
@@ -257,11 +257,11 @@ def kernel(fn):
 
 
 # ---------------------------------------------------------------------------
-# Recording
+# Tracing
 # ---------------------------------------------------------------------------
 
 class _Def:
-    """One recorded kernel: the sizes of its buffers and its items. An item
+    """One traced kernel: the sizes of its buffers and its items. An item
     is a statement, a loop or a call, as in a source file."""
 
     def __init__(self, name, sizes):
@@ -272,19 +272,19 @@ class _Def:
 
 
 class _Tracer:
-    """Records the operations a kernel calls."""
+    """Traces the operations a kernel calls."""
 
     def __init__(self):
         self.defs = {}       # Kernel.key() -> _Def, finished kernels
         self.order = []      # finished kernels, callees first
-        self.frames = []     # kernels being recorded, outermost first
+        self.frames = []     # kernels being traced, outermost first
         self.loop = None     # the items of the open loop, or None
         self.scope = 0       # counts loops, so that a word knows its own
 
     def in_loop(self):
         return self.loop is not None
 
-    def record(self, target):
+    def trace(self, target):
         frame = _Def(target.name, target.sizes)
         saved = self.loop, self.scope
         self.loop = None
@@ -367,13 +367,13 @@ class _Tracer:
             raise TauError(f"{target.name}: expected buffers of sizes "
                            f"{target.sizes}")
         if target.key() not in self.defs:
-            self.defs[target.key()] = self.record(target)
+            self.defs[target.key()] = self.trace(target)
         self.emit({"op": "call", "args": args, "at": pin[0] if pin else 0,
                    "def": self.defs[target.key()]})
 
 
 class Program:
-    """A recorded program: the outermost kernel and the kernels it calls."""
+    """A traced program: the outermost kernel and the kernels it calls."""
 
     def __init__(self, entry, order):
         self.entry = entry
@@ -575,13 +575,13 @@ _ctx = None
 
 
 def trace(target):
-    """Record a kernel and the kernels it calls."""
+    """Trace a kernel and the kernels it calls."""
     global _ctx
     if _ctx is not None:
         raise TauError("tau.trace cannot be used inside a kernel")
     _ctx = tracer = _Tracer()
     try:
-        entry = tracer.record(target)
+        entry = tracer.trace(target)
     finally:
         _ctx = None
     return Program(entry, tracer.order)
@@ -621,7 +621,7 @@ def _need():
 
 def loop(n):
     """`for i in tau.loop(n):` runs its body for i = 0 .. n - 1. The body is
-    recorded once; `i` may be used in positions and pins."""
+    traced once; `i` may be used in positions and pins."""
     ctx = _need()
     if isinstance(ctx, _Tracer):
         ctx.begin_loop(n)
@@ -632,7 +632,7 @@ def loop(n):
             raise TauError("a tau.loop cannot be inside another")
         for k in range(n):
             ctx.iteration = k
-            # The index is the same handle as when recording; the runner
+            # The index is the same handle as when tracing; the runner
             # fills in the iteration when a position or a pin is used.
             yield Index(0, 1)
         ctx.iteration = None
@@ -784,7 +784,7 @@ def dense(x, weights, pos, n, bias=None, shift=0, activate=True, at=None):
     """A quantized linear layer: `relu(requant(W * x + bias, shift))`.
 
     This is not an operation of the machine. It is a Python function that
-    calls three or four of them, and those are what gets recorded. A pin
+    calls three or four of them, and those are what gets traced. A pin
     given here goes on the matrix product."""
     if bias is None:
         y = matvec(x, weights, pos, n, at=at)

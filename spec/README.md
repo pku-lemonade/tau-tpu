@@ -48,13 +48,13 @@ tau-tpu specifies two things. Each has its own question.
 |---|---|---|
 | Doc | `docs/Machine.md` | `docs/Programs.md`, `docs/Compiler.md` |
 | The question | Does the machine built from components do what the slice-level machine says it does? | Does a compiled program, run on the machine, compute what its source says, when its source says? |
-| Specification | The architectural (slice-level) machine: what the machine does with a program, cycle by cycle, with each slice one box with a delay. `execute` in `Machine/Arch.lean`. | The source specification: what a program computes and on which cycles, with no machine in sight. `Source.run` and `Source.timeline` in `IR/Source.lean`. |
-| Measured against it | The circuit (cell-level) machine, with each slice built from components: `cellExecute` in `Machine/Circuit.lean`. | Every program a compiler produces, run by `execute`. |
+| Specification | The slice-level machine: what the machine does with a program, cycle by cycle, with each slice one box with a delay. `execute` in `Machine/SliceLevel.lean`. | The source specification: what a program computes and on which cycles, with no machine in sight. `Source.run` and `Source.timeline` in `IR/Source.lean`. |
+| Measured against it | The cell-level machine, with each slice built from blocks: `cellExecute` in `Machine/CellLevel.lean`. | Every program a compiler produces, run by `execute`. |
 | How | A theorem, once, for all programs. | A check, on each compiled program, and theorems that the check can be trusted. |
 | Main theorem | `cellExecute_eq` | `check_sound`, `check_pins` |
 
-`Machine/Arch.lean` appears on both sides. In part 1 it is the standard that
-`Machine/Circuit.lean` must meet. In part 2 it is what "running a compiled
+`Machine/SliceLevel.lean` appears on both sides. In part 1 it is the standard that
+`Machine/CellLevel.lean` must meet. In part 2 it is what "running a compiled
 program" means, and the source specification is the standard.
 
 `end_to_end` (`Proofs/EndToEnd.lean`) joins the two.
@@ -94,12 +94,12 @@ definition here is a model of something outside Lean.
 | `docs/Machine.md` | Definition | Theorems |
 |---|---|---|
 | 1, lanes and words | `Isa/Word.lean` | `Proofs/Isa/Word.lean` |
-| 2, the components | `Blocks/` | `Proofs/Blocks/`: for each block, its output at cycle `t` in terms of earlier inputs |
-| 3.1 to 3.3 and 3.5 to 3.8, the slice-level machine | `Isa/Op.lean`, `Isa/Instr.lean`; `step` and `execute` in `Machine/Arch.lean` | `execute_map` (`Proofs/Machine/Arch.lean`) |
+| 2, the blocks | `Blocks/` | `Proofs/Blocks/`: for each block, its output at cycle `t` in terms of earlier inputs |
+| 3.1 to 3.3 and 3.5 to 3.8, the slice-level machine | `Isa/Op.lean`, `Isa/Instr.lean`; `step` and `execute` in `Machine/SliceLevel.lean` | `execute_map` (`Proofs/Machine/SliceLevel.lean`) |
 | 3.4, the timing rule | derived from `step`; stated with `Machine/Timing.lean` | `arrives_east`, `arrives_west` (`Proofs/Machine/Timing.lean`) |
 | 3.9, what a slice issues | `issues` in `Machine/Issues.lean` | `issues_map` (`Proofs/Machine/Issues.lean`) |
 | 3.10, the image | `Program.encode`, `Image.decode` in `Isa/Encode.lean` | `Image.decode_encode` (`Proofs/Isa/Encode.lean`) |
-| 4, the cell-level machine | `cellExecute` in `Machine/Circuit.lean` | `cellExecute_eq` (`Proofs/Machine/Circuit.lean`) |
+| 4, the cell-level machine | `cellExecute` in `Machine/CellLevel.lean` | `cellExecute_eq` (`Proofs/Machine/CellLevel.lean`) |
 
 Two of these carry everything else.
 
@@ -108,8 +108,8 @@ Two of these carry everything else.
   what a word holds. So one run on names tells what every run on real words
   computes, and on which cycle it issues each word. Every check in part 2
   rests on this.
-- **Refinement** (`cellExecute_eq`). The circuit machine built from components
-  gives, on every program, the result the architectural machine gives.
+- **Refinement** (`cellExecute_eq`). The cell-level machine, built from blocks,
+  gives on every program the result the slice-level machine gives.
 
 The timing rule is proved from `step` and nothing depends on it. It is the
 rule a person uses to write a schedule.
@@ -182,7 +182,7 @@ placed ─schedule→ compiled ─route→ compiled ─slice→ compiled ─fold
 
 └──────────────────────────────── check ─────────────────────────────────────┘
 
-compiled, on Machine/Arch.lean        =  compiled, on Machine/Circuit.lean
+compiled, on Machine/SliceLevel.lean        =  compiled, on Machine/CellLevel.lean
                                cellExecute_eq
 ```
 
@@ -203,10 +203,10 @@ above it, and `spec/Tau.lean` lists the modules in the same order.
 |---|---|
 | `Blocks/` | Clocked components: shift register, accumulator, multiply-accumulate, pipeline, memory, sequencer, repeater, systolic array. |
 | `Isa/` | Lanes and words (`Word.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`, whose entries are the repeater's), events (`Event.lean`), and the image (`Encode.lean`). |
-| `Machine/` | The machine: architectural slice model (`Arch.lean`), timing rule (`Timing.lean`), issued words (`Issues.lean`), and component-built circuit (`Circuit.lean`). |
+| `Machine/` | The machine: the slice-level machine (`SliceLevel.lean`), the timing rule (`Timing.lean`), issued words (`Issues.lean`), and the cell-level machine, built from blocks (`CellLevel.lean`). |
 | `IR/` | The four IRs of a program (`Source.lean`, `Kernel.lean`, `Placed.lean`, `Compiled.lean`), the memory map (`MemMap.lean`), and the Lean copy of unroll (`Unroll.lean`). |
 | `Check/` | Symbolic expressions (`Expr.lean`), expression simplification (`Simplify.lean`), and the checks (`Checker.lean`, `Passes.lean`). |
-| `Sim/` | The JSON readers and the functions behind `tau-sim` and `tau-check`. |
+| `Tools/` | What the command-line tools call: the JSON readers (`Json.lean`), and running and checking stage files (`Run.lean`). The entry points are in `spec/tools/`. |
 | `Claims.lean` | Every main statement. |
 | `Proofs/` | The theorems, mirroring `Blocks/`, `Isa/`, `Machine/`, `IR/`, `Check/`, plus `Claims.lean` and `EndToEnd.lean`. |
 
@@ -228,13 +228,13 @@ Each step is a section of a doc, then the file in `spec/Tau/` that specifies
 it.
 
 1. Machine 1, 3.5, 3.6: `Isa/Word.lean`, `Isa/Op.lean`, `Isa/Instr.lean`.
-2. Machine 3.1 to 3.4, 3.7, 3.8: `Machine/Arch.lean`, then `Machine/Timing.lean`.
+2. Machine 3.1 to 3.4, 3.7, 3.8: `Machine/SliceLevel.lean`, then `Machine/Timing.lean`.
 3. Machine 3.9: `Isa/Event.lean`, `Machine/Issues.lean`.
 4. Programs: `IR/Kernel.lean`, `IR/Source.lean`.
 5. Compiler 2 and 3: `IR/MemMap.lean`, `IR/Placed.lean`, `IR/Compiled.lean`.
 6. Compiler 5 and 7: `Check/Expr.lean`, `Check/Checker.lean`, `Check/Passes.lean`.
 7. Machine 3.10: `Isa/Encode.lean`.
-8. Machine 2 and 4: `Blocks/`, `Machine/Circuit.lean`.
+8. Machine 2 and 4: `Blocks/`, `Machine/CellLevel.lean`.
 9. `Claims.lean`, then [Status](#status) below. Nothing under `Proofs/` has
    to be read to know what is claimed.
 
@@ -245,9 +245,9 @@ it.
 `spec/Tau/Proofs/EndToEnd.lean` states it. If the checker accepts a compiled
 program for a source program, then for every contents of the buffers:
 
-- the circuit machine (`Machine/Circuit.lean`) runs the program without a trap,
+- the cell-level machine (`Machine/CellLevel.lean`) runs the program without a trap,
 - it leaves in memory exactly the buffers the source program computes, and
-- the architectural machine (`Machine/Arch.lean`) issues every word the source
+- the slice-level machine (`Machine/SliceLevel.lean`) issues every word the source
   pins to a cycle on that cycle.
 
 The theorem rests on Lean's three standard axioms and nothing else.
@@ -267,9 +267,9 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | Claim | Standing | Where |
 |---|---|---|
 | Each block gives the stated output at cycle `t` | proved | `Proofs/Blocks/` |
-| The circuit machine equals the architectural machine | proved | `cellExecute_eq` (`Proofs/Machine/Circuit.lean`) |
+| The cell-level machine equals the slice-level machine | proved | `cellExecute_eq` (`Proofs/Machine/CellLevel.lean`) |
 | A finished program that `check` accepts computes its source, without a trap | proved | `check_sound`, `end_to_end` |
-| It issues every word its source pins to a cycle on that cycle | proved, for `Machine/Arch.lean` | `check_pins`, `end_to_end` |
+| It issues every word its source pins to a cycle on that cycle | proved, for `Machine/SliceLevel.lean` | `check_pins`, `end_to_end` |
 | The output of a pass that the pass's check accepts computes what the input computes, and keeps its pins | proved | `checkInlined_sound`, `checkKernels_sound`, `checkPlaced_sound`, `checkScheduled_sound`, `checkRouted_sound`, and the same names ending in `_pins` |
 | If all eight per-pass checks accept, the finished program computes its source and keeps its pins | proved | `passes_sound`, `passes_pins`, `end_to_end_passes` |
 | `Kernel.unroll`, the Lean copy of `tau-unroll`, keeps what a kernel computes and its pins; the simplifier inside the checks keeps the value of an expression | proved | `Kernel.run_unroll`, `Kernel.timeline_unroll`, `Expr.denote_simp` |
@@ -279,16 +279,16 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | The compiler's output is accepted | tested, on the examples | `scripts/check-examples.sh` |
 | The tables of the docs hold of the definitions | tested | `course/tests/CourseTest/Docs.lean` |
 | The C++ `tau-unroll` gives the kernel that its Lean copy gives; the C++ writes the image that the Lean encoding gives | tested, on the examples | `tau-check --unroll`, `tau-check --encode` |
-| The frontend's record of a Python program is what the compiler reads from the frontend's MLIR | tested, on the examples written in Python | `scripts/check-examples.sh` |
-| A Python program run on real numbers ends with the buffers, and issues the pinned words, that its record does | tested, on the same examples | `scripts/check-examples.sh` |
-| What a Python file means | not stated; the record of one run is the program | `compiler/python/tau/__init__.py` |
+| The frontend's trace of a Python program is what the compiler reads from the frontend's MLIR | tested, on the examples written in Python | `scripts/check-examples.sh` |
+| A Python program run on real numbers ends with the buffers, and issues the pinned words, that its trace does | tested, on the same examples | `scripts/check-examples.sh` |
+| What a Python file means | not stated; the trace of one run is the program | `compiler/python/tau/__init__.py` |
 | The other six passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing on the same cycles | |
 | The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|` | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
 | A pinned word is issued by the slice the user had in mind | not stated; a pin names a word and a cycle, not a slice | `Isa/Event.lean` |
-| The circuit machine issues the words the architectural machine issues, on the same cycles | not stated; only its final memory is compared | |
+| The cell-level machine issues the words the slice-level machine issues, on the same cycles | not stated; only its final memory is compared | |
 | `source.json` says what `kernel.mlir` says | trusted; for programs written in Python, tested against the frontend's own file | MLIR's parser, `compiler/lib/Emit/EmitSource.cpp` |
-| The JSON files are read correctly | trusted | `Sim/Json.lean` |
+| The JSON files are read correctly | trusted | `Tools/Json.lean` |
 | The definitions in the theorems mean what is intended | trusted; read them against the docs | `Source.run`, `Source.timeline`, `cellExecute`, `Isa/Word.lean` |
 | The docs say what was meant | trusted; nothing can check it | `docs/` |
 | Lean checks proofs and compiles `tau-check` correctly | trusted | |

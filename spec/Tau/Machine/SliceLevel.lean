@@ -5,7 +5,7 @@ import Tau.Isa.Instr
 
 This is tau-tpu with each slice treated as one box: an instruction goes in at
 one cycle and its result comes out a fixed number of cycles later. What happens
-inside the box is the subject of `Tau.Machine.Circuit`.
+inside the box is the subject of `Tau.Machine.CellLevel`.
 
 One cycle of the machine (`step`) does three things.
 
@@ -32,7 +32,7 @@ inductive TrapKind where
   /-- An instruction read a stream slot that held nothing. -/
   | emptyRead
   /-- An instruction named a stream that does not exist. -/
-  | badTrack
+  | badStream
   /-- A memory address was out of range. -/
   | badAddress
   /-- An instruction was sent to a slice of the wrong kind. -/
@@ -68,7 +68,7 @@ structure Slice (V : Type) where
   /-- Matrix slices: the stored columns. -/
   weights : List V
   /-- Results on their way out, newest first. -/
-  pipe : List (Option (Track × V))
+  pipe : List (Option (Stream × V))
 
 /-- The state of the whole machine at the start of a cycle. -/
 structure State (V : Type) where
@@ -87,18 +87,18 @@ def State.belt (s : State V) : Dir → List (List (Option V))
   | .west => s.west
 
 /-- What stream `tr` holds at position `p`. -/
-def State.sample (s : State V) (p : Nat) (tr : Track) : Option V :=
+def State.sample (s : State V) (p : Nat) (tr : Stream) : Option V :=
   match (s.belt tr.dir)[tr.id]? with
   | some row => row[p]?.getD none
   | none => none
 
 /-- Carry out one instruction at one slice. Returns the new state of the slice
 and the result, if any, with the stream it is meant for. -/
-def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
-    (sl : Slice V) : Instr → Except TrapKind (Slice V × Option (Track × V))
+def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
+    (sl : Slice V) : Instr → Except TrapKind (Slice V × Option (Stream × V))
   | .read addr dst =>
     if kind ≠ .mem then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match sl.words[addr]? with
       | none => .error .badAddress
@@ -112,14 +112,14 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
       | some v => .ok ({ sl with words := sl.words.set addr v }, none)
   | .un op src dst =>
     if op.kind ≠ kind then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd src with
       | none => .error .emptyRead
       | some v => .ok (sl, some (dst, S.un op v))
   | .bin op a b dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd a, rd b with
       | some va, some vb => .ok (sl, some (dst, S.bin op va vb))
@@ -139,15 +139,15 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
       | some x, some w => .ok ({ sl with acc := S.mac j sl.acc x w }, none)
   | .emit dst =>
     if kind ≠ .mxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else .ok ({ sl with acc := S.zero }, some (dst, sl.acc))
   | .const xs dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else .ok (sl, some (dst, S.const xs))
   | .sel m a b dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd m, rd a, rd b with
       | some vm, some va, some vb => .ok (sl, some (dst, S.sel vm va vb))
@@ -175,14 +175,14 @@ def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
 
 /-- Push a result into a slice's pipe and take out the one that has been in it
 for the full delay. -/
-def shiftPipe (sl : Slice V) (entering : Option (Track × V)) :
-    Slice V × Option (Track × V) :=
+def shiftPipe (sl : Slice V) (entering : Option (Stream × V)) :
+    Slice V × Option (Stream × V) :=
   ({ sl with pipe := (entering :: sl.pipe).dropLast },
    (entering :: sl.pipe).getLast?.getD none)
 
 /-- One cycle of the slice at position `p`. -/
 def stepSlice (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
-    (sl : Slice V) : Except Trap (Slice V × Option (Track × V)) :=
+    (sl : Slice V) : Except Trap (Slice V × Option (Stream × V)) :=
   match prog.dueAt p s.time with
   | [] => .ok (shiftPipe sl none)
   | [i] =>
@@ -196,7 +196,7 @@ def stepSlice (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat
 
 /-- One cycle of every slice, starting from position `p`. -/
 def stepSlices (S : Sem V) (cfg : Config) (prog : Program) (s : State V) :
-    Nat → List (Slice V) → Except Trap (List (Slice V × Option (Track × V)))
+    Nat → List (Slice V) → Except Trap (List (Slice V × Option (Stream × V)))
   | _, [] => .ok []
   | p, sl :: rest =>
     match stepSlice S cfg prog s p sl with
@@ -208,14 +208,14 @@ def stepSlices (S : Sem V) (cfg : Config) (prog : Program) (s : State V) :
 
 /-- The value, if any, that the slice at position `p` places on stream
 `(d, id)` this cycle. `outs[p]` is what came out of the slice at `p`. -/
-def inject (outs : List (Option (Track × V))) (d : Dir) (id p : Nat) : Option V :=
+def inject (outs : List (Option (Stream × V))) (d : Dir) (id p : Nat) : Option V :=
   match outs[p]?.getD none with
   | some (tr, v) => if tr.dir = d ∧ tr.id = id then some v else none
   | none => none
 
 /-- One stream after one cycle: every word moves one position in direction `d`,
 and a newly placed result replaces whatever arrives at its position. -/
-def advanceRow (outs : List (Option (Track × V))) (d : Dir) (id : Nat)
+def advanceRow (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
     (row : List (Option V)) : List (Option V) :=
   (List.range row.length).map fun p =>
     match inject outs d id p with
@@ -226,7 +226,7 @@ def advanceRow (outs : List (Option (Track × V))) (d : Dir) (id : Nat)
       | .west => row[p + 1]?.getD none
 
 /-- All streams in direction `d` after one cycle, starting from stream `id`. -/
-def advance (outs : List (Option (Track × V))) (d : Dir) :
+def advance (outs : List (Option (Stream × V))) (d : Dir) :
     Nat → List (List (Option V)) → List (List (Option V))
   | _, [] => []
   | id, row :: rest => advanceRow outs d id row :: advance outs d (id + 1) rest

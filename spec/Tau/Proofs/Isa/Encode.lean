@@ -14,9 +14,9 @@ instructions, entries, a slice's list, and the whole image.
 
 namespace Tau
 
-theorem Track.decode_encode (tr : Track) : Track.decode tr.encode = tr := by
+theorem Stream.decode_encode (tr : Stream) : Stream.decode tr.encode = tr := by
   obtain ⟨dir, id⟩ := tr
-  cases dir <;> simp [Track.encode, Track.decode] <;> omega
+  cases dir <;> simp [Stream.encode, Stream.decode] <;> omega
 
 theorem decodeInt_encodeInt (z : Int) : decodeInt (encodeInt z) = z := by
   cases z <;> simp [encodeInt, decodeInt] <;> omega
@@ -34,24 +34,24 @@ theorem BinOp.decode_encode (op : BinOp) : BinOp.decode op.encode = some op := b
 theorem Instr.decode_encode (i : Instr) (r : List Nat) :
     Instr.decode (i.encode ++ r) = some (i, r) := by
   cases i <;>
-    simp [Instr.encode, Instr.decode, Track.decode_encode, UnOp.decode_encode,
+    simp [Instr.encode, Instr.decode, Stream.decode_encode, UnOp.decode_encode,
       BinOp.decode_encode, decodeInt_comp_encodeInt]
 
 /-- An entry read back is the entry, at the slice whose list it was in. -/
-theorem Timed.decode_encode (p : Nat) (e : Timed) (r : List Nat) :
-    Timed.decode p (e.encode ++ r) = some ({ e with slice := p }, r) := by
-  simp [Timed.encode, Timed.decode, Instr.decode_encode]
+theorem TimedEntry.decode_encode (p : Nat) (e : TimedEntry) (r : List Nat) :
+    TimedEntry.decode p (e.encode ++ r) = some ({ e with slice := p }, r) := by
+  simp [TimedEntry.encode, TimedEntry.decode, Instr.decode_encode]
 
-theorem decodeEntries_encode (p : Nat) (es : List Timed) (r : List Nat) :
-    decodeEntries p es.length (es.flatMap Timed.encode ++ r) =
+theorem decodeEntries_encode (p : Nat) (es : List TimedEntry) (r : List Nat) :
+    decodeEntries p es.length (es.flatMap TimedEntry.encode ++ r) =
       some (es.map fun e => { e with slice := p }, r) := by
   induction es with
   | nil => rfl
   | cons e rest ih =>
     simp only [List.length_cons, List.flatMap_cons, List.append_assoc, decodeEntries,
-      Timed.decode_encode, ih, List.map_cons]
+      TimedEntry.decode_encode, ih, List.map_cons]
 
-theorem decodeSlice_encodeSlice (p : Nat) (es : List Timed) :
+theorem decodeSlice_encodeSlice (p : Nat) (es : List TimedEntry) :
     decodeSlice p (encodeSlice es) = some (es.map fun e => { e with slice := p }) := by
   have h := decodeEntries_encode p es []
   simp only [List.append_nil] at h

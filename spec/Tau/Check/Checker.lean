@@ -1,4 +1,4 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.IR.Source
 import Tau.IR.Compiled
 import Tau.Check.Simplify

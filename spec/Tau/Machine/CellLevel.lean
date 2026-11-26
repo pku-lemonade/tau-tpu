@@ -1,4 +1,4 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.Blocks.Repeater
 import Tau.Blocks.Memory
 import Tau.Blocks.ShiftRegister
@@ -8,7 +8,7 @@ import Tau.Blocks.Mac
 # The cell-level machine
 
 This is tau-tpu with each slice opened up. Where the slice-level machine
-(`Tau.Machine.Arch`) treats a slice as one box, here a slice is
+(`Tau.Machine.SliceLevel`) treats a slice as one box, here a slice is
 built from the blocks in `spec/Tau/Blocks/`:
 
 * a **repeater** that issues the slice's instructions, counting down to each
@@ -26,7 +26,7 @@ count, used only to report where a trap happened.)
 This machine works on real words only. The streams between slices are the
 same as at the slice level.
 
-`Tau.Proofs.Machine.Circuit` proves that this machine and the
+`Tau.Proofs.Machine.CellLevel` proves that this machine and the
 slice-level machine cannot be told apart: on every program they trap on the
 same cycle for the same reason, or end with the same memory contents.
 
@@ -50,7 +50,7 @@ structure Cell (lanes : Nat) where
   /-- Shift register: its depth, which is the slice's delay. -/
   depth : Nat
   /-- Shift register: results on their way out. -/
-  pipe : Vector (Option (Track × Word lanes)) depth
+  pipe : Vector (Option (Stream × Word lanes)) depth
   /-- Matrix slice: the vector operand. -/
   x : Option (Word lanes)
   /-- Matrix slice: the total held by the multiply-accumulate cell of each lane. -/
@@ -67,11 +67,11 @@ def macLanes (acc : Vector Lane lanes) (cmd : Fin lanes → AccIn (Lane × Lane)
   Vector.ofFn fun k => ((mac (0 : Lane)).step acc[k] (cmd k)).1
 
 /-- Carry out one instruction at one slice, by stepping its blocks. -/
-def cellExec (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
-    (c : Cell lanes) : Instr → Except TrapKind (Cell lanes × Option (Track × Word lanes))
+def cellExec (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
+    (c : Cell lanes) : Instr → Except TrapKind (Cell lanes × Option (Stream × Word lanes))
   | .read addr dst =>
     if kind ≠ .mem then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match ((memory c.size c.mem).step c.mem (.read addr)).2 with
       | none => .error .badAddress
@@ -86,14 +86,14 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
         .ok ({ c with mem := ((memory c.size c.mem).step c.mem (.write addr v)).1 }, none)
   | .un op src dst =>
     if op.kind ≠ kind then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd src with
       | none => .error .emptyRead
       | some v => .ok (c, some (dst, (wordSem lanes).un op v))
   | .bin op a b dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd a, rd b with
       | some va, some vb => .ok (c, some (dst, (wordSem lanes).bin op va vb))
@@ -115,15 +115,15 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
         .ok ({ c with acc := macLanes c.acc fun k => .add (x[j]?.getD 0, w[k]) }, none)
   | .emit dst =>
     if kind ≠ .mxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else .ok ({ c with acc := macLanes c.acc fun _ => .clear }, some (dst, c.acc))
   | .const xs dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else .ok (c, some (dst, (wordSem lanes).const xs))
   | .sel m a b dst =>
     if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badTrack
+    else if cfg.streams ≤ dst.id then .error .badStream
     else
       match rd m, rd a, rd b with
       | some vm, some va, some vb => .ok (c, some (dst, (wordSem lanes).sel vm va vb))
@@ -155,18 +155,18 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Track → Option (Word lanes))
 
 /-- Push a result into a slice's shift register and take out the one that
 leaves it. -/
-def cellShift (c : Cell lanes) (entering : Option (Track × Word lanes)) :
-    Cell lanes × Option (Track × Word lanes) :=
+def cellShift (c : Cell lanes) (entering : Option (Stream × Word lanes)) :
+    Cell lanes × Option (Stream × Word lanes) :=
   let r := (shiftRegister c.depth none).step c.pipe entering
   ({ c with pipe := r.1 }, r.2)
 
 /-- One cycle of the slice at position `p`. The repeater issues the
 instructions due and advances its registers. -/
-def cellStep (cfg : Config) (prog : Program) (rd : Track → Option (Word lanes)) (p : Nat)
-    (c : Cell lanes) : Except Trap (Cell lanes × Option (Track × Word lanes)) :=
+def cellStep (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes)) (p : Nat)
+    (c : Cell lanes) : Except Trap (Cell lanes × Option (Stream × Word lanes)) :=
   let issued := (repeater (prog.entriesFor p)).step c.slots ()
-  let tick (r : Cell lanes × Option (Track × Word lanes)) :
-      Cell lanes × Option (Track × Word lanes) :=
+  let tick (r : Cell lanes × Option (Stream × Word lanes)) :
+      Cell lanes × Option (Stream × Word lanes) :=
     ({ r.1 with clock := c.clock + 1, slots := issued.1 }, r.2)
   match issued.2 with
   | [] => .ok (tick (cellShift c none))
@@ -189,14 +189,14 @@ structure CellState (lanes : Nat) where
   cells : List (Cell lanes)
 
 /-- What stream `tr` holds at position `p`. -/
-def CellState.sample (s : CellState lanes) (p : Nat) (tr : Track) : Option (Word lanes) :=
+def CellState.sample (s : CellState lanes) (p : Nat) (tr : Stream) : Option (Word lanes) :=
   match (match tr.dir with | .east => s.east | .west => s.west)[tr.id]? with
   | some row => row[p]?.getD none
   | none => none
 
 /-- One cycle of every slice, starting from position `p`. -/
 def cellSteps (cfg : Config) (prog : Program) (s : CellState lanes) :
-    Nat → List (Cell lanes) → Except Trap (List (Cell lanes × Option (Track × Word lanes)))
+    Nat → List (Cell lanes) → Except Trap (List (Cell lanes × Option (Stream × Word lanes)))
   | _, [] => .ok []
   | p, c :: rest =>
     match cellStep cfg prog (s.sample p) p c with

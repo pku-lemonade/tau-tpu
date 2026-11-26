@@ -14,7 +14,7 @@ slice by slice, and with runs merged into repeating entries. An image
 A compiled program is a `Program` (`Tau.Isa.Instr`) together with the
 machine it is for, the memory map and the number of cycles to run. What it
 computes is what the machine does with it: `execute` in
-`Tau.Machine.Arch`.
+`Tau.Machine.SliceLevel`.
 
 Every instruction of a compiled program has a cycle, so every word it issues
 is an event (`Tau.Isa.Event`). `Compiled.timeline` lists them. The pins

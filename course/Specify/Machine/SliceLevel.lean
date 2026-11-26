@@ -9,7 +9,7 @@ Source: `docs/Machine.md`, sections 3.2, 3.5 and 3.7.
 
 Two parts of the machine, small enough to write in an afternoon. The types
 are the ones in `spec/Tau/Isa/Instr.lean` and at the top of
-`spec/Tau/Machine/Arch.lean` (`Slice`, `TrapKind`); read those first. Do not
+`spec/Tau/Machine/SliceLevel.lean` (`Slice`, `TrapKind`); read those first. Do not
 read `exec` and `advanceRow` further down that file yet.
 
 The steps, which are the same in every file of this folder:
@@ -57,8 +57,8 @@ the stream the result is for.
 
 Write the cases for `read`, `write`, `un` and `bin`. Leave the others as
 they are. -/
-def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V) (sl : Slice V) :
-    Instr → Except TrapKind (Slice V × Option (Track × V))
+def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V) (sl : Slice V) :
+    Instr → Except TrapKind (Slice V × Option (Stream × V))
   | .read addr dst => todo
   | .write src addr => todo
   | .un op src dst => todo
@@ -80,7 +80,7 @@ def MovesOnePosition : Prop := todo
 
 /-! ## Compare
 
-The definitions are `advanceRow` and `exec` in `spec/Tau/Machine/Arch.lean`.
+The definitions are `advanceRow` and `exec` in `spec/Tau/Machine/SliceLevel.lean`.
 The statement for one cycle is `sample_step` in
 `spec/Tau/Proofs/Machine/Timing.lean`, and the whole timing rule is
 `arrives_east` in the same file.

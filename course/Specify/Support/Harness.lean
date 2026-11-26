@@ -30,7 +30,7 @@ instance {σ ι ο : Type} [Inhabited σ] [Inhabited ο] : Inhabited (Block σ �
 
 instance : Inhabited TrapKind := ⟨.wrongSlice⟩
 
-instance : Inhabited Track := ⟨⟨.east, 0⟩⟩
+instance : Inhabited Stream := ⟨⟨.east, 0⟩⟩
 
 /-- One row of a table: what it is about, and whether your definition agrees
 with the source. -/

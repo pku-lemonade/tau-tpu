@@ -3,7 +3,7 @@ import Tau.Machine.Timing
 /-!
 # The timing rule
 
-`Tau.Machine.Arch` defines one cycle of the machine: a result enters
+`Tau.Machine.SliceLevel` defines one cycle of the machine: a result enters
 the pipe of its slice, the oldest entry of the pipe comes out, and every
 stream moves one position. This file proves what follows from that over many
 cycles. A result computed at slice `p` on cycle `t` can be read at slice `q` on
@@ -35,8 +35,8 @@ variable {V : Type}
 /-! ## One slice, one cycle -/
 
 /-- An instruction does not touch the pipe of its slice. -/
-theorem exec_pipe (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
-    (sl sl' : Slice V) (i : Instr) (r : Option (Track × V))
+theorem exec_pipe (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
+    (sl sl' : Slice V) (i : Instr) (r : Option (Stream × V))
     (h : exec S cfg kind rd sl i = .ok (sl', r)) : sl'.pipe = sl.pipe := by
   cases i <;> simp only [exec] at h <;> (repeat' split at h) <;>
     first
@@ -44,8 +44,8 @@ theorem exec_pipe (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Optio
     | (cases h; rfl)
 
 /-- A result is always meant for a stream that exists. -/
-theorem exec_track (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Option V)
-    (sl sl' : Slice V) (i : Instr) (tr : Track) (v : V)
+theorem exec_track (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
+    (sl sl' : Slice V) (i : Instr) (tr : Stream) (v : V)
     (h : exec S cfg kind rd sl i = .ok (sl', some (tr, v))) : tr.id < cfg.streams := by
   cases i <;> simp only [exec] at h <;> (repeat' split at h) <;>
     first
@@ -56,7 +56,7 @@ theorem exec_track (S : Sem V) (cfg : Config) (kind : Kind) (rd : Track → Opti
 /-- One cycle of a slice pushes its result into the pipe and takes the oldest
 entry out. -/
 theorem stepSlice_pipe (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
-    (sl sl' : Slice V) (o : Option (Track × V)) (hsl : s.slices[p]? = some sl)
+    (sl sl' : Slice V) (o : Option (Stream × V)) (hsl : s.slices[p]? = some sl)
     (h : stepSlice S cfg prog s p sl = .ok (sl', o)) :
     sl'.pipe = (s.result S cfg prog p :: sl.pipe).dropLast ∧
       o = (s.result S cfg prog p :: sl.pipe).getLast?.getD none := by
@@ -94,7 +94,7 @@ theorem stepSlice_pipe (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
 /-- If `stepSlices` does not trap, entry `i` of its answer is `stepSlice` of
 entry `i` of the slices. -/
 theorem stepSlices_getElem? (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Track × V)))
+    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × V)))
     (h : stepSlices S cfg prog s p0 sls = .ok rs) (i : Nat) (sl : Slice V)
     (hsl : sls[i]? = some sl) :
     ∃ r, rs[i]? = some r ∧ stepSlice S cfg prog s (p0 + i) sl = .ok r := by
@@ -122,7 +122,7 @@ theorem stepSlices_getElem? (S : Sem V) (cfg : Config) (prog : Program) (s : Sta
 
 /-- If `stepSlices` does not trap, it answers for every slice. -/
 theorem stepSlices_length (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Track × V)))
+    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × V)))
     (h : stepSlices S cfg prog s p0 sls = .ok rs) : rs.length = sls.length := by
   induction sls generalizing p0 rs with
   | nil =>
@@ -171,7 +171,7 @@ theorem step_slice (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
 /-- The list of results that `step` hands to the streams is `State.out` at
 every position. -/
 theorem outs_getD (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (rs : List (Slice V × Option (Track × V)))
+    (rs : List (Slice V × Option (Stream × V)))
     (hrs : stepSlices S cfg prog s 0 s.slices = .ok rs) (p : Nat) :
     (rs.map (·.2))[p]?.getD none = s.out S cfg prog p := by
   cases hsl : s.slices[p]? with
@@ -189,7 +189,7 @@ theorem outs_getD (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
 /-! ## The shape of the state is kept -/
 
 /-- Stream `i` after a cycle is `advanceRow` of stream `i` before it. -/
-theorem advance_getElem? (outs : List (Option (Track × V))) (d : Dir) (id i : Nat)
+theorem advance_getElem? (outs : List (Option (Stream × V))) (d : Dir) (id i : Nat)
     (rows : List (List (Option V))) :
     (advance outs d id rows)[i]? = (rows[i]?).map (advanceRow outs d (id + i)) := by
   induction rows generalizing id i with
@@ -202,14 +202,14 @@ theorem advance_getElem? (outs : List (Option (Track × V))) (d : Dir) (id i : N
       rw [ih (id + 1) i, show id + 1 + i = id + (i + 1) by omega]
 
 /-- A cycle keeps the number of streams. -/
-theorem advance_length (outs : List (Option (Track × V))) (d : Dir) (id : Nat)
+theorem advance_length (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
     (rows : List (List (Option V))) : (advance outs d id rows).length = rows.length := by
   induction rows generalizing id with
   | nil => rfl
   | cons row rest ih => simp [advance, ih]
 
 /-- A cycle keeps the length of a stream. -/
-theorem advanceRow_length (outs : List (Option (Track × V))) (d : Dir) (id : Nat)
+theorem advanceRow_length (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
     (row : List (Option V)) : (advanceRow outs d id row).length = row.length := by
   simp [advanceRow]
 
@@ -360,7 +360,7 @@ theorem out_delay (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → Stat
 
 /-- Slot `p` of a stream after a cycle: a newly placed result if there is
 one, else the word from one position upstream. -/
-theorem advanceRow_getElem? (outs : List (Option (Track × V))) (d : Dir) (id : Nat)
+theorem advanceRow_getElem? (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
     (row : List (Option V)) (p : Nat) (hp : p < row.length) :
     (advanceRow outs d id row)[p]? = some
       (match inject outs d id p with
@@ -376,7 +376,7 @@ theorem advanceRow_getElem? (outs : List (Option (Track × V))) (d : Dir) (id : 
 position `p` holds the word that the slice at `p` placed on `tr` in that
 cycle, if it placed one. Otherwise it holds what was one position upstream. -/
 theorem sample_step (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
-    (hs : s.Shaped cfg) (h : step S cfg prog s = .ok s') (p : Nat) (tr : Track)
+    (hs : s.Shaped cfg) (h : step S cfg prog s = .ok s') (p : Nat) (tr : Stream)
     (hp : p < cfg.kinds.length) (hid : tr.id < cfg.streams) :
     s'.sample p tr =
       match s.out S cfg prog p with
@@ -429,7 +429,7 @@ theorem sample_step (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
 
 /-- A result is always meant for a stream that exists. -/
 theorem State.result_track (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
-    (tr : Track) (v : V) (h : s.result S cfg prog p = some (tr, v)) : tr.id < cfg.streams := by
+    (tr : Stream) (v : V) (h : s.result S cfg prog p = some (tr, v)) : tr.id < cfg.streams := by
   cases hdue : prog.dueAt p s.time with
   | nil => simp [State.result, hdue] at h
   | cons i rest =>

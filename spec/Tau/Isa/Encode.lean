@@ -9,7 +9,7 @@ entry of a program becomes numbers (`encode`) and how the numbers are read
 back (`decode`).
 
 `decode` is what gives an image its meaning: the machine loaded with an image
-does what `execute` (`Tau.Machine.Arch`) does with the decoded
+does what `execute` (`Tau.Machine.SliceLevel`) does with the decoded
 program. `encode` is the Lean copy of the last step of the compiler. That
 reading back what was written gives the program again is proved in
 `Tau.Proofs.Isa.Encode`.
@@ -34,13 +34,13 @@ Docs: Machine 3.10 (`docs/`).
 namespace Tau
 
 /-- A stream as a number. -/
-def Track.encode (tr : Track) : Nat :=
+def Stream.encode (tr : Stream) : Nat :=
   match tr.dir with
   | .east => 2 * tr.id
   | .west => 2 * tr.id + 1
 
 /-- The stream a number stands for. -/
-def Track.decode (n : Nat) : Track :=
+def Stream.decode (n : Nat) : Stream :=
   ⟨if n % 2 = 0 then .east else .west, n / 2⟩
 
 /-- A signed integer as a number. -/
@@ -150,11 +150,11 @@ def Instr.decode : List Nat → Option (Instr × List Nat)
   | _ => none
 
 /-- An entry as numbers. Its slice is not stored. -/
-def Timed.encode (e : Timed) : List Nat :=
+def TimedEntry.encode (e : TimedEntry) : List Nat :=
   e.time :: e.repeats :: e.gap :: e.stride :: e.instr.encode
 
 /-- Read an entry of slice `p` from the front of a list of numbers. -/
-def Timed.decode (p : Nat) : List Nat → Option (Timed × List Nat)
+def TimedEntry.decode (p : Nat) : List Nat → Option (TimedEntry × List Nat)
   | time :: repeats :: gap :: stride :: r =>
     match Instr.decode r with
     | some (instr, r') => some (⟨p, time, instr, repeats, gap, stride⟩, r')
@@ -162,10 +162,10 @@ def Timed.decode (p : Nat) : List Nat → Option (Timed × List Nat)
   | _ => none
 
 /-- Read `n` entries of slice `p` from the front of a list of numbers. -/
-def decodeEntries (p : Nat) : Nat → List Nat → Option (List Timed × List Nat)
+def decodeEntries (p : Nat) : Nat → List Nat → Option (List TimedEntry × List Nat)
   | 0, r => some ([], r)
   | n + 1, r =>
-    match Timed.decode p r with
+    match TimedEntry.decode p r with
     | some (e, r') =>
       match decodeEntries p n r' with
       | some (es, r'') => some (e :: es, r'')
@@ -173,12 +173,12 @@ def decodeEntries (p : Nat) : Nat → List Nat → Option (List Timed × List Na
     | none => none
 
 /-- The entries of one slice as numbers: how many, then each. -/
-def encodeSlice (es : List Timed) : List Nat :=
-  es.length :: es.flatMap Timed.encode
+def encodeSlice (es : List TimedEntry) : List Nat :=
+  es.length :: es.flatMap TimedEntry.encode
 
 /-- Read the entries of slice `p` from its list of numbers. Every number must
 be used. -/
-def decodeSlice (p : Nat) : List Nat → Option (List Timed)
+def decodeSlice (p : Nat) : List Nat → Option (List TimedEntry)
   | n :: r =>
     match decodeEntries p n r with
     | some (es, []) => some es

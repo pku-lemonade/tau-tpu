@@ -2,3 +2,6 @@
 compiler/build/
 out/
 __pycache__/
+# Workspace settings are each person's own: VS Code and its extensions write
+# here. Shared editor rules are in .editorconfig.
+.vscode/settings.json

@@ -124,7 +124,7 @@ Lean examples and their exercises under `course/Specify/` work without it.
 | 7 | Memory | `Blocks/Memory` | `Blocks/Memory`, one proof |
 | 8-9 | The repeater | `Blocks/Repeater` | `Blocks/Repeater`, two proofs |
 | 10-11 | The systolic array | `Blocks/SystolicArray` | `Blocks/SystolicArray`, one proof |
-| 12-14 | The slice-level machine | `Machine/Arch` | none; you write schedules |
+| 12-14 | The slice-level machine | `Machine/SliceLevel` | none; you write schedules |
 | 15-16 | Kernels and loop unrolling | `IR/Kernel`, `IR/Unroll`, `IR/ReadCpp` | `IR/Unroll`, three proofs |
 | 17 | Expressions and simplification | `IR/Simplify` | `Check/Simplify` |
 | 18-20 | The checker | `Machine/OnTime` | `Check/Checker`, `Check/Passes`, two proofs each |

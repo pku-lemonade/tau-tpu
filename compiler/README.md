@@ -99,7 +99,7 @@ compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --machine machines
 ```
 
 The program is the last function of the file; the functions before it are
-kernels it may call. The input can be written by hand or recorded from
+kernels it may call. The input can be written by hand or traced from
 Python:
 
 ```bash

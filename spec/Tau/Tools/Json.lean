@@ -52,7 +52,7 @@ def kind : String → Except String Kind
   | "mxm" => pure .mxm
   | s => throw s!"unknown slice kind '{s}'"
 
-def track (j : Json) (key : String) : Except String Track := do
+def stream (j : Json) (key : String) : Except String Stream := do
   let t ← j.getObjVal? key
   let d ← match ← str t "dir" with
     | "east" => pure Dir.east
@@ -91,21 +91,21 @@ def binOp (j : Json) : Except String BinOp := do
 
 def instr (j : Json) : Except String Instr := do
   match ← str j "op" with
-  | "read" => pure (.read (← nat j "addr") (← track j "dst"))
-  | "write" => pure (.write (← track j "src") (← nat j "addr"))
-  | "un" => pure (.un (← unOp j) (← track j "src") (← track j "dst"))
-  | "bin" => pure (.bin (← binOp j) (← track j "a") (← track j "b") (← track j "dst"))
-  | "load" => pure (.load (← track j "src"))
-  | "mac" => pure (.mac (← nat j "j") (← track j "src"))
-  | "emit" => pure (.emit (← track j "dst"))
-  | "const" => pure (.const (← ints j "values") (← track j "dst"))
-  | "sel" => pure (.sel (← track j "m") (← track j "a") (← track j "b") (← track j "dst"))
-  | "seed" => pure (.seed (← track j "src"))
-  | "install" => pure (.install (← nat j "j") (← track j "src"))
+  | "read" => pure (.read (← nat j "addr") (← stream j "dst"))
+  | "write" => pure (.write (← stream j "src") (← nat j "addr"))
+  | "un" => pure (.un (← unOp j) (← stream j "src") (← stream j "dst"))
+  | "bin" => pure (.bin (← binOp j) (← stream j "a") (← stream j "b") (← stream j "dst"))
+  | "load" => pure (.load (← stream j "src"))
+  | "mac" => pure (.mac (← nat j "j") (← stream j "src"))
+  | "emit" => pure (.emit (← stream j "dst"))
+  | "const" => pure (.const (← ints j "values") (← stream j "dst"))
+  | "sel" => pure (.sel (← stream j "m") (← stream j "a") (← stream j "b") (← stream j "dst"))
+  | "seed" => pure (.seed (← stream j "src"))
+  | "install" => pure (.install (← nat j "j") (← stream j "src"))
   | "macw" => pure (.macw (← nat j "j"))
   | s => throw s!"unknown instruction '{s}'"
 
-def timed (j : Json) : Except String Timed := do
+def timed (j : Json) : Except String TimedEntry := do
   pure {
     slice := ← nat j "slice"
     time := ← nat j "time"

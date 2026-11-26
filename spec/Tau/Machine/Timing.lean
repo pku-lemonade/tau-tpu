@@ -1,9 +1,9 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 
 /-!
 # What the timing rule is stated with
 
-`Tau.Machine.Arch` defines one cycle of the machine. The timing
+`Tau.Machine.SliceLevel` defines one cycle of the machine. The timing
 rule is about many cycles: a result computed at slice `p` on cycle `t` is at
 slice `q` on cycle `t + delay + 1 + |q - p|`. To state it one needs names for
 "the states of a run", "the result a slice computes in a cycle" and "what a
@@ -49,7 +49,7 @@ structure State.Shaped (cfg : Config) (s : State V) : Prop where
 result enters the pipe. `none` if no instruction is due or the instruction
 has no result. -/
 def State.result (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat) :
-    Option (Track × V) :=
+    Option (Stream × V) :=
   match prog.dueAt p s.time, cfg.kindAt p, s.slices[p]? with
   | [i], some kind, some sl =>
     match exec S cfg kind (s.sample p) sl i with
@@ -60,7 +60,7 @@ def State.result (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : 
 /-- What comes out of the pipe of the slice at `p` in the cycle that starts in
 `s`. This is the result that the machine places on a stream at position `p`. -/
 def State.out (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat) :
-    Option (Track × V) :=
+    Option (Stream × V) :=
   match s.slices[p]? with
   | some sl =>
     match stepSlice S cfg prog s p sl with
@@ -70,7 +70,7 @@ def State.out (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat
 
 /-- What stream `tr` holds one position upstream of `p`. This is the word
 that reaches `p` on the next cycle, if no slice places a result there. -/
-def State.upstream (s : State V) (p : Nat) (tr : Track) : Option V :=
+def State.upstream (s : State V) (p : Nat) (tr : Stream) : Option V :=
   match tr.dir with
   | .east => if p = 0 then none else s.sample (p - 1) tr
   | .west => s.sample (p + 1) tr

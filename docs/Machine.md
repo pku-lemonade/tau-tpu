@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Describes | The tau-tpu machine: its components, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
+| Describes | The tau-tpu machine: its blocks, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
 | Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`Formats.md`](Formats.md)). |
 | Specified in | `spec/Tau/Isa/`, `spec/Tau/Blocks/`, `spec/Tau/Machine/` |
 | Tables tested by | `course/tests/CourseTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
@@ -14,15 +14,15 @@ that specification; Docs/README 1 says how the two are kept together.
 The machine is described twice. Section 3, the *slice-level machine*, treats
 a slice as one box that takes an instruction and gives a result some cycles
 later. Section 4, the *cell-level machine*, builds each box from the
-components of section 2. The two must behave the same.
+blocks of section 2. The two must behave the same.
 
 ## 1. Conventions
 
 The machine has one clock. Cycles are numbered from 0.
 
-A *component* has a state, takes one input in every cycle and gives one
-output in every cycle. The output during cycle `t` may depend on the input of
-cycle `t` and on the state at the start of cycle `t`. The state at the start
+A *block*, or component, has a state, takes one input in every cycle and
+gives one output in every cycle. The output during cycle `t` may depend on the
+input of cycle `t` and on the state at the start of cycle `t`. The state at the start
 of cycle `t + 1` is decided during cycle `t`.
 
 A table lists, for each cycle, the input and the output.
@@ -31,7 +31,7 @@ A *lane* is a 32-bit value, read as a signed integer. Arithmetic on lanes
 wraps on overflow. A *word* is a fixed number of lanes side by side. The
 number of lanes is the same everywhere on a machine.
 
-## 2. Components
+## 2. Blocks
 
 ### 2.1 Shift register
 
@@ -305,7 +305,7 @@ The machine never guesses and never waits.
 | Trap | Cause |
 |---|---|
 | empty read | an instruction read a stream slot that held nothing |
-| bad track | an instruction named a stream that does not exist |
+| bad stream | an instruction named a stream that does not exist |
 | bad address | a memory address or a stored column was out of range |
 | wrong slice | an instruction was sent to a slice of the wrong kind |
 | two instructions | two instructions were due at one slice on one cycle |

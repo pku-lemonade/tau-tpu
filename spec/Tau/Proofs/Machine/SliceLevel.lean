@@ -1,4 +1,4 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 
 /-!
 # The machine does not look at its values
@@ -37,11 +37,11 @@ def State.map (f : V → W) (s : State V) : State W where
   slices := s.slices.map (Slice.map f)
 
 /-- Apply `f` to what a slice step returns. -/
-def mapResult (f : V → W) (r : Slice V × Option (Track × V)) :
-    Slice W × Option (Track × W) :=
+def mapResult (f : V → W) (r : Slice V × Option (Stream × V)) :
+    Slice W × Option (Stream × W) :=
   (r.1.map f, r.2.map (Prod.map id f))
 
-theorem State.sample_map (f : V → W) (s : State V) (p : Nat) (tr : Track) :
+theorem State.sample_map (f : V → W) (s : State V) (p : Nat) (tr : Stream) :
     (s.map f).sample p tr = (s.sample p tr).map f := by
   unfold State.sample
   cases hd : tr.dir <;> simp only [State.belt, State.map, List.getElem?_map] <;>
@@ -52,7 +52,7 @@ theorem State.sample_map (f : V → W) (s : State V) (p : Nat) (tr : Track) :
         cases row[p]? <;> rfl
 
 theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
-    (kind : Kind) (rd : Track → Option V) (rd' : Track → Option W)
+    (kind : Kind) (rd : Stream → Option V) (rd' : Stream → Option W)
     (hrd : ∀ tr, rd' tr = (rd tr).map f) (sl : Slice V) (i : Instr) :
     exec T cfg kind rd' (sl.map f) i = (exec S cfg kind rd sl i).map (mapResult f) := by
   -- One case per instruction, all of the same shape: unfold `exec`, rewrite
@@ -137,7 +137,7 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     · rfl
     · cases sl.x <;> cases sl.weights[j]? <;> simp [Except.map, mapResult, Slice.map, h.mac]
 
-theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Track × V)) :
+theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) :
     shiftPipe (sl.map f) (r.map (Prod.map id f)) = mapResult f (shiftPipe sl r) := by
   have hcons : r.map (Prod.map id f) :: (sl.map f).pipe =
       (r :: sl.pipe).map (Option.map (Prod.map id f)) := rfl
@@ -191,7 +191,7 @@ theorem stepSlices_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cf
       | error e => rfl
       | ok rs => rfl
 
-theorem inject_map (f : V → W) (outs : List (Option (Track × V))) (d : Dir) (k p : Nat) :
+theorem inject_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k p : Nat) :
     inject (outs.map (Option.map (Prod.map id f))) d k p = (inject outs d k p).map f := by
   unfold inject
   simp only [List.getElem?_map]
@@ -205,7 +205,7 @@ theorem inject_map (f : V → W) (outs : List (Option (Track × V))) (d : Dir) (
       simp only [Option.map_some, Option.getD_some, Prod.map, id]
       split <;> rfl
 
-theorem advanceRow_map (f : V → W) (outs : List (Option (Track × V))) (d : Dir) (k : Nat)
+theorem advanceRow_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k : Nat)
     (row : List (Option V)) :
     advanceRow (outs.map (Option.map (Prod.map id f))) d k (row.map (Option.map f)) =
       (advanceRow outs d k row).map (Option.map f) := by
@@ -227,7 +227,7 @@ theorem advanceRow_map (f : V → W) (outs : List (Option (Track × V))) (d : Di
       simp only [Option.map_none, List.getElem?_map]
       cases row[p + 1]? <;> rfl
 
-theorem advance_map (f : V → W) (outs : List (Option (Track × V))) (d : Dir) (k : Nat)
+theorem advance_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k : Nat)
     (rows : List (List (Option V))) :
     advance (outs.map (Option.map (Prod.map id f))) d k (rows.map (List.map (Option.map f))) =
       (advance outs d k rows).map (List.map (Option.map f)) := by

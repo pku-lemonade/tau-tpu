@@ -14,14 +14,14 @@ set_option verso.code.warnLineLength 100
 
 *Source:* `docs/Machine.md`, section 3.
 
-*Specify:* `course/Specify/Machine/Arch.lean`.
+*Specify:* `course/Specify/Machine/SliceLevel.lean`.
 
 *Read:* `spec/Tau/Isa/Op.lean` and `spec/Tau/Isa/Instr.lean` now.
-`spec/Tau/Machine/Arch.lean` and `spec/tests/TauTest/Linear.lean` after you have
+`spec/Tau/Machine/SliceLevel.lean` and `spec/tests/TauTest/Linear.lean` after you have
 specified.
 
 *Proofs:* `spec/Tau/Proofs/Machine/Timing.lean`,
-`spec/Tau/Proofs/Machine/Arch.lean`. For reading.
+`spec/Tau/Proofs/Machine/SliceLevel.lean`. For reading.
 
 *Time:* three days.
 
@@ -33,11 +33,11 @@ then program the machine by hand.
 
 Read section 3 of `Machine.md`, all of it. Then read `spec/Tau/Isa/Op.lean`,
 `spec/Tau/Isa/Instr.lean`, and the first eighty lines of
-`spec/Tau/Machine/Arch.lean`, down to the definition of `State`. Those are
+`spec/Tau/Machine/SliceLevel.lean`, down to the definition of `State`. Those are
 the types: operations, instructions, traps, the state of a slice. Stop
 there.
 
-The whole machine is too large to write in a day. `course/Specify/Machine/Arch.lean`
+The whole machine is too large to write in a day. `course/Specify/Machine/SliceLevel.lean`
 asks for the two parts that everything else follows from: how a stream moves
 in one cycle, and what four of the instructions do, traps included. Follow
 the steps at the top of the file and come back when the three reports say
@@ -47,13 +47,13 @@ that all rows agree.
 
 {docstring Tau.Kind}
 
-{docstring Tau.Track}
+{docstring Tau.Stream}
 
 {docstring Tau.Instr}
 
-{docstring Tau.Timed}
+{docstring Tau.TimedEntry}
 
-`Timed.once slice time instr` is an instruction issued once. The other three
+`TimedEntry.once slice time instr` is an instruction issued once. The other three
 fields make it repeat, and are explained below.
 
 A program is a list of timed instructions, and a machine is described by a
@@ -67,7 +67,7 @@ Its state is the contents of every stream slot and of every slice.
 
 {docstring Tau.State}
 
-One cycle is the function `step`. Read it in `spec/Tau/Machine/Arch.lean`
+One cycle is the function `step`. Read it in `spec/Tau/Machine/SliceLevel.lean`
 together with the comment at the top of the file. Read the functions in the
 order they are defined: `exec`, `shiftPipe`, `stepSlice`, `stepSlices`,
 `inject`, `advanceRow`, `advance`, `step`.
@@ -124,7 +124,7 @@ Why cycle 4? Follow the word.
 * Cycle 4: it is at position 2, where slice 2 is told to write it.
 
 That is the timing rule from Machine 3.4 (also stated at the top of
-`spec/Tau/Machine/Arch.lean`): a result computed at slice
+`spec/Tau/Machine/SliceLevel.lean`): a result computed at slice
 `p` on cycle `t` can be read at slice `q` on cycle
 `t + delay + 1 + |q - p|`. Here that is 0 + 1 + 1 + 2 = 4.
 
@@ -229,8 +229,8 @@ now.
 # How to work through it
 
 1. Read section 3 of `Machine.md`, and the types, as above.
-2. Specify streams and instructions in `course/Specify/Machine/Arch.lean`.
-3. Read `spec/Tau/Machine/Arch.lean` top to bottom. Compare `advanceRow` and
+2. Specify streams and instructions in `course/Specify/Machine/SliceLevel.lean`.
+3. Read `spec/Tau/Machine/SliceLevel.lean` top to bottom. Compare `advanceRow` and
    `exec` with yours. In which order does the repository's `exec` make its
    checks? The doc does not say, and the `Decisions` table shows that the
    order can be seen from outside.
@@ -245,7 +245,7 @@ now.
 
 # Exercises
 
-*Specify.* `course/Specify/Machine/Arch.lean`.
+*Specify.* `course/Specify/Machine/SliceLevel.lean`.
 
 *State.* `MovesOnePosition` in that file.
 

@@ -4,7 +4,7 @@ import Tau.Blocks.Repeater
 /-!
 # Instructions and programs
 
-A tau-tpu machine is a row of slices. Between them run *streams*: tracks that
+A tau-tpu machine is a row of slices. Between them run *streams*, which
 carry words east or west, one slice per cycle. An instruction tells one slice
 what to do on one cycle: which stream slots to read, what to compute, and which
 stream to put the result on.
@@ -33,7 +33,7 @@ inductive Dir where
   deriving DecidableEq, Repr
 
 /-- A stream: a direction and a number. -/
-structure Track where
+structure Stream where
   /-- The direction the stream moves in. -/
   dir : Dir
   /-- Its number among the streams going that way. -/
@@ -43,29 +43,29 @@ structure Track where
 /-- What a slice can be told to do. -/
 inductive Instr where
   /-- Memory: put the word at `addr` on `dst`. -/
-  | read (addr : Nat) (dst : Track)
+  | read (addr : Nat) (dst : Stream)
   /-- Memory: store the word on `src` at `addr`. -/
-  | write (src : Track) (addr : Nat)
+  | write (src : Stream) (addr : Nat)
   /-- Vector or rearrangement: apply `op` to the word on `src`. -/
-  | un (op : UnOp) (src dst : Track)
+  | un (op : UnOp) (src dst : Stream)
   /-- Vector: apply `op` to the words on `a` and `b`. -/
-  | bin (op : BinOp) (a b dst : Track)
+  | bin (op : BinOp) (a b dst : Stream)
   /-- Matrix: keep the word on `src` as the vector operand. -/
-  | load (src : Track)
+  | load (src : Stream)
   /-- Matrix: add lane `j` of the vector operand, times the word on `src`, to
   the accumulator. -/
-  | mac (j : Nat) (src : Track)
+  | mac (j : Nat) (src : Stream)
   /-- Matrix: put the accumulator on `dst` and clear it. -/
-  | emit (dst : Track)
+  | emit (dst : Stream)
   /-- Vector: put the constant word with lanes `xs` on `dst`. -/
-  | const (xs : List Int) (dst : Track)
+  | const (xs : List Int) (dst : Stream)
   /-- Vector: lane by lane, the word on `a` where the word on `m` is not zero
   and the word on `b` elsewhere. -/
-  | sel (m a b dst : Track)
+  | sel (m a b dst : Stream)
   /-- Matrix: replace the accumulator by the word on `src`. -/
-  | seed (src : Track)
+  | seed (src : Stream)
   /-- Matrix: keep the word on `src` as stored column `j`. -/
-  | install (j : Nat) (src : Track)
+  | install (j : Nat) (src : Stream)
   /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
   the accumulator. -/
   | macw (j : Nat)
@@ -83,7 +83,7 @@ def Instr.bump (k : Nat) : Instr → Instr
 
 /-- An instruction together with its slice and its cycle, and how it
 repeats. -/
-structure Timed where
+structure TimedEntry where
   /-- The position of the slice that executes the instruction. -/
   slice : Nat
   /-- The cycle on which it is first issued. -/
@@ -99,14 +99,14 @@ structure Timed where
   deriving DecidableEq, Repr
 
 /-- An instruction issued once. -/
-def Timed.once (slice time : Nat) (instr : Instr) : Timed := { slice, time, instr }
+def TimedEntry.once (slice time : Nat) (instr : Instr) : TimedEntry := { slice, time, instr }
 
 /-- A timed instruction as an entry of its slice's repeater. -/
-def Timed.entry (e : Timed) : Entry Instr :=
+def TimedEntry.entry (e : TimedEntry) : Entry Instr :=
   ⟨e.time, e.repeats, e.gap, e.instr, Instr.bump e.stride⟩
 
 /-- A program: every instruction the machine will execute. -/
-abbrev Program := List Timed
+abbrev Program := List TimedEntry
 
 /-- The instructions of the program that are for slice `p`. -/
 def Program.entriesOf (prog : Program) (p : Nat) : Program :=
@@ -115,7 +115,7 @@ def Program.entriesOf (prog : Program) (p : Nat) : Program :=
 /-- The entries of the program that are for slice `p`, as its repeater takes
 them. -/
 def Program.entriesFor (prog : Program) (p : Nat) : List (Entry Instr) :=
-  (prog.entriesOf p).map Timed.entry
+  (prog.entriesOf p).map TimedEntry.entry
 
 /-- The instructions that slice `p` must execute at cycle `t`. -/
 def Program.dueAt (prog : Program) (p t : Nat) : List Instr :=

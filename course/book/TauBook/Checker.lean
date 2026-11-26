@@ -25,7 +25,7 @@ Leave out what these files say about pins, events and timelines: the next
 chapter is about them.
 
 *Proofs:* `spec/Tau/Proofs/Check/Checker.lean` and `spec/Tau/Proofs/Check/Passes.lean`:
-four short ones are exercises. `spec/Tau/Proofs/Machine/Arch.lean`,
+four short ones are exercises. `spec/Tau/Proofs/Machine/SliceLevel.lean`,
 `spec/Tau/Proofs/IR/Kernel.lean`, `spec/Tau/Proofs/IR/MemMap.lean` and
 `spec/Tau/Proofs/IR/Placed.lean` are for reading.
 
@@ -185,7 +185,7 @@ Program ───────────run on real words───────�
 
 # The proofs
 
-`spec/Tau/Proofs/Machine/Arch.lean` proves `execute_map`. It is the longest
+`spec/Tau/Proofs/Machine/SliceLevel.lean` proves `execute_map`. It is the longest
 proof file so far and the least clever. It has one lemma for each function in
 the machine, in the order in which they are defined, each saying that the
 function commutes with `f`. Most are a case split followed by `simp`. Proofs
@@ -328,7 +328,7 @@ it against the machine.
    `spec/Tau/Check/Checker.lean`. Redo the small example above in your scratch
    file with a program of your own.
 2. Read the statements of `execute_map` and `Kernel.run_map`, and the proof
-   of one case of `exec_map`, in `spec/Tau/Proofs/Machine/Arch.lean`. Every
+   of one case of `exec_map`, in `spec/Tau/Proofs/Machine/SliceLevel.lean`. Every
    other case is the same.
 3. In `Prove/Check/Checker.lean`, read the statements of the four lemmas
    that are given: `agree_exprs`, `Source.run_of_exprs`, `execute_of_exprs`

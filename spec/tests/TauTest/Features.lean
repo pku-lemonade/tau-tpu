@@ -1,4 +1,4 @@
-import Tau.Machine.Circuit
+import Tau.Machine.CellLevel
 
 /-!
 # Test: operations, repeats and stored columns
@@ -50,8 +50,8 @@ def cfg : Config where
   sxmDelay := 1
   mxmDelay := 1
 
-def e (id : Nat) : Track := ⟨.east, id⟩
-def w (id : Nat) : Track := ⟨.west, id⟩
+def e (id : Nat) : Stream := ⟨.east, id⟩
+def w (id : Nat) : Stream := ⟨.west, id⟩
 
 def words (rows : List (List Int)) : List (Word 2) := rows.map Word.ofInts
 

@@ -1,4 +1,4 @@
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.IR.Kernel
 import Tau.IR.MemMap
 

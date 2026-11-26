@@ -7,7 +7,7 @@
 //
 //   * a word produced at slice p and used at slice q:
 //         time(use) = time(def) + delay(p) + 1 + |q - p|
-//     This is the timing rule of spec/Tau/Machine/Arch.lean. There is no
+//     This is the timing rule of spec/Tau/Machine/SliceLevel.lean. There is no
 //     slack: the word is at q on that cycle and on no other.
 //
 //   * two instructions of one matrix-vector product: one cycle apart.

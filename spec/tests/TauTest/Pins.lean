@@ -31,7 +31,7 @@ def reluAt (t : Nat) : Kernel :=
     .stmt (.pin ⟨t, 0⟩ (.un 1 .relu 0)),
     .stmt (.store 1 1 ⟨0, 0⟩) ]
 
-def east : Track := ⟨.east, 0⟩
+def east : Stream := ⟨.east, 0⟩
 
 /-- Read at cycle `t`, relu three cycles later, write three cycles after
 that: the timing rule with a delay of 1 and a distance of 1. -/

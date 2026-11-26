@@ -1,4 +1,4 @@
-import Tau.Sim.Run
+import Tau.Tools.Run
 
 /-!
 # tau-check
@@ -49,7 +49,7 @@ def main (args : List String) : IO UInt32 := do
   | ["--unroll", bpath, apath] =>
     let (_, before) ← Json.orFail bpath (Json.kernel (← Json.readFile bpath))
     let (_, after) ← Json.orFail apath (Json.kernel (← Json.readFile apath))
-    if Sim.sameUnroll before after then
+    if Tools.sameUnroll before after then
       IO.println "SAME"
       pure 0
     else
@@ -58,7 +58,7 @@ def main (args : List String) : IO UInt32 := do
   | ["--encode", cpath, ipath] =>
     let c ← Json.orFail cpath (Json.compiled (← Json.readFile cpath))
     let (_, img) ← Json.orFail ipath (Json.imageFile (← Json.readFile ipath))
-    if Sim.sameImage c img then
+    if Tools.sameImage c img then
       IO.println "SAME"
       pure 0
     else
@@ -67,15 +67,15 @@ def main (args : List String) : IO UInt32 := do
   | [bpath, apath] =>
     let before ← Json.orFail bpath (Json.stage (← Json.readFile bpath))
     let after ← Json.orFail apath (Json.stage (← Json.readFile apath))
-    match Sim.checkPair before after with
+    match Tools.checkPair before after with
     | some true =>
       IO.println "ACCEPT"
       pure 0
     | some false =>
-      IO.println s!"REJECT: {Sim.explainPair before after}"
+      IO.println s!"REJECT: {Tools.explainPair before after}"
       pure 1
     | none =>
-      IO.eprintln s!"tau-check: no check compares a {Sim.stageName before} with a {Sim.stageName after}"
+      IO.eprintln s!"tau-check: no check compares a {Tools.stageName before} with a {Tools.stageName after}"
       pure 2
   | _ =>
     IO.eprintln "usage: tau-check <before.json> <after.json>"

@@ -1,7 +1,7 @@
 //===- EmitMachine.cpp - write placed, compiled and image files -----------===//
 //
 // Writes a function made of instructions, entries or images in the JSON
-// formats that the Lean tools read (docs/Formats.md, spec/Tau/Sim/Json.lean).
+// formats that the Lean tools read (docs/Formats.md, spec/Tau/Tools/Json.lean).
 // Each file says what is in the IR; the numbers of the image are worked out by
 // `tau-encode` (lib/Passes/Encode.cpp).
 //
@@ -96,7 +96,7 @@ std::vector<tau::SliceOp> slicesOf(func::FuncOp func) {
 }
 
 /// "e3" -> {"dir": "east", "id": 3}.
-json::Value trackJSON(StringRef name) {
+json::Value streamJSON(StringRef name) {
   int64_t id = 0;
   name.drop_front().getAsInteger(10, id);
   return json::Object{{"dir", name.starts_with("e") ? "east" : "west"},
@@ -157,7 +157,7 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
             body[key] = json::Array(array.asArrayRef());
         for (StringRef key : {"src", "a", "b", "m", "dst"})
           if (auto name = entry->getAttrOfType<StringAttr>(key))
-            body[key] = trackJSON(name.getValue());
+            body[key] = streamJSON(name.getValue());
         program.push_back(std::move(body));
       }
     (*file)["program"] = std::move(program);
@@ -166,11 +166,11 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
 
   // Before: the instructions, each with the stream of every word it uses,
   // as `tau-schedule` or `tau-route` gave it.
-  struct Track {
+  struct Stream {
     bool east;
     int64_t id;
   };
-  llvm::DenseMap<Value, Track> tracks;
+  llvm::DenseMap<Value, Stream> streams;
   for (Operation &op : func.getBody().front()) {
     if (!isInstr(op))
       continue;
@@ -181,7 +181,7 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
     std::optional<int64_t> stream = optIntAttr(op, "stream");
     if (!east || !stream)
       return createStringError("the function has not been scheduled");
-    tracks[result] = Track{east.getValue(), *stream};
+    streams[result] = Stream{east.getValue(), *stream};
   }
 
   std::vector<std::pair<int64_t, json::Object>> timed;
@@ -194,9 +194,9 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
     json::Object body = common(op);
     body["time"] = *time;
     connect(op, body, [&](Value value) -> json::Value {
-      Track track = tracks.lookup(value);
-      return json::Object{{"dir", track.east ? "east" : "west"},
-                          {"id", track.id}};
+      Stream on = streams.lookup(value);
+      return json::Object{{"dir", on.east ? "east" : "west"},
+                          {"id", on.id}};
     });
     timed.push_back({*time, std::move(body)});
   }

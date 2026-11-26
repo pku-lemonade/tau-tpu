@@ -38,20 +38,20 @@ def eventOf {V : Type} (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : Option (Ev
 #guard passes (Tables.pinDecisions eventOf)
 
 /-- A solution to `Specify.Isa.Encode`. -/
-def encodeEntry (e : Timed) : List Nat :=
+def encodeEntry (e : TimedEntry) : List Nat :=
   match e.instr with
   | .read addr dst => [e.time, e.repeats, e.gap, e.stride, 0, addr, dst.encode]
   | .write src addr => [e.time, e.repeats, e.gap, e.stride, 1, src.encode, addr]
   | i => e.time :: e.repeats :: e.gap :: e.stride :: i.encode
 
-#guard passes (Tables.numbers Track.encode encodeInt)
-#guard passes (Tables.numbersBack Track.decode decodeInt)
+#guard passes (Tables.numbers Stream.encode encodeInt)
+#guard passes (Tables.numbersBack Stream.decode decodeInt)
 #guard passes (Tables.entries encodeEntry)
 
 -- The two statements of `Specify.Isa.Encode`, for streams.
-example (tr : Track) : Track.decode tr.encode = tr := Track.decode_encode tr
-example (n : Nat) : (Track.decode n).encode = n := by
-  simp only [Track.decode, Track.encode]
+example (tr : Stream) : Stream.decode tr.encode = tr := Stream.decode_encode tr
+example (n : Nat) : (Stream.decode n).encode = n := by
+  simp only [Stream.decode, Stream.encode]
   split <;> simp_all <;> omega
 
 /-! ## A copy of `tau-simplify` -/
@@ -135,7 +135,7 @@ def simplify (k : Kernel) : Kernel := simplifyFrom ⟨[], []⟩ k
 
 /-- Whether the word that `(p, t, i)` computes is at the slice at `q` on cycle
 `u`, on the stream `tr`: Machine 3.4. -/
-def arrives (cfg : Config) (tr : Track) (q u : Nat) : Nat × Nat × Instr → Bool
+def arrives (cfg : Config) (tr : Stream) (q u : Nat) : Nat × Nat × Instr → Bool
   | (p, t, i) =>
     Tables.result i == some tr &&
     match cfg.kindAt p with

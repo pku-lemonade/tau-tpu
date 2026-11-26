@@ -6,7 +6,7 @@ start and once from cycle 40, with a scratch buffer between the two calls.
 So the first product is issued on cycle 12 and the second on cycle 52.
 
 `tau.dense` is not an operation of the machine. It is a Python function that
-calls `affine`, `requant` and `relu`, and only those are recorded.
+calls `affine`, `requant` and `relu`, and only those are traced.
 """
 
 import tau

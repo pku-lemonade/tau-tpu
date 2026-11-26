@@ -2,7 +2,7 @@
 # Compile every example and check every pass of the compiler on it.
 #
 # An example is examples/.../kernel.mlir, examples/.../kernel.py (which the
-# Python frontend records as a kernel.mlir first), or both (in which case
+# Python frontend traces as a kernel.mlir first), or both (in which case
 # both must produce the same source.json). For each, tauc writes the program as
 # written and one file per pass:
 #

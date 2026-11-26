@@ -1,12 +1,12 @@
 import Tau.IR.Placed
-import Tau.Proofs.Machine.Arch
+import Tau.Proofs.Machine.SliceLevel
 import Tau.Proofs.IR.Kernel
 import Tau.Proofs.IR.MemMap
 
 /-!
 # A placed program does not look at its values
 
-The same fact as `Tau.Proofs.Machine.Arch` and `Tau.Proofs.IR.Kernel`,
+The same fact as `Tau.Proofs.Machine.SliceLevel` and `Tau.Proofs.IR.Kernel`,
 for the placed IR: a function `f` that respects the operations commutes
 with carrying out a placed program. Whether the program fails depends only on
 the program and the memory sizes, never on the values.

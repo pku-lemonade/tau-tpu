@@ -8,7 +8,7 @@ Build this file alone with:
 -/
 
 import Tau.Proofs.Check.Passes
-import Tau.Proofs.Machine.Circuit
+import Tau.Proofs.Machine.CellLevel
 import Tau.Proofs.IR.Unroll
 
 /-!
@@ -38,7 +38,7 @@ The proof is short, because each layer has already done its part:
 * It says nothing about the C++ compiler or the Python frontend. A wrong
   compiler produces programs the checker rejects; the theorem covers only the
   programs it accepts.
-* It trusts the JSON readers in `Tau.Sim.Json`: the source program and
+* It trusts the JSON readers in `Tau.Tools.Json`: the source program and
   the compiled program that were checked must be the ones that were meant.
 * The third point is about the slice-level machine. The cell-level machine
   is proved to end with the same memory; that it issues the same words on

@@ -9,126 +9,64 @@ cmake -S compiler -B compiler/build -G Ninja -DMLIR_DIR=/usr/lib/llvm-21/lib/cma
 cmake --build compiler/build                 # tauc and tau-opt
 scripts/check-examples.sh                    # compile every example; check and run every stage
 python3 scripts/make-exercises.py            # regenerate course/Prove/
-PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out   # record a Python program
+PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out   # trace a Python program
 (cd course/book && lake build)               # check every Lean example in the book
 ```
 
 Run every command from the repository folder. Installing the tools is
-"Setup" in `README.md`. CI (`.github/workflows/ci.yml`) and
-`docker/Dockerfile` run the same install commands; change all three
-together.
+"Setup" in `README.md`. The Lean version is pinned in `lean-toolchain`. The
+library has no dependencies; do not add Mathlib. The book in `course/book/`
+is a separate Lake package because it depends on Verso.
 
-The Lean version is pinned in `lean-toolchain`. The library has no
-dependencies; do not add Mathlib. The book in `course/book/` is a separate
-Lake package because it depends on Verso.
+## Rules for each folder
 
-## Conventions
+Before you change files in one of these folders, read its own rules:
 
-- Definitions go under `spec/Tau/<Area>/`. Theorems about them go under
-  `spec/Tau/Proofs/<Area>/`, in a file with the same name.
-- No `sorry` under `spec/Tau/`. `spec/tests/TauTest/Axioms.lean` pins the
-  axioms of the main theorems.
-- Nothing in `spec/` imports from `course/`. `spec/tests/` (`TauTest`) tests
-  the specification alone; a test that needs the course's tables or
-  exercises goes in `course/tests/` (`CourseTest`).
-- A person writes and judges what is outside `spec/Tau/Proofs/`; what is inside it
-  only has to compile. So a main theorem's statement is also a named
-  proposition in `spec/Tau/Claims.lean`, proved in `spec/Tau/Proofs/Claims.lean` by
-  that theorem, and a definition that a main statement needs goes in the
-  definitions tree, not in a proof file. Add both lines when you add a main
-  theorem.
-- Every hardware component is a `Tau.Block` (`spec/Tau/Blocks/Basic.lean`). Every
-  block theorem gives the output at cycle `t` as a function of earlier inputs.
-- Every IR of a program has two meanings: what it computes (`run`,
-  `execute`) and its timeline, the words it issues on fixed cycles
-  (`spec/Tau/Isa/Event.lean`). Every check compares both, and has two theorems,
-  `_sound` and `_pins`. A new IR or check needs both.
+- `spec/AGENTS.md`: the Lean specification, its proofs and its tests.
+- `compiler/AGENTS.md`: the C++ compiler and the Python frontend.
+- `course/AGENTS.md`: the course's exercises and tests.
+- Docs/README 1 (`docs/README.md`): the docs.
+
+These hold everywhere:
+
+- A fact is stated once. What the machine, a program and a compiler are
+  meant to be is in `docs/`, and nowhere else: cite a section ("Machine
+  3.4") instead of restating it, and do not add another docs folder. Each
+  folder's README says what is in that folder and nothing more.
 - Every rewrite of a program is a pass with a file of its own and a check.
-  Do not put a rewrite in a file writer. The passes are in
-  `compiler/lib/Passes/`, one file each; the writers, in `compiler/lib/Emit/`,
-  write what the IR holds.
 - Sizes are parameters. A theorem holds for every size; a check at one fixed
   size is a test.
-- The machine and the kernel semantics are written for an arbitrary `Sem`
-  (`spec/Tau/Isa/Op.lean`) and must never inspect a value to decide what to do. The
-  checker's proof depends on this.
-- Each definition file starts with a module comment that says what the thing
-  is, where tau-tpu uses it, and which terms a newcomer should look up, and
-  ends with the doc sections it specifies (`Docs: Machine 2.5`). It does not
-  teach digital design or compilers.
-- In a comment in a Lean file under `spec/` or `course/tests/`, name another
-  Lean file by its module (`Tau.Machine.Arch`), not its path, so that moving
-  a folder does not change the comment. Name folders, and files that are not
-  Lean, by their path.
-- `course/Work/` is for a student's own files. Do not put project code
-  there.
-- `course/Prove/` is generated. Change the proof under `spec/Tau/Proofs/` and
-  rerun `scripts/make-exercises.py`; never edit an exercise file by hand in a
-  commit. The script lists which proofs are exercises; the course asks only
-  for short ones. A comment at the top level of a proof (`  -- ...`) is kept
-  in the exercise as an outline, so write such comments in long proofs.
-- `course/Specify/` holds the specification exercises: a definition for the
-  student to write from a source, with tests. It has the folders of
-  `spec/Tau/`, as `course/Prove/` has those of `spec/Tau/Proofs/`: an
-  exercise about `spec/Tau/<Area>/` goes in `course/Specify/<Area>/`, under
-  the name of the file it asks for when there is one; the exercises about
-  the method are in `course/Specify/Method/`. `course/Specify/Support/Tables.lean`
-  has the tests, and `course/tests/CourseTest/Docs.lean` and
-  `course/tests/CourseTest/SpecSolutions.lean` run them on a solution, so an
-  exercise that cannot be solved fails the build. Commit these files with
-  `todo` in place of the definitions.
-- All shared prose about the specification is in `docs/`, and a fact is
-  stated there once. `Machine.md`, `Programs.md` and `Compiler.md` give the
-  intent, as a designer would write it. `Formats.md` describes the JSON
-  formats the tools exchange. `docs/README.md` has the rules for the docs
-  (section 1). Do not add another docs folder, and do not restate a doc in a
-  module comment, another README or the book: cite its section, as
-  "Machine 3.4", "Formats 3" or "Docs/README 1".
-- Call the thing the docs describe *the machine*: `spec/Tau/Machine/Arch.lean`
-  (the slice-level machine) and `spec/Tau/Machine/Circuit.lean` (the cell-level
-  machine) are two descriptions of it. Do not call it a chip or a processor in
-  prose. Use `machine` consistently across docs, Lean, C++ (`tau::Machine`,
-  `--machine`), and `machines/`.
-- A doc says less than the Lean on purpose, and the Lean decides where they
-  differ. It belongs to the project, and the course specifies from it, so do
-  not fill in what a doc leaves open: the `...Decisions` tables in
-  `course/Specify/Support/Tables.lean` list what must stay unsaid. A section
-  keeps its number.
-- Every table in a doc that gives a result for an input is a row in
-  `course/Specify/Support/Tables.lean`, run on the definitions by
-  `course/tests/CourseTest/Docs.lean`. Change the table, the rows and the definition
-  in `spec/Tau/` together.
-- Outside `docs/` and `spec/`, each part documents itself and nothing else:
-  `compiler/README.md` says how this compiler works and its limits, the
-  comment at the top of `compiler/python/tau/__init__.py` how the frontend
-  records, `examples/README.md` the examples, `spec/README.md` the Lean map
-  and claim status, and the root `README.md` how to set up and try the
-  project.
-- `course/Specify/IR/ReadCpp.lean` quotes lines of the C++ by number. After
-  changing `Unroll.cpp` or `Schedule.cpp`, renumber it; a test fails until
-  you do.
-- To add a feature, follow the path in the book chapter "Extending the
-  machine" (`course/book/TauBook/Extending.lean`).
-- `examples/*/*/stages/` (`nn/linear`, `ops/elementwise`, `nn/residual`) are
-  copies of `tauc`'s output, for readers without the compiler; the book points
-  to them. After changing the compiler, refresh them with
-  `UPDATE_STAGES=1 scripts/check-examples.sh`.
-- After changing the compiler or the JSON formats, run
-  `scripts/check-examples.sh` and update `docs/Formats.md`.
-- The image is described in section 3.10 of `docs/Machine.md`, specified
-  in `spec/Tau/Isa/Encode.lean`, and made by `tau-encode`
-  (`encodeEntry` in `compiler/lib/Passes/Encode.cpp`). Change them together. Its tables
-  are tested against the Lean, and `tau-check --encode` fails until the C++
-  agrees with it.
-- The frontend (`compiler/python/tau/`) is one Python module with no dependencies.
-  It records; it does not translate. An operation added to the dialect needs
-  a function there with both behaviours, recording and computing, and the
-  computing one must follow `spec/Tau/Isa/Word.lean`. An example written in
-  Python is `examples/.../kernel.py` and binds its program to `kernel`.
-- `spec/README.md` ("The map" and "Status") names every IR, step, check and
-  main theorem, and says how each claim stands. Update both when you add or
-  rename one. They point to Lean files and doc sections and do not restate
-  definitions.
+- To add a feature, follow the book chapter "Extending the machine"
+  (`course/book/TauBook/Extending.lean`).
+
+## Change these together
+
+| When you change | Also change |
+|---|---|
+| the install commands in `README.md` ("Setup") | `.github/workflows/ci.yml` and `docker/Dockerfile` |
+| a table in a doc | its rows in `course/Specify/Support/Tables.lean` and the definition in `spec/Tau/` (Docs/README 1) |
+| the image (Machine 3.10) | `spec/Tau/Isa/Encode.lean` and `encodeEntry` in `compiler/lib/Passes/Encode.cpp`; `tau-check --encode` fails until they agree |
+| what the compiler writes | `examples/*/*/stages/`, with `UPDATE_STAGES=1 scripts/check-examples.sh`; and `docs/Formats.md` if a format changes |
+| `compiler/lib/Passes/Unroll.cpp` or `Schedule.cpp` | the line numbers that `course/Specify/IR/ReadCpp.lean` and `course/Specify/Support/Tables.lean` quote; a test fails until you do |
+| a proof under `spec/Tau/Proofs/` | `course/Prove/`, by rerunning `scripts/make-exercises.py` |
+| a main theorem | its statement in `spec/Tau/Claims.lean` and the line that proves it in `spec/Tau/Proofs/Claims.lean` |
+| an IR, step, check or main theorem, added or renamed | "The map" and "Status" in `spec/README.md`, which name every one and say how each claim stands |
+| a kernel operation in the dialect | a function in `compiler/python/tau/` that traces it and computes it |
+
+## Words
+
+One word for each thing, in the docs, the Lean, the C++ and all prose.
+
+| Say | For | Also fine | Not |
+|---|---|---|---|
+| machine | what the docs describe; `Machine/SliceLevel.lean` and `Machine/CellLevel.lean` are two descriptions of it | machine config, for its description (`Tau.Config`, `tau::Machine`, `machines/`) | chip, processor |
+| slice-level machine, cell-level machine | those two descriptions | | architectural, circuit |
+| block | a clocked component, `Tau.Block` | component | |
+| IR | one of the representations a program takes in the compiler (Compiler 2) | | form |
+| stream | what carries words between slices, `Tau.Stream` | | track |
+| entry | one item of a slice's program, `Tau.TimedEntry`, `tau.entry` | timed entry | |
+| trace | what the Python frontend does to a program | | record |
+| pin | a cycle attached to an operation | `at`, its name in Python and MLIR | |
 
 ## Helping a student
 
@@ -155,7 +93,8 @@ write and theirs to review. When someone is working through the course:
     hypothesis to get past it without saying so.
   - Leave no `sorry`. If part is unproved, say which part.
   - Report every file you changed.
-- `course/Specify/Method/Review.lean` contains proofs that are wrong on purpose. Do
-  not point out what is wrong with them unless asked for the answer.
+- `course/Specify/Method/Review.lean` contains proofs that are wrong on
+  purpose. Do not point out what is wrong with them unless asked for the
+  answer.
 - Do not explain digital design or compiler theory at length. Name the term
   and point to the reading list in the book.

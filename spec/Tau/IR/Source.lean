@@ -5,7 +5,7 @@ import Tau.IR.Kernel
 
 The first IR a program takes: what the user wrote. A source program is a
 kernel that may also *call* other kernels. It is what the Python frontend
-records (`compiler/python/tau/`), and the Lean model of a module of the compiler's `tau`
+traces (`compiler/python/tau/`), and the Lean model of a module of the compiler's `tau`
 dialect with `tau.call` in it.
 
 A call names the kernel to run, the caller's buffers that the kernel's own

@@ -22,10 +22,10 @@ import Tau.Isa.Event
 import Tau.Isa.Encode
 
 -- The machine (Machine 3, 4).
-import Tau.Machine.Arch
+import Tau.Machine.SliceLevel
 import Tau.Machine.Timing
 import Tau.Machine.Issues
-import Tau.Machine.Circuit
+import Tau.Machine.CellLevel
 
 -- The IRs of a program (Programs, Compiler 2 to 4).
 import Tau.IR.Kernel
@@ -42,8 +42,8 @@ import Tau.Check.Checker
 import Tau.Check.Passes
 
 -- What the command-line tools call (Formats).
-import Tau.Sim.Json
-import Tau.Sim.Run
+import Tau.Tools.Json
+import Tau.Tools.Run
 
 -- Every main statement.
 import Tau.Claims
@@ -64,10 +64,10 @@ import Tau.Proofs.Isa.Word
 import Tau.Proofs.Isa.Event
 import Tau.Proofs.Isa.Encode
 
-import Tau.Proofs.Machine.Arch
+import Tau.Proofs.Machine.SliceLevel
 import Tau.Proofs.Machine.Timing
 import Tau.Proofs.Machine.Issues
-import Tau.Proofs.Machine.Circuit
+import Tau.Proofs.Machine.CellLevel
 
 import Tau.Proofs.IR.Kernel
 import Tau.Proofs.IR.Source

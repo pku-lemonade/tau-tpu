@@ -1,8 +1,91 @@
 # The examples
 
-Programs for the machine, each with the buffers to run it on. They are what
-`scripts/check-examples.sh` compiles and checks; the comment at the top of
-the script says what it checks on each.
+Programs for the machine, each with the buffers to run it on, and how to try
+them. Run every command from the repository folder, after "Setup" in the
+[root README](../README.md#setup). `out/` can be any folder; `tauc` makes it.
+
+Contents:
+- [Try it](#try-it)
+- [What is in a folder](#what-is-in-a-folder)
+- [The examples](#the-examples)
+
+## Try it
+
+### 1. Without the compiler
+
+Lean alone can check and run the compiler's output for three examples, kept
+in their `stages/` folders:
+
+```bash
+lake exe tau-check examples/nn/linear/stages/source.json examples/nn/linear/stages/image.json
+lake exe tau-sim examples/nn/linear/stages/image.json examples/nn/linear/buffers.json
+```
+
+`tau-check` prints `ACCEPT` if the image computes what the source computes;
+`tau-sim` prints the buffers at the end. The same program can also be run
+in Python, with no compiler and no Lean:
+
+```bash
+PYTHONPATH=compiler/python python3 -m tau examples/nn/linear/kernel.py --run examples/nn/linear/buffers.json
+```
+
+### 2. From Python
+
+```bash
+PYTHONPATH=compiler/python python3 -m tau examples/nn/linear/kernel.py -o out   # out/kernel.mlir and out/traced.json
+compiler/build/bin/tauc out/kernel.mlir -o out                                  # one file per pass
+lake exe tau-check out/source.json out/image.json                              # the whole compiler at once
+lake exe tau-sim out/image.json examples/nn/linear/buffers.json                # run the image
+```
+
+### 3. From MLIR
+
+```bash
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out
+lake exe tau-check out/source.json out/image.json
+lake exe tau-sim out/image.json examples/nn/linear/buffers.json
+```
+
+`nn/linear`, `nn/residual` and `ops/elementwise` have the same program as
+both `kernel.py` and `kernel.mlir`.
+
+### 4. Pins and timelines
+
+`paced` pins a loop to one iteration every four cycles. `--timeline` prints
+words and their cycles instead of buffers:
+
+```bash
+PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out
+compiler/build/bin/tauc out/kernel.mlir -o out
+lake exe tau-check out/source.json out/image.json                          # buffers and pins
+lake exe tau-sim --timeline out/source.json examples/paced/buffers.json   # the pinned words
+lake exe tau-sim --timeline out/image.json examples/paced/buffers.json    # every word the machine issues
+```
+
+### 5. One pass at a time
+
+`tauc` writes one file per pass (Formats 5), and each can be checked against
+the file before it and run on its own. A rejection names the pass that went
+wrong:
+
+```bash
+lake exe tau-check out/placed.json out/scheduled.json   # tau-schedule
+lake exe tau-sim out/placed.json examples/paced/buffers.json
+```
+
+`compiler/README.md` ("Nothing here is proved") lists the pair for every pass.
+
+### 6. Every example
+
+```bash
+scripts/check-examples.sh   # every line should start with "ok"
+```
+
+The script compiles every example, checks every pass against its input,
+runs every file, and confirms that a damaged copy of each file is rejected,
+and for a program with pins a copy that is one cycle late. For an example
+written in Python it also compares the frontend with the compiler and with
+the Lean tools.
 
 ## What is in a folder
 
@@ -26,8 +109,7 @@ lake exe tau-sim examples/linear-by-hand/compiled.json examples/linear-by-hand/b
 ## The examples
 
 Programs with pins and calls are at the top, neural-network layers under
-`nn/`, and single operations and memory hazards under `ops/`. Three have a
-`stages/` folder: `nn/linear`, `nn/residual` and `ops/elementwise`.
+`nn/`, and single operations and memory hazards under `ops/`.
 
 | Example | Input | What it exercises |
 |---|---|---|
