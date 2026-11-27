@@ -154,7 +154,8 @@ is wrong.
 
 The duty of section 5 does not say which step decides what. The table of
 section 4 does, and an output can be held to its row of that table as well,
-by comparing its text with the text of the input:
+by comparing its instructions with those of the input, without running
+either:
 
 | Step | Its output |
 |---|---|

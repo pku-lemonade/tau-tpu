@@ -173,7 +173,8 @@ method on steps small enough for it.
 
 **Three steps held to what they decide.** Compiler 4 gives each step of the
 back end one thing to decide, and Compiler 8 says what its output may then
-differ in. A *rule* compares the texts of the input and the output for that.
+differ in. A *rule* compares the instructions of the input and of the output for
+that, without running either.
 
 | Step | Decides | Rule |
 |---|---|---|

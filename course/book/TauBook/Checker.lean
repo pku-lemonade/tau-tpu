@@ -305,8 +305,9 @@ kernel; it has made a decision about time that the scheduler can then not
 take back.
 
 `spec/Tau/Check/Decides.lean` has a _rule_ for each of the three. A rule
-compares the text of the output with the text of the input, and says whether
-they differ only in what the pass decides (section 8 of the doc).
+compares the instructions of the output with those of the input, without
+running either, and says whether they differ only in what the pass decides
+(section 8 of the doc).
 
 {docstring Tau.placeOnly}
 

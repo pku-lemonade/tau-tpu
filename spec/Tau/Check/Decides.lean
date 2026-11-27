@@ -10,9 +10,9 @@ checks of `Tau.Check.Passes` do not ask about that. They ask whether the
 output of a pass computes what its input computes, on the same cycles, and
 they accept an output that got there by doing another pass's work.
 
-This file has one *rule* for each of the three. A rule compares the text of
-the output with the text of the input and says whether the two differ only in
-what the pass is there to decide.
+This file has one *rule* for each of the three. A rule compares the
+instructions of the output with those of the input, without running either,
+and says whether the two differ only in what the pass is there to decide.
 
 | Pass | Rule | Its output |
 |---|---|---|
@@ -25,7 +25,7 @@ that breaks a rule can still be right, and the checks decide that. What a
 rule says is that a pass left alone what the other passes decide. Each rule
 is a conjunction of named parts, so that a tool can say which part failed.
 
-To compare texts, an instruction is reduced to its *shape*: what it does,
+To compare two programs, an instruction is reduced to its *shape*: what it does,
 without the words it uses. `read 3 to stream 2 going east`, `read 3 to
 variable 7` and the kernel's `load` of the word at address 3 have one shape.
 

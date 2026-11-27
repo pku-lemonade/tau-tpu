@@ -157,20 +157,20 @@ machine would be loaded with.
              "memDelay": 1, "vxmDelay": 1, "sxmDelay": 1, "mxmDelay": 2},
   "memSizes": [0, 0, 4, 4, 0, 0, 0, 0, 0],
   "map": [{"slice": 2, "base": 0, "size": 4}, {"slice": 3, "base": 0, "size": 4}],
-  "cycles": 22,
+  "cycles": 11,
   "image": [
     [0],
     [0],
-    [1, 2, 3, 3, 1, 0, 0, 0],
-    [1, 9, 3, 3, 1, 1, 1, 0],
-    [1, 6, 3, 3, 0, 2, 0, 1, 0],
+    [1, 0, 3, 0, 1, 0, 0, 0],
+    [1, 7, 3, 0, 1, 1, 1, 0],
+    [1, 4, 3, 0, 0, 2, 0, 1, 0],
     [0], [0], [0], [0]
   ]
 }
 ```
 
-This is `examples/paced`. Slice 2 has one entry: from cycle 2, three more
-times, 3 idle cycles apart, the address growing by 1; opcode 0, `read`,
+This is `examples/paced`. Slice 2 has one entry: from cycle 0, three more
+times, with no idle cycle between, the address growing by 1; opcode 0, `read`,
 address 0, onto stream 0 going east.
 
 The numbers are those of Machine 3.10: for each slice the count of its

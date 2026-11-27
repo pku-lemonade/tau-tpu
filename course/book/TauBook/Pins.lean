@@ -240,9 +240,14 @@ than that, the word waits in memory, which is the only place a word can wait.
 If the second is earlier, the compiler refuses the program.
 
 `examples/pinned-chain/kernel.py` has both cases: three pins that agree, and
-three of which one is much later.
+three of which one is three cycles later than that.
 
-`examples/paced/kernel.py` pins a loop to one iteration every four cycles:
+A pin need not cost anything. The pins of the examples are on the cycles of
+the shortest schedule the compiler finds, where there is one: the program
+runs as fast as without them, and its timing is now part of what is checked.
+
+`examples/paced/kernel.py` pins a loop to one iteration every cycle, the
+fastest pace there is, since a slice issues one instruction in a cycle:
 
 ```
 PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out
@@ -251,19 +256,26 @@ lake exe tau-sim --timeline out/source.json examples/paced/buffers.json
 lake exe tau-check out/source.json out/compiled.json
 ```
 
-One iteration takes seven cycles from its read to its write, so with four
-cycles between iterations two are always in flight. Open `out/compiled.json`:
-the whole loop is three entries, each issued four times, four cycles apart.
-A loop at a fixed spacing is what a repeating entry is.
+One iteration takes seven cycles from its read to its write, so with one
+cycle between iterations all four are in flight at once. Open
+`out/compiled.json`: the whole loop is three entries, each issued four times,
+on consecutive cycles. A loop at a fixed spacing is what a repeating entry is.
 
 ```
-cycle:   2   4   6   8  10  12  14  16  18  20  22
-iter 0:  R───────V─────W
-iter 1:          R───────V─────W
-iter 2:                  R───────V─────W
-iter 3:                          R───────V─────W
+cycle:   0  1  2  3  4  5  6  7  8  9  10
+iter 0:  R───────────V────────W
+iter 1:     R───────────V────────W
+iter 2:        R───────────V────────W
+iter 3:           R───────────V────────W
          (R = read at slice 2, V = relu at slice 4, W = write at slice 3)
 ```
+
+A pace is also what makes a long loop a short program.
+`examples/paced-axpy/kernel.py` has three operations in its loop and one pin,
+on the last. Compile it with and without the pin, and count the entries of
+`out/compiled.json` each time. Without the pin the compiler fits the
+iterations in between each other, which is two cycles shorter and has little
+that repeats.
 
 # How to work through it
 
@@ -299,8 +311,8 @@ pins of a source program.
 *Claims.* Add to `course/Work/Claims.md` a row for what a pin claims and a row
 for what it does not.
 
-*By hand.* In `examples/paced/kernel.py`, change the spacing from 4 to 2,
-then 1, then 0, and compile each (work on a copy, or change it back
+*By hand.* In `examples/paced/kernel.py`, change the spacing from 1 to 4,
+then 2, then 0, and compile each (work on a copy, or change it back
 afterwards). Write down first how many cycles you expect
 each to take. One of them does not compile: read the error, find in
 `Schedule.cpp` the line that prints it, and say what on the machine is asked to

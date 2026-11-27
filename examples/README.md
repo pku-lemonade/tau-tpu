@@ -51,7 +51,7 @@ both `kernel.py` and `kernel.mlir`.
 
 ### 4. Pins and timelines
 
-`paced` pins a loop to one iteration every four cycles. `--timeline` prints
+`paced` pins a loop to one iteration every cycle. `--timeline` prints
 words and their cycles instead of buffers:
 
 ```bash
@@ -111,12 +111,17 @@ lake exe tau-sim examples/linear-by-hand/compiled.json examples/linear-by-hand/b
 Programs with pins and calls are at the top, neural-network layers under
 `nn/`, and single operations and memory hazards under `ops/`.
 
+The pins of `paced`, `two-layer` and `pinned-end` are on the cycles of the
+shortest schedule the compiler finds for the program, so they cost nothing.
+`paced-axpy` and `pinned-chain` say what theirs cost.
+
 | Example | Input | What it exercises |
 |---|---|---|
-| `paced` | Python | a loop pinned to one iteration every four cycles, which folds into three repeating entries |
-| `two-layer` | Python | one kernel called twice, the second call from a later cycle, with a scratch buffer between |
+| `paced` | Python | a loop pinned to one iteration every cycle, the fastest pace there is, which folds into three repeating entries |
+| `paced-axpy` | Python | a loop of three operations paced by one pin: two cycles longer than the compiler's own schedule, and a third the entries |
+| `two-layer` | Python | one kernel called twice, the second call from the first cycle on which its input is ready, with a scratch buffer between |
 | `pinned-chain` | Python | three pins that agree, so the word goes directly, and three that do not, so it waits in memory |
-| `pinned-end` | Python | one pin at the end of a chain; what comes before it is scheduled backward from it, so nothing waits |
+| `pinned-end` | Python | one pin at the end of a chain, on the earliest cycle it can have; what comes before it is scheduled backward from it, so nothing waits |
 | `linear-by-hand` | JSON | the linear layer scheduled by hand |
 | `nn/linear` | Python & MLIR | one quantized linear layer; a redundant `relu` for the simplifier |
 | `nn/residual` | Python & MLIR | a residual block; one value used twice |
