@@ -141,4 +141,5 @@ Programs with pins and calls are at the top, neural-network layers under
 | `ops/shuffle` | MLIR | the rearrangement slice, and a value that waits in memory |
 | `ops/east-side` | MLIR | buffers east of the vector slice; uses the east matrix and rearrangement slices |
 | `ops/overwrite` | MLIR | a running sum in one word, and a load that must survive a store |
+| `ops/unused` | MLIR | two operations whose words nothing uses: the simplifier removes the one without a pin and keeps the pinned one |
 | `ops/neighbours` | MLIR | two words of one memory slice needed on one cycle; one goes round through a second memory slice |

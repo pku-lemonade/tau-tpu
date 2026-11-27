@@ -6,8 +6,13 @@
 //   max(a, a)    -> a
 //   min(a, a)    -> a
 //
+// The rewrite driver also removes an operation whose word nothing uses, if
+// the operation has no effect.
+//
 // A pinned operation is never removed: its word has to be issued on its
-// cycle, so there has to be an operation to issue it.
+// cycle, so there has to be an operation to issue it. The rewrites below ask
+// for the pin, and the dialect gives a pinned operation an effect
+// (`Tau_ValueOp` in TauOps.td), so the driver leaves it alone.
 //
 // spec/Tau/Check/Simplify.lean applies the same rewrites to expressions, and
 // spec/Tau/Proofs/Check/Simplify.lean proves they keep values. This C++ code is

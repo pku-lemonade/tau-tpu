@@ -70,6 +70,22 @@ class Tau_Op<string mnemonic, list<Trait> traits = []>
 // `at t every d` means cycle `t + d * i`. spec/Tau/Isa/Event.lean says what a pin
 // claims.
 
+// An operation that only computes a word may be removed when nothing uses the
+// word, unless it is pinned: a pinned word has to be issued on its cycle, used
+// or not. So such an operation has no effect when it has no pin, and one when
+// it has.
+class Tau_ValueOp<string mnemonic>
+    : Tau_Op<mnemonic, [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let extraClassDefinition = [{
+    void $cppClass::getEffects(
+        ::llvm::SmallVectorImpl<::mlir::MemoryEffects::EffectInstance>
+            &effects) {
+      if (getAt())
+        effects.emplace_back(::mlir::MemoryEffects::Write::get());
+    }
+  }];
+}
+
 def Tau_LoadOp : Tau_Op<"load"> {
   let summary = "Load one word from a buffer";
   let arguments = (ins Tau_BufType:$buf, I64Attr:$base, I64Attr:$stride,
@@ -91,7 +107,7 @@ def Tau_StoreOp : Tau_Op<"store"> {
   }];
 }
 
-class Tau_UnOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
+class Tau_UnOp<string mnemonic, string desc> : Tau_ValueOp<mnemonic> {
   let summary = desc;
   let arguments = (ins Tau_WordType:$a,
                        OptionalAttr<I64Attr>:$at,
@@ -102,7 +118,7 @@ class Tau_UnOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
   }];
 }
 
-class Tau_UnKOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
+class Tau_UnKOp<string mnemonic, string desc> : Tau_ValueOp<mnemonic> {
   let summary = desc;
   let arguments = (ins Tau_WordType:$a, I64Attr:$k,
                        OptionalAttr<I64Attr>:$at,
@@ -113,7 +129,7 @@ class Tau_UnKOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
   }];
 }
 
-class Tau_BinOp<string mnemonic, string desc> : Tau_Op<mnemonic, [Pure]> {
+class Tau_BinOp<string mnemonic, string desc> : Tau_ValueOp<mnemonic> {
   let summary = desc;
   let arguments = (ins Tau_WordType:$a, Tau_WordType:$b,
                        OptionalAttr<I64Attr>:$at,
@@ -140,7 +156,7 @@ def Tau_RotateOp : Tau_UnKOp<"rotate", "Rotate the lanes by k places">;
 def Tau_ReverseOp : Tau_UnOp<"reverse", "Put the lanes in opposite order">;
 def Tau_BroadcastOp : Tau_UnKOp<"broadcast", "Copy lane k to every lane">;
 
-def Tau_PermuteOp : Tau_Op<"permute", [Pure]> {
+def Tau_PermuteOp : Tau_ValueOp<"permute"> {
   let summary = "Lane i takes the value of lane table[i]";
   let arguments = (ins Tau_WordType:$a, DenseI64ArrayAttr:$table,
                        OptionalAttr<I64Attr>:$at,
@@ -162,7 +178,7 @@ def Tau_XorOp : Tau_BinOp<"xor", "Bit-wise exclusive or">;
 def Tau_LtOp
     : Tau_BinOp<"lt", "Lane-wise: 1 where the first is less, else 0">;
 
-def Tau_ConstOp : Tau_Op<"const", [Pure]> {
+def Tau_ConstOp : Tau_ValueOp<"const"> {
   let summary = "The constant word with the given lanes";
   let arguments = (ins DenseI64ArrayAttr:$values,
                        OptionalAttr<I64Attr>:$at,
@@ -173,7 +189,7 @@ def Tau_ConstOp : Tau_Op<"const", [Pure]> {
   }];
 }
 
-def Tau_SelectOp : Tau_Op<"select", [Pure]> {
+def Tau_SelectOp : Tau_ValueOp<"select"> {
   let summary = "Lane-wise: a where m is not zero, b elsewhere";
   let arguments = (ins Tau_WordType:$m, Tau_WordType:$a, Tau_WordType:$b,
                        OptionalAttr<I64Attr>:$at,
