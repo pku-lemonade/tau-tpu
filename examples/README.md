@@ -115,13 +115,16 @@ Programs with pins and calls are at the top, neural-network layers under
 |---|---|---|
 | `paced` | Python | a loop pinned to one iteration every four cycles, which folds into three repeating entries |
 | `two-layer` | Python | one kernel called twice, the second call from a later cycle, with a scratch buffer between |
-| `pinned-chain` | Python | three pins that agree and stay in one group, and three that do not, so a word waits in memory |
+| `pinned-chain` | Python | three pins that agree, so the word goes directly, and three that do not, so it waits in memory |
+| `pinned-end` | Python | one pin at the end of a chain; what comes before it is scheduled backward from it, so nothing waits |
 | `linear-by-hand` | JSON | the linear layer scheduled by hand |
 | `nn/linear` | Python & MLIR | one quantized linear layer; a redundant `relu` for the simplifier |
 | `nn/residual` | Python & MLIR | a residual block; one value used twice |
 | `nn/affine` | MLIR | the linear layer with the bias added inside the matrix slice |
+| `nn/affine-own-bias` | MLIR | an affine layer whose bias is the vector it multiplies: one word used by two instructions of a product |
 | `nn/affine-batch` | MLIR | two affine layers in a loop, each with its own matrix |
 | `nn/batch-linear` | MLIR | a matrix multiplied four times; its columns are stored in the matrix slice once |
+| `nn/two-matrices` | MLIR | two matrices that take turns in one matrix slice's stored columns |
 | `nn/mlp` | MLIR | two linear layers in a row |
 | `nn/mlp-wide` | MLIR | the same kernel on the 17-slice machine (`machines/tau17.json`) |
 | `nn/gemv8` | MLIR | an 8 x 8 matrix times a vector |
@@ -138,3 +141,4 @@ Programs with pins and calls are at the top, neural-network layers under
 | `ops/shuffle` | MLIR | the rearrangement slice, and a value that waits in memory |
 | `ops/east-side` | MLIR | buffers east of the vector slice; uses the east matrix and rearrangement slices |
 | `ops/overwrite` | MLIR | a running sum in one word, and a load that must survive a store |
+| `ops/neighbours` | MLIR | two words of one memory slice needed on one cycle; one goes round through a second memory slice |

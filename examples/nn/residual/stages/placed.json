@@ -179,55 +179,25 @@
       "src": 14
     },
     {
-      "addr": 2,
-      "op": "write",
-      "slice": 2,
-      "src": 15
-    },
-    {
-      "addr": 2,
+      "a": 0,
+      "b": 15,
       "dst": 16,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 4,
-      "op": "write",
-      "slice": 3,
-      "src": 16
-    },
-    {
-      "addr": 0,
-      "dst": 17,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 4,
-      "dst": 18,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 17,
-      "b": 18,
-      "dst": 19,
       "fn": "add",
       "op": "bin",
       "slice": 4
     },
     {
-      "dst": 20,
+      "dst": 17,
       "fn": "relu",
       "op": "un",
       "slice": 4,
-      "src": 19
+      "src": 16
     },
     {
       "addr": 1,
       "op": "write",
       "slice": 2,
-      "src": 20
+      "src": 17
     }
   ],
   "map": [
@@ -260,8 +230,8 @@
   "memSizes": [
     0,
     0,
-    3,
-    5,
+    2,
+    4,
     0,
     1,
     4,

@@ -190,6 +190,50 @@ def explainPair (before after : Json.Stage) : String :=
           | none => s!"the {second} and the {first} disagree"
         else s!"the {second} and the {first} end with different buffers"
 
+/-! ## Holding a pass to what it decides
+
+The rules of `Tau.Check.Decides`, for two stage files. Like the comparisons
+below, this is a test of the compiler and no theorem depends on it. -/
+
+/-- The parts of the rule for two stage files, each with what it says, in
+the order they are tried. `none` if no rule compares these two kinds of
+file. -/
+def decidesParts : Json.Stage → Json.Stage → Option (List (String × Bool))
+  | .kernel _ k, .placed pl => some
+    [ ("the placed program has scratch space: a word of memory that belongs to no buffer",
+        pl.noScratch),
+      ("the placed program does not have one instruction for each operation of the kernel",
+        sameOperations k pl),
+      ("the placed program does not have one write for each store of the kernel",
+        sameStores k pl) ]
+  | .placed pl, .compiled c => some
+    ([ ("the compiled program has another memory map", c.map == pl.map),
+       ("the compiled program is for another machine", c.cfg.sameSlices pl.cfg) ] ++
+     (List.range pl.cfg.kinds.length).map fun p =>
+       (s!"slice {p}: the compiled program does not have the placed program's instructions, " ++
+          "with nothing added but reads of the same buffer words and uses of scratch words",
+        sameWorkAt pl c p))
+  | .compiled c, .compiled c' => some
+    [ ("the second program has another memory map, other memory sizes or another length",
+        c'.map == c.map && c'.memSizes == c.memSizes && c'.cycles == c.cycles),
+      ("the second program is for another machine", c'.cfg.sameSlices c.cfg),
+      ("the second program does not have the entries of the first with other stream numbers",
+        sameEntries c c'),
+      ("a stream of the first program has two streams of the second in its place",
+        oneRenaming c c') ]
+  | _, _ => none
+
+/-- Which rule compares two stage files, and its verdict: `placeOnly`,
+`scheduleOnly` or `routeOnly`. -/
+def decidesPair (before after : Json.Stage) : Option Bool :=
+  (decidesParts before after).map fun parts => parts.all (·.2)
+
+/-- The first part of the rule that does not hold. -/
+def explainDecides (before after : Json.Stage) : String :=
+  match (decidesParts before after).bind fun parts => parts.find? fun part => !part.2 with
+  | some (what, _) => what
+  | none => "the rule holds"
+
 /-! ## Comparing a pass with its Lean model
 
 `Kernel.unroll` (`Tau.IR.Unroll`) is the Lean model of the compiler's

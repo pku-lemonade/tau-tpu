@@ -251,14 +251,18 @@ def Tau_CallOp : Tau_Op<"call"> {
 // kernel needs them to take effect. spec/Tau/IR/Placed.lean is the Lean model.
 //
 // A `!tau.word` value is now a word travelling on a stream from the slice
-// that produces it to the one slice that uses it. A `!tau.acc` value links
-// the instructions of one matrix-vector product.
+// that produces it to the slices that use it. A `!tau.acc` value links the
+// instructions of one matrix-vector product, or of one stored matrix.
 //
 // Every instruction has a `slice`, and a `pin` if the kernel operation it
 // issues the word of was pinned. The later passes add:
 //
 //   time            the cycle of issue                       (tau-schedule)
 //   east, stream    the stream that carries the result       (tau-route)
+//
+// `tau-schedule` also adds instructions: a read of a buffer word for each
+// instruction that uses it, and for a word that has to wait a write to a
+// scratch word and the reads that take it out again.
 
 class Tau_Instr<string mnemonic> : Tau_Op<"i." # mnemonic>;
 

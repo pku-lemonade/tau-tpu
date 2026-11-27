@@ -51,6 +51,7 @@ These hold everywhere:
 | a proof under `spec/Tau/Proofs/` | `course/Prove/`, by rerunning `scripts/make-exercises.py` |
 | a main theorem | its statement in `spec/Tau/Claims.lean` and the line that proves it in `spec/Tau/Proofs/Claims.lean` |
 | an IR, step, check or main theorem, added or renamed | "The map" and "Status" in `spec/README.md`, which name every one and say how each claim stands |
+| what `tau-place`, `tau-schedule` or `tau-route` decides (Compiler 4 and 8) | its rule in `spec/Tau/Check/Decides.lean`, and the rule's parts in `decidesParts` in `spec/Tau/Tools/Run.lean` |
 | a kernel operation in the dialect | a function in `compiler/python/tau/` that traces it and computes it |
 
 ## Words

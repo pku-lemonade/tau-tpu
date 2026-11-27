@@ -28,6 +28,12 @@ std::optional<int64_t> optIntAttr(mlir::Operation &op, llvm::StringRef name);
 void setIntAttr(mlir::Operation &op, llvm::StringRef name, int64_t value);
 /// The result of `op` that travels on a stream, if it has one.
 mlir::Value streamResult(mlir::Operation &op);
+/// The direction of the stream that carries the result of `op` to the
+/// instructions that use it: east (true) if all of them are at its position
+/// or a higher one, west if all are at its position or a lower one, and
+/// nothing if they lie on both sides. A word is on one stream, and a stream
+/// goes one way (Machine 3.2).
+std::optional<bool> goesEast(mlir::Operation &op);
 /// The name a machine's `delays` give `op` (Formats 3): the `fn` of
 /// `tau.i.un` and `tau.i.bin`, and the instruction otherwise. Mirrors
 /// `Instr.name` in spec/Tau/Isa/Instr.lean.

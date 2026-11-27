@@ -82,6 +82,15 @@ optimization:
   the self-guided version. Lessons 2 and 3 cover representations and local
   optimization; lesson 5 covers SSA.
 
+For binding, list scheduling, ASAP and ALAP schedules, critical path and
+spilling, which are what `tau-place` and `tau-schedule` do:
+
+* Cooper and Torczon, _Engineering a Compiler_, the chapter on instruction
+  scheduling. List scheduling, forward and backward, in a dozen pages.
+* De Micheli, _Synthesis and Optimization of Digital Circuits_, 1994, the
+  chapter on scheduling. ASAP and ALAP schedules, and list scheduling when
+  the resources are limited, as a hardware designer meets them.
+
 For MLIR:
 
 * [The MLIR Toy tutorial](https://mlir.llvm.org/docs/Tutorials/Toy/).

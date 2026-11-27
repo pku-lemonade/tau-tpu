@@ -110,15 +110,18 @@ Lean. Then give it to someone and ask them what they think is guaranteed.
 
 # Where to go next
 
-* Write down, in Lean, what a valid schedule of a placed program is: the same
-  instructions, each operand read on the cycle the timing rule gives, and no
-  two words in one stream slot. Then prove that a valid schedule computes what
-  the placed program computes. `spec/Tau/Proofs/Machine/Timing.lean` is the
-  first lemma. This is a large project.
+* Write down, in Lean, what a valid schedule of a placed program is. Start
+  from `scheduleOnly` in `spec/Tau/Check/Decides.lean`, which says which
+  instructions a schedule may have. Add when: each operand is read on the
+  cycle the timing rule gives, a word that waits is read after it is written,
+  and no two words are in one stream slot. Then prove that a valid schedule
+  computes what the placed program computes.
+  `spec/Tau/Proofs/Machine/Timing.lean` is the first lemma. This is a large
+  project.
 * Prove something about the scheduler itself, in Lean: for instance, that a
   schedule built by `tau-schedule` from the output of `tau-place` is always
-  valid in that sense. This is a research-sized problem. Start with groups of
-  one operation.
+  valid in that sense. This is a research-sized problem. Start with a
+  program of one operation, and with the forward walk alone.
 * Lean-MLIR is a framework for verifying rewrites on MLIR-style
   representations, with far more automation than this course uses.
 * CompCert is a C compiler proved correct in another proof assistant. Its

@@ -40,6 +40,7 @@ import Tau.Check.Expr
 import Tau.Check.Simplify
 import Tau.Check.Checker
 import Tau.Check.Passes
+import Tau.Check.Decides
 
 -- What the command-line tools call (Formats).
 import Tau.Tools.Json

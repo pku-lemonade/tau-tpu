@@ -40,53 +40,17 @@
       "slice": 4
     },
     {
-      "addr": 4,
-      "op": "write",
-      "slice": 2,
-      "src": 2
-    },
-    {
-      "addr": 0,
+      "a": 0,
+      "b": 1,
       "dst": 3,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 0,
-      "dst": 4,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 3,
-      "b": 4,
-      "dst": 5,
       "fn": "sub",
       "op": "bin",
       "slice": 4
     },
     {
-      "addr": 4,
-      "op": "write",
-      "slice": 3,
-      "src": 5
-    },
-    {
-      "addr": 4,
-      "dst": 6,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 4,
-      "dst": 7,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 6,
-      "b": 7,
-      "dst": 8,
+      "a": 2,
+      "b": 3,
+      "dst": 4,
       "fn": "max",
       "op": "bin",
       "slice": 4
@@ -95,217 +59,133 @@
       "addr": 0,
       "op": "write",
       "slice": 5,
-      "src": 8
+      "src": 4
     },
     {
       "addr": 1,
-      "dst": 9,
+      "dst": 5,
       "op": "read",
       "slice": 2
     },
     {
       "addr": 1,
-      "dst": 10,
+      "dst": 6,
       "op": "read",
       "slice": 3
     },
     {
-      "a": 9,
-      "b": 10,
-      "dst": 11,
+      "a": 5,
+      "b": 6,
+      "dst": 7,
       "fn": "add",
       "op": "bin",
       "slice": 4
     },
     {
-      "addr": 4,
-      "op": "write",
-      "slice": 5,
-      "src": 11
+      "a": 5,
+      "b": 6,
+      "dst": 8,
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4
+    },
+    {
+      "a": 7,
+      "b": 8,
+      "dst": 9,
+      "fn": "max",
+      "op": "bin",
+      "slice": 4
     },
     {
       "addr": 1,
-      "dst": 12,
+      "op": "write",
+      "slice": 5,
+      "src": 9
+    },
+    {
+      "addr": 2,
+      "dst": 10,
       "op": "read",
       "slice": 2
     },
     {
-      "addr": 1,
-      "dst": 13,
+      "addr": 2,
+      "dst": 11,
       "op": "read",
       "slice": 3
+    },
+    {
+      "a": 10,
+      "b": 11,
+      "dst": 12,
+      "fn": "add",
+      "op": "bin",
+      "slice": 4
+    },
+    {
+      "a": 10,
+      "b": 11,
+      "dst": 13,
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4
     },
     {
       "a": 12,
       "b": 13,
       "dst": 14,
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 4,
-      "dst": 15,
-      "op": "read",
-      "slice": 5
-    },
-    {
-      "a": 15,
-      "b": 14,
-      "dst": 16,
       "fn": "max",
       "op": "bin",
       "slice": 4
     },
     {
-      "addr": 1,
+      "addr": 2,
       "op": "write",
       "slice": 5,
-      "src": 16
+      "src": 14
     },
     {
-      "addr": 2,
-      "dst": 17,
+      "addr": 3,
+      "dst": 15,
       "op": "read",
       "slice": 2
     },
     {
-      "addr": 2,
-      "dst": 18,
+      "addr": 3,
+      "dst": 16,
       "op": "read",
       "slice": 3
+    },
+    {
+      "a": 15,
+      "b": 16,
+      "dst": 17,
+      "fn": "add",
+      "op": "bin",
+      "slice": 4
+    },
+    {
+      "a": 15,
+      "b": 16,
+      "dst": 18,
+      "fn": "sub",
+      "op": "bin",
+      "slice": 4
     },
     {
       "a": 17,
       "b": 18,
       "dst": 19,
-      "fn": "add",
+      "fn": "max",
       "op": "bin",
       "slice": 4
     },
     {
-      "addr": 0,
+      "addr": 3,
       "op": "write",
-      "slice": 6,
+      "slice": 5,
       "src": 19
-    },
-    {
-      "addr": 2,
-      "dst": 20,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 2,
-      "dst": 21,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 20,
-      "b": 21,
-      "dst": 22,
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 0,
-      "dst": 23,
-      "op": "read",
-      "slice": 6
-    },
-    {
-      "a": 23,
-      "b": 22,
-      "dst": 24,
-      "fn": "max",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 2,
-      "op": "write",
-      "slice": 5,
-      "src": 24
-    },
-    {
-      "addr": 3,
-      "dst": 25,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 3,
-      "dst": 26,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 25,
-      "b": 26,
-      "dst": 27,
-      "fn": "add",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 5,
-      "op": "write",
-      "slice": 2,
-      "src": 27
-    },
-    {
-      "addr": 3,
-      "dst": 28,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 3,
-      "dst": 29,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 28,
-      "b": 29,
-      "dst": 30,
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 5,
-      "op": "write",
-      "slice": 3,
-      "src": 30
-    },
-    {
-      "addr": 5,
-      "dst": 31,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 5,
-      "dst": 32,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 31,
-      "b": 32,
-      "dst": 33,
-      "fn": "max",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 3,
-      "op": "write",
-      "slice": 5,
-      "src": 33
     }
   ],
   "map": [
@@ -328,11 +208,11 @@
   "memSizes": [
     0,
     0,
-    6,
-    6,
+    4,
+    4,
     0,
-    5,
-    1,
+    4,
+    0,
     0,
     0
   ]

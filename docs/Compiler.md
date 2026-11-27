@@ -34,7 +34,7 @@ On the way a program is written in four *intermediate representations*
 |---|---|---|
 | Source | kernels that call each other; statements, loops, pins | |
 | Kernel | one kernel, with no calls | slices, addresses, cycles but for its pins |
-| Placed | machine instructions in order, each with a slice; an address for every buffer | cycles but for its pins; streams |
+| Placed | machine instructions in order, each with a slice; an address for every buffer | cycles but for its pins; scratch space; streams |
 | Compiled | instructions each with a slice, a cycle and the streams it reads and writes | |
 
 A compiled program is a program for the machine (Machine 3.8). The image
@@ -53,7 +53,8 @@ holds it and its first address. Loading the buffers into the machine, and
 reading them back, go through the map.
 
 Memory words that belong to no buffer are scratch space, for words that have
-to wait.
+to wait. A placed program has none: its memories hold the buffers and nothing
+else. A compiled program has as much as its schedule uses.
 
 ## 4. The steps
 
@@ -70,12 +71,19 @@ Compiled (scheduled) ◀──────────────────�
 | inline | source | kernel | nothing: each call is replaced by the kernel it calls |
 | simplify | kernel | kernel | which statements can go without changing any result |
 | unroll | kernel | kernel with no loops | nothing: each loop is replaced by its iterations |
-| place | kernel with no loops | placed | where each buffer lives, which slice runs each statement, which words travel directly and which wait in memory |
-| schedule | placed | compiled | the cycle of every instruction |
-| route | compiled | compiled | the stream of every word |
+| place | kernel with no loops | placed | where: the memory and address of each buffer, and the slice that runs each statement |
+| schedule | placed | compiled | when: the cycle of every instruction, and with it which words wait in memory, and in which scratch words |
+| route | compiled | compiled | on which stream: the stream of every word |
 | slice | compiled | compiled | nothing: each slice's entries, naming streams |
 | fold | compiled | compiled | which runs of entries become one repeating entry (Machine 2.7) |
 | encode | compiled | image | nothing: the numbers of Machine 3.10 |
+
+Place decides nothing about time. In a placed program every word goes from
+the instruction that makes it straight to the instructions that use it, and
+there may be several of those. A word can wait only in a memory (Machine
+3.4), and whether it has to is known only when both its ends have a cycle. So
+schedule decides that together with the cycles: it adds the scratch words,
+the write that puts a waiting word into one and the reads that take it out.
 
 Schedule gives every word a stream to itself, on a machine with as many streams
 as that takes. Route fits the words onto the streams the machine has. So the
@@ -141,3 +149,20 @@ ever decides anything from what a word holds (Programs 1, Machine 3.3).
 It can reject an output that is right: two expressions can be written
 differently and still always have the same value. It never accepts one that
 is wrong.
+
+## 8. Keeping to the table
+
+The duty of section 5 does not say which step decides what. The table of
+section 4 does, and an output can be held to its row of that table as well,
+by comparing its text with the text of the input:
+
+| Step | Its output |
+|---|---|
+| place | has one instruction for each operation of the kernel, one write for each store, and no scratch space |
+| schedule | has the memory map of its input, every operation and every write to a buffer of its input, each on the same slice, and nothing else but reads of buffer words its input reads and writes and reads of scratch words |
+| route | is its input with other numbers for the streams |
+
+This is not part of the duty. An output that breaks its row can still be
+right (section 6); it has made a decision that belongs to another step. Only
+these three rows are written out, because each of these steps adds something
+the next one builds on: where, then when, then on which stream.

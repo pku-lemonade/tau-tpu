@@ -62,6 +62,7 @@ In dependency order. A small feature touches only the first few.
 5. `spec/Tau/IR/Kernel.lean`, `spec/Tau/Check/Expr.lean` and their proofs, if kernels can
    say it.
 6. `spec/Tau/IR/Placed.lean` and its proof: the placed IR.
+   `spec/Tau/Check/Decides.lean`: the shape of a new instruction.
 7. `spec/Tau/Machine/CellLevel.lean` and `spec/Tau/Proofs/Machine/CellLevel.lean`: how
    the slice does it with blocks, and that this is the same thing.
 8. `spec/Tau/Tools/Json.lean`: reading it from a file.

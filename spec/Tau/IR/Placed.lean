@@ -7,15 +7,18 @@ import Tau.IR.MemMap
 
 The third IR a program takes in the compiler, and the output of
 `tau-place`. The kernel has become machine instructions. Every buffer has a
-home in some memory, every operation has a slice, and the compiler has decided
-which values travel directly and which wait in memory. What is still missing
-is time: no instruction has a cycle, unless it is pinned, and no word has a
-stream.
+home in some memory and every operation has a slice. That is all that has
+been decided: where. What is still missing is time. No instruction has a
+cycle, unless it is pinned, and no word has a stream. No word waits in
+memory either: whether one has to is known only when both its ends have a
+cycle, so `tau-schedule` decides it, and a placed program has no scratch
+space.
 
 A placed program is a list of instructions to be carried out one after
 another, as if each took effect at once. `Placed.execute` gives that meaning.
 It reuses the slice state of the slice-level machine and ignores streams and
-pipes. A word in transit is named by a variable, as in a kernel.
+pipes. A word in transit is named by a variable, as in a kernel, and as in a
+kernel any number of later instructions may use it.
 
 An instruction may carry a pin, the cycle it must be issued on
 (`Tau.Isa.Event`). The pins of the kernel are now on the instructions

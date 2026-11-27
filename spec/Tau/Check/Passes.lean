@@ -34,7 +34,11 @@ Each check asks whether the output computes what the input computes, and
 issues the pinned words on their cycles. It does not ask how the pass got
 there: `checkScheduled` accepts any timed program that ends with the buffers
 of the placed program and keeps its pins, including one whose instructions
-are different.
+are different. A schedule always has other instructions than the placed
+program it was made from: it reads a buffer word once for each instruction
+that uses it, and it writes a word that has to wait to a scratch word and
+reads it back. Whether a pass did only what it is there to decide is a
+separate question, with rules of its own in `Tau.Check.Decides`.
 
 In a compiled program every instruction has a cycle, so every word it issues
 is an event. `checkRouted` therefore asks that the second program issue every

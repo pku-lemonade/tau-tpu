@@ -65,14 +65,16 @@ turns the first into the second.
 ## 2. Placed
 
 The output of `tau-place`: the machine, the memory map, and the instructions
-in the order they must take effect. There are no cycles and no streams yet.
+in the order they must take effect. There are no cycles and no streams yet,
+and no scratch space: `memSizes` covers the buffers and nothing else.
 
 ```json
 {
   "config": {"kinds": ["mxm", "sxm", "mem", "mem", "vxm", "mem", "mem", "sxm", "mxm"],
              "streams": 8, "memDelay": 1, "vxmDelay": 1, "sxmDelay": 1, "mxmDelay": 2},
-  "memSizes": [0, 0, 2, 1, 0, 2, 1, 0, 0],
-  "map": [{"slice": 2, "base": 0, "size": 1}],
+  "memSizes": [0, 0, 1, 1, 0, 2, 1, 0, 0],
+  "map": [{"slice": 2, "base": 0, "size": 1}, {"slice": 3, "base": 0, "size": 1},
+          {"slice": 5, "base": 0, "size": 2}, {"slice": 6, "base": 0, "size": 1}],
   "instructions": [
     {"op": "read", "slice": 2, "addr": 0, "dst": 0},
     {"op": "load", "slice": 0, "src": 0},
@@ -86,7 +88,7 @@ in the order they must take effect. There are no cycles and no streams yet.
 ```
 
 - `dst`, `src`, `a`, `b` and `m` are numbers naming words in transit. Each
-  is produced once and used by one instruction.
+  is produced once, and any number of the instructions after it may use it.
 - An instruction with `pin` must be issued on that cycle. `tau-place` puts
   the pin of a kernel statement on the instruction that issues its word: the
   `read` of a load, the `write` of a store, the `emit` of a matrix product.

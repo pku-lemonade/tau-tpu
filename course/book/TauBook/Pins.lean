@@ -226,19 +226,22 @@ look at how a pass got from its input to its output.
 
 Read the paragraphs on pins at the top of `Place.cpp` and `Schedule.cpp`.
 
-The instructions of a group are a fixed distance apart in time. That is the
-timing rule: there is no slack. So a group can be moved as a whole, and one
-pin decides where it goes. Two pins in one group have to agree with the
-distance between their instructions. `tau-place` works the distances out as
-it builds a group, and lets a pinned operation join only if its pin agrees
-with the pins already there. If it does not, the value between the two waits
-in memory, which is the only place a word can wait. `tau-schedule` then
-starts each pinned group where its pins put it.
+`tau-place` puts each pin on the instruction that issues the word, and
+decides nothing about time. `tau-schedule` gives every pinned instruction its
+cycle before it schedules anything else. The timing rule has no slack: a word
+issued at one slice is at another a fixed number of cycles later, and on no
+other cycle. So a word goes directly into a pinned instruction only from an
+instruction exactly that many cycles before it. The scheduler therefore
+works backward from each pin through the instructions whose words have to
+reach it, and puts each as late as it can be. Everything else it schedules
+forward, from cycle 0. Two pinned instructions joined by a word are the right
+distance apart or they are not. If they are not, and the second is later
+than that, the word waits in memory, which is the only place a word can wait.
+If the second is earlier, the compiler refuses the program.
 
 `examples/pinned-chain/kernel.py` has both cases: three pins that agree, and
 three of which one is much later.
 
-Without pins, groups run one after another. With them, groups may overlap.
 `examples/paced/kernel.py` pins a loop to one iteration every four cycles:
 
 ```
@@ -308,15 +311,15 @@ iterations are in flight at once.
 First find, with `tau-sim --timeline` on the image of the unpinned kernel,
 the cycles the compiler gives the two, and pin both to those. Then move the
 second one cycle earlier, and compile. Then move it twenty cycles later, and
-find in `out/placed.json` the write and the read that `tau-place` put
-between them.
+find in `out/scheduled.json` the write and the read that `tau-schedule` put
+between them. `out/placed.json` has neither: say why.
 
 *By hand.* Break the compiler, as in the last chapter, and say first which
 stage you expect to be rejected. For one of the three the answer is none;
 say why that change is harmless.
 
-1. In `compiler/lib/Passes/Schedule.cpp`, replace `start = *pin - offset;` by
-   `start = now;`, so that pins are ignored.
+1. In `compiler/lib/Passes/Schedule.cpp`, in `Scheduler::run`, replace
+   `if (hasPins) {` by `if (false) {`, so that pins are ignored.
 2. In `compiler/lib/Passes/Inline.cpp`, replace `at.getInt() + origin` by
    `at.getInt()`, so that a called kernel's pins are not moved.
 3. In `compiler/lib/Passes/Unroll.cpp`, delete the line

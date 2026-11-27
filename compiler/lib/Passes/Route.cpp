@@ -5,8 +5,10 @@
 // widened to have enough of them; this pass fits the words onto the streams
 // the machine has (`tau.streams`) and puts the machine back as it was.
 //
-// The direction is forced: east if the word's user is at a higher position
-// than its producer, west otherwise.
+// The direction is forced. A word is on one stream, and every slice it
+// passes may read it (Machine 3.2). So it goes east if the instructions that
+// use it are at its own position or a higher one, and west if they are at a
+// lower one. The pass fails if they lie on both sides.
 //
 // For the number, think of a stream not as a row of fixed slots but as a row
 // of slots that move, one position per cycle. A word placed at position p on
@@ -77,18 +79,14 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
         op.emitError("run tau-schedule before tau-route");
         return signalPassFailure();
       }
-      // One instruction may read a word in two of its operands. Two
-      // different instructions may not: the word is at each position once.
-      for (Operation *user : result.getUsers())
-        if (user != *result.user_begin()) {
-          op.emitError("a travelling word has more than one user");
-          return signalPassFailure();
-        }
-
       int64_t from = tau::intAttr(op, "slice");
-      bool east = true;
-      if (!result.use_empty())
-        east = tau::intAttr(*result.use_begin()->getOwner(), "slice") >= from;
+      std::optional<bool> direction = tau::goesEast(op);
+      if (!direction) {
+        op.emitError("the instructions that use this word lie on both sides "
+                     "of the slice that issues it");
+        return signalPassFailure();
+      }
+      bool east = *direction;
       int delay = machine->delayOf(static_cast<int>(from), tau::delayName(op));
       int64_t land = *time + delay + 1;
       int64_t slot = east ? from - land : from + land;

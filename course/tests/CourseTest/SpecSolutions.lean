@@ -292,7 +292,7 @@ open Specify.Tables
 
 #guard passes (readUnroll ⟨.mlir, ""⟩ ⟨.kernel, "Idx.inst"⟩ ⟨.kernel, "Stmt.inst"⟩ ⟨.mlir, ""⟩
   ⟨.limit, "Item"⟩ ⟨.kernel, "unrollLoop"⟩ ⟨.mlir, ""⟩ ⟨.kernel, "Item.unroll"⟩ ⟨.mlir, ""⟩)
-#guard passes (readDifferences (some true) (some false) (some true) 93)
+#guard passes (readDifferences (some true) (some false) (some true) 301)
 
 -- The names the answers give exist.
 #check @Idx.inst

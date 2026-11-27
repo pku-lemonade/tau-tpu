@@ -171,6 +171,20 @@ they produce is a test (`tau-check --unroll`, `tau-check --encode`). The
 checks already cover both steps; the copies are there to show the second
 method on steps small enough for it.
 
+**Three steps held to what they decide.** Compiler 4 gives each step of the
+back end one thing to decide, and Compiler 8 says what its output may then
+differ in. A *rule* compares the texts of the input and the output for that.
+
+| Step | Decides | Rule |
+|---|---|---|
+| place | where | `placeOnly` in `Check/Decides.lean` |
+| schedule | when | `scheduleOnly` |
+| route | on which stream | `routeOnly` |
+
+A rule is not a check: it has no theorem, and an output that breaks it can
+still be right. That a compiler keeps to it is a test (`tau-check
+--decides`).
+
 ### How the theorems add up
 
 ```
@@ -205,7 +219,7 @@ above it, and `spec/Tau.lean` lists the modules in the same order.
 | `Isa/` | Lanes and words (`Word.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`, whose entries are the repeater's), events (`Event.lean`), and the image (`Encode.lean`). |
 | `Machine/` | The machine: the slice-level machine (`SliceLevel.lean`), the timing rule (`Timing.lean`), issued words (`Issues.lean`), and the cell-level machine, built from blocks (`CellLevel.lean`). |
 | `IR/` | The four IRs of a program (`Source.lean`, `Kernel.lean`, `Placed.lean`, `Compiled.lean`), the memory map (`MemMap.lean`), and the Lean copy of unroll (`Unroll.lean`). |
-| `Check/` | Symbolic expressions (`Expr.lean`), expression simplification (`Simplify.lean`), and the checks (`Checker.lean`, `Passes.lean`). |
+| `Check/` | Symbolic expressions (`Expr.lean`), expression simplification (`Simplify.lean`), the checks (`Checker.lean`, `Passes.lean`), and the rules for what a back-end pass may decide (`Decides.lean`). |
 | `Tools/` | What the command-line tools call: the JSON readers (`Json.lean`), and running and checking stage files (`Run.lean`). The entry points are in `spec/tools/`. |
 | `Claims.lean` | Every main statement. |
 | `Proofs/` | The theorems, mirroring `Blocks/`, `Isa/`, `Machine/`, `IR/`, `Check/`, plus `Claims.lean` and `EndToEnd.lean`. |
@@ -282,7 +296,9 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | The frontend's trace of a Python program is what the compiler reads from the frontend's MLIR | tested, on the examples written in Python | `scripts/check-examples.sh` |
 | A Python program run on real numbers ends with the buffers, and issues the pinned words, that its trace does | tested, on the same examples | `scripts/check-examples.sh` |
 | What a Python file means | not stated; the trace of one run is the program | `compiler/python/tau/__init__.py` |
-| The other six passes have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing on the same cycles | |
+| The outputs of `tau-place`, `tau-schedule` and `tau-route` differ from their inputs only in what each pass decides: where, when, on which stream | tested, on the examples | `placeOnly`, `scheduleOnly`, `routeOnly` (`Check/Decides.lean`), by `tau-check --decides` |
+| The other four passes (inline, simplify, slice, fold) have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing on the same cycles | |
+| A schedule is as short as it can be, or a set of pins that can be met is met | no; a check says nothing about speed, and a pass may refuse | |
 | The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|`, where `delay` is the delay of its instruction | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
 | A pinned word is issued by the slice the user had in mind | not stated; a pin names a word and a cycle, not a slice | `Isa/Event.lean` |

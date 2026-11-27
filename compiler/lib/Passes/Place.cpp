@@ -1,54 +1,41 @@
 //===- Place.cpp - the tau-place pass -------------------------------------===//
 //
-// Turns a kernel with no loops into instructions.
+// Turns a kernel with no loops into instructions, and decides where
+// (Compiler 4): which memory holds each buffer, and which slice runs each
+// operation. In textbook terms this is *binding*.
 //
-// Placement of buffers. Buffers are spread over the memory slices in turn.
-// Words of memory beyond the buffers are scratch space.
+// Buffers. Buffers are spread over the memory slices in turn. The memories
+// hold the buffers and nothing else: scratch space is `tau-schedule`'s to
+// add.
 //
-// Placement of operations. An operation runs on a slice of the kind it
-// needs. Where the machine has several, it takes the one nearest to where its
+// Operations. An operation runs on a slice of the kind it needs. Where the
+// machine has several, it takes the one nearest to the slice its first
 // operand comes from.
 //
 // Stored matrices. A matrix slice can keep the columns of a matrix. When the
 // same matrix is multiplied again later, with no store to its buffer in
 // between, the pass installs the columns once and every product then uses
-// the stored columns instead of streaming them from memory again.
+// the stored columns instead of streaming them from memory again. Which
+// slice stores which matrix is a decision about where.
 //
-// Grouping. A word can only wait in memory, so the pass has to decide which
-// values travel straight from the operation that makes them to the operation
-// that uses them, and which are written to memory and read back. It builds
-// *groups*. A group is a chain of operations in which each result is used
-// only by the next operation. Every other operand of a chained operation is
-// read from memory. The last result is written to memory, or straight to the
-// buffer if the kernel stores it there.
-//
-// A chain is only extended while the following holds, which lets
-// `tau-schedule` give every group a schedule with no two instructions on one
-// slice in one cycle:
-//
-//   * no memory slice is read for two different operations of the group, and
-//   * operands that must arrive together (the two of a two-word operation,
-//     the three of a select) are not read from the same slice.
-//
-// When the second condition fails for a single operation, operands are first
-// copied to scratch words in other slices.
+// Each operation of the kernel becomes its instructions, in the kernel's
+// order: a load one read, a store one write, a matrix product the
+// instructions of its matrix slice with a read for each column it streams,
+// and any other operation one instruction. A word goes from the instruction
+// that makes it to every instruction that uses it. The pass decides nothing
+// about time: no word waits in memory here, and no rule in this file exists
+// to make a schedule possible.
 //
 // Pins. A pinned operation hands its pin to the instruction that issues its
 // word: the read of a load, the write of a store, the `emit` of a matrix
-// product, and otherwise the one instruction the operation becomes. The
-// instructions of a group have fixed distances in time, given by the timing
-// rule, so the pins of a group have to agree with those distances. The pass
-// works the distances out as it builds a group. A pinned operation joins a
-// group only if its pin agrees with the pins already in it. If it does not,
-// the value between the two waits in memory, which is the only place a word
-// can wait: a pinned load is read on its cycle into a scratch word, and a
-// chain ends before a pinned operation that disagrees.
+// product, and otherwise the one instruction the operation becomes.
 //
 // The pass records the machine, the memory map and the memory sizes on the
-// function. It does not choose cycles or streams.
+// function.
 //
 // Nothing here is proved. `tau-check unrolled.json placed.json` decides whether
-// the instructions, run in order, compute what the kernel computes.
+// the instructions, run in order, compute what the kernel computes, and
+// `tau-check --decides` whether the pass kept to deciding where.
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,29 +48,14 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/ErrorHandling.h"
 
 #include <map>
 #include <optional>
-#include <set>
 
 using namespace llvm;
 using namespace mlir;
 
 namespace {
-
-/// A word of memory.
-struct Loc {
-  int slice = -1;
-  int64_t addr = 0;
-
-  bool operator==(const Loc &other) const {
-    return slice == other.slice && addr == other.addr;
-  }
-  bool operator<(const Loc &other) const {
-    return std::tie(slice, addr) < std::tie(other.slice, other.addr);
-  }
-};
 
 /// The columns of a matrix: `n` words of a buffer starting at `base`.
 struct Matrix {
@@ -113,130 +85,66 @@ struct Node {
   /// The cycle the operation's word must be issued on, if it is pinned.
   std::optional<int64_t> pin;
   /// Where the operation is in the user's file, for error messages.
-  std::optional<Location> loc;
-};
+  Location loc;
 
-/// How a matrix-vector product gets its columns.
-struct MatMode {
-  int slice = -1;
-  /// Use columns stored in the slice, not streamed from memory.
-  bool stored = false;
-  /// The columns have to be installed first.
-  bool install = false;
+  Node(Location loc) : loc(loc) {}
 };
 
 class Placer {
 public:
   Placer(func::FuncOp func, const tau::Machine &machine)
-      : func(func), machine(machine), builder(func.getContext()) {}
+      : func(func), machine(machine), builder(func.getContext()),
+        here(func.getLoc()) {}
 
-  Error run();
+  /// False if the kernel cannot be placed; the error has been reported.
+  bool run();
 
 private:
   func::FuncOp func;
   const tau::Machine &machine;
   OpBuilder builder;
-  Type word;
-  Type acc;
+  Type wordType;
+  Type accType;
 
   std::vector<Node> nodes;
   std::vector<int64_t> bufSizes;
-  /// For each value, the operations that use it.
-  std::vector<std::vector<int>> uses;
-  /// A load whose word can be read where its value is used, because no store
-  /// to its buffer comes in between.
-  std::vector<bool> isVirtual;
 
-  std::vector<int> mems;
-  std::vector<int> sxms;
-  std::vector<int> mxms;
-  int vxm = -1;
-  /// Words of memory handed out so far at each position.
-  std::vector<int64_t> used;
-  std::vector<Loc> bufLoc;
-  size_t nextScratch = 0;
-
-  /// Where each value can be read from memory, once it can.
-  std::vector<std::optional<Loc>> valueLoc;
-  std::vector<bool> done;
+  /// The positions of the slices of each kind.
+  std::vector<int> mems, vxms, sxms, mxms;
+  /// For each buffer, its memory slice and first address.
+  std::vector<std::pair<int, int64_t>> bufLoc;
+  /// For each value of the kernel, the word that carries it.
+  std::vector<Value> words;
   /// The matrix whose columns each matrix slice currently stores.
   std::map<int, Matrix> installed;
   /// The location given to new instructions: that of the operation being
   /// placed.
-  std::optional<Location> here;
-  /// For each value, the pin of the load that made it, until the read that
-  /// issues its word has been emitted.
-  std::vector<std::optional<int64_t>> loadPin;
+  Location here;
 
-  /// The pin of a load, for the read that issues its word. A pin is handed
-  /// out once.
-  std::optional<int64_t> takePin(int value) {
-    std::optional<int64_t> pin = loadPin[value];
-    loadPin[value].reset();
-    return pin;
-  }
-  /// The timing rule: how many cycles after the instruction `name` at `from`
-  /// the instruction at `to` that uses its word is issued.
-  int64_t lag(StringRef name, int from, int to) const {
-    return machine.delayOf(from, name) + 1 + std::abs(to - from);
-  }
-  /// The name of the instruction that issues the word of `node`, for its
-  /// delay (Formats 3).
-  static StringRef issuer(const Node &node) {
-    switch (node.kind) {
-    case Node::Load:
-      return "read";
-    case Node::Store:
-      return "write";
-    case Node::Un:
-    case Node::Bin:
-      return node.fn;
-    case Node::MatVec:
-      return "emit";
-    case Node::Const:
-      return "const";
-    case Node::Sel:
-      return "sel";
-    }
-    llvm_unreachable("every kind of node is named above");
-  }
-
-  Error read();
+  bool read();
+  bool usedAgain(size_t index) const;
   static int nearest(const std::vector<int> &candidates, int from);
-  int sliceOf(const Node &node, int from) const;
-  int origin(const Node &node) const;
-  Loc newScratch(const std::set<int> &avoid);
-  int chainNext(int index) const;
-  bool usedAgain(int index) const;
-  MatMode decide(int index, int from) const;
-  bool admit(const Node &node, int flight, const MatMode &mode,
-             std::set<int> &readSlices) const;
-  void forget(int buf);
-  Error placeComputed(int index);
+  int cameFrom(const Node &node) const;
 
-  // Building instructions.
   Operation *make(StringRef name, ArrayRef<Value> operands,
                   ArrayRef<Type> results, ArrayRef<NamedAttribute> attrs);
   NamedAttribute attr(StringRef name, int64_t value) {
     return builder.getNamedAttr(name, builder.getI64IntegerAttr(value));
   }
-  void setPin(Operation *op, std::optional<int64_t> pin) {
-    if (pin)
-      tau::setIntAttr(*op, "pin", *pin);
-  }
-  Value emitRead(Loc loc, std::optional<int64_t> pin = std::nullopt);
-  void emitWrite(Value value, Loc loc,
-                 std::optional<int64_t> pin = std::nullopt);
-  void emitCopy(Loc from, Loc to) { emitWrite(emitRead(from), to); }
+  Value readWord(int buf, int64_t position);
+  bool place(size_t index);
+  bool placeProduct(size_t index);
 };
 
-Error Placer::read() {
+bool Placer::read() {
   llvm::DenseMap<Value, int> buffers;
   llvm::DenseMap<Value, int> values;
   for (BlockArgument arg : func.getArguments()) {
     auto buf = dyn_cast<tau::BufType>(arg.getType());
-    if (!buf)
-      return createStringError("every argument must be a !tau.buf");
+    if (!buf) {
+      func.emitError("every argument must be a !tau.buf");
+      return false;
+    }
     buffers[arg] = static_cast<int>(bufSizes.size());
     bufSizes.push_back(buf.getSize());
   }
@@ -249,7 +157,7 @@ Error Placer::read() {
   for (Operation &op : func.getBody().front()) {
     if (isa<func::ReturnOp>(op))
       continue;
-    Node node;
+    Node node(op.getLoc());
     if (auto load = dyn_cast<tau::LoadOp>(op)) {
       node.kind = Node::Load;
       node.buf = buffers.lookup(load.getBuf());
@@ -300,96 +208,26 @@ Error Placer::read() {
       node.args = {values.lookup(op.getOperand(0))};
       node.dst = define(op.getResult(0));
     } else if (isa<tau::ForOp>(op)) {
-      return createStringError("run tau-unroll before tau-place");
+      op.emitError("run tau-unroll before tau-place");
+      return false;
     } else if (isa<tau::CallOp>(op)) {
-      return createStringError("run tau-inline before tau-place");
+      op.emitError("run tau-inline before tau-place");
+      return false;
     } else {
-      return createStringError("cannot place operation '" +
-                               op.getName().getStringRef() + "'");
+      op.emitError("cannot place this operation");
+      return false;
     }
     if (auto at = op.getAttrOfType<IntegerAttr>("at"))
       node.pin = at.getInt();
-    node.loc = op.getLoc();
     nodes.push_back(std::move(node));
   }
-
-  uses.assign(values.size(), {});
-  for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i)
-    for (int arg : nodes[i].args)
-      uses[arg].push_back(i);
-
-  // A load is virtual if no store to its buffer lies between it and any use.
-  // A pinned load has one read to pin, so it is virtual only if it has one
-  // use.
-  isVirtual.assign(nodes.size(), false);
-  for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i) {
-    if (nodes[i].kind != Node::Load)
-      continue;
-    bool safe = !nodes[i].pin || uses[nodes[i].dst].size() == 1;
-    for (int use : uses[nodes[i].dst])
-      for (int j = i + 1; j < use; ++j)
-        if (nodes[j].kind == Node::Store && nodes[j].buf == nodes[i].buf)
-          safe = false;
-    isVirtual[i] = safe;
-  }
-
-  valueLoc.assign(values.size(), std::nullopt);
-  loadPin.assign(values.size(), std::nullopt);
-  done.assign(nodes.size(), false);
-  return Error::success();
-}
-
-int Placer::nearest(const std::vector<int> &candidates, int from) {
-  int best = -1;
-  for (int candidate : candidates)
-    if (best < 0 || std::abs(candidate - from) < std::abs(best - from))
-      best = candidate;
-  return best;
-}
-
-/// The slice an operation runs on, given where its operand comes from.
-/// Matrix-vector products are placed by `decide`.
-int Placer::sliceOf(const Node &node, int from) const {
-  if (node.kind == Node::Un && tau::isRearrangement(node.fn))
-    return nearest(sxms, from);
-  return vxm;
-}
-
-/// Where the first operand of an operation that starts a group comes from.
-int Placer::origin(const Node &node) const {
-  for (int arg : node.args)
-    if (valueLoc[arg])
-      return valueLoc[arg]->slice;
-  return vxm;
-}
-
-Loc Placer::newScratch(const std::set<int> &avoid) {
-  for (size_t tries = 0; tries < mems.size(); ++tries) {
-    int slice = mems[(nextScratch + tries) % mems.size()];
-    if (avoid.count(slice))
-      continue;
-    nextScratch += tries + 1;
-    return {slice, used[slice]++};
-  }
-  return {};
-}
-
-/// If the result of operation `index` has exactly one use, and only virtual
-/// loads lie between the two, return the using operation. Otherwise -1.
-int Placer::chainNext(int index) const {
-  int value = nodes[index].dst;
-  if (value < 0 || uses[value].size() != 1)
-    return -1;
-  int use = uses[value][0];
-  for (int j = index + 1; j < use; ++j)
-    if (!(nodes[j].kind == Node::Load && isVirtual[j]))
-      return -1;
-  return use;
+  words.assign(values.size(), Value());
+  return true;
 }
 
 /// Whether the matrix of the product at `index` is multiplied again later,
 /// before anything is stored to its buffer.
-bool Placer::usedAgain(int index) const {
+bool Placer::usedAgain(size_t index) const {
   const Node &node = nodes[index];
   Matrix matrix{node.buf, node.base, node.n};
   for (size_t j = index + 1; j < nodes.size(); ++j) {
@@ -403,408 +241,196 @@ bool Placer::usedAgain(int index) const {
   return false;
 }
 
-/// Which matrix slice runs the product at `index`, and whether it uses
-/// stored columns.
-MatMode Placer::decide(int index, int from) const {
-  const Node &node = nodes[index];
-  Matrix matrix{node.buf, node.base, node.n};
-  for (const auto &entry : installed)
-    if (entry.second == matrix)
-      return {entry.first, true, false};
-  int slice = nearest(mxms, from);
-  if (node.n <= machine.mxmWeights && usedAgain(index))
-    return {slice, true, true};
-  return {slice, false, false};
+/// The candidate nearest to `from`; the first of them on a tie. -1 if there
+/// is none.
+int Placer::nearest(const std::vector<int> &candidates, int from) {
+  int best = -1;
+  for (int candidate : candidates)
+    if (best < 0 || std::abs(candidate - from) < std::abs(best - from))
+      best = candidate;
+  return best;
 }
 
-/// Whether `node` may join a group that already reads the memory slices in
-/// `readSlices`. `flight` is the value arriving from the previous operation
-/// of the chain, or -1. On success the slices `node` reads are added.
-bool Placer::admit(const Node &node, int flight, const MatMode &mode,
-                   std::set<int> &readSlices) const {
-  // The distinct words this operation reads from memory.
-  std::set<Loc> words;
-  for (int arg : node.args)
-    if (arg != flight && valueLoc[arg])
-      words.insert(*valueLoc[arg]);
-
-  // The operands of a two-word operation or a select arrive on the same
-  // cycle, so two of them cannot come from one slice. The operands of a
-  // matrix-vector product arrive on different cycles.
-  bool together = node.kind == Node::Bin || node.kind == Node::Sel;
-  std::set<int> mine;
-  for (const Loc &loc : words) {
-    if (together && mine.count(loc.slice))
-      return false;
-    mine.insert(loc.slice);
-  }
-  if (node.kind == Node::MatVec && !mode.stored)
-    mine.insert(bufLoc[node.buf].slice);
-
-  for (int slice : mine)
-    if (readSlices.count(slice))
-      return false;
-  readSlices.insert(mine.begin(), mine.end());
-  return true;
-}
-
-/// A store to `buf` makes any stored copy of its columns stale.
-void Placer::forget(int buf) {
-  for (auto it = installed.begin(); it != installed.end();)
-    it = it->second.buf == buf ? installed.erase(it) : std::next(it);
+/// The slice the first operand of an operation comes from. An operation
+/// with no operand counts as coming from the first vector slice.
+int Placer::cameFrom(const Node &node) const {
+  if (!node.args.empty())
+    return static_cast<int>(
+        tau::intAttr(*words[node.args[0]].getDefiningOp(), "slice"));
+  return vxms.empty() ? 0 : vxms.front();
 }
 
 Operation *Placer::make(StringRef name, ArrayRef<Value> operands,
                         ArrayRef<Type> results,
                         ArrayRef<NamedAttribute> attrs) {
-  OperationState state(here ? *here : func.getLoc(), name);
+  OperationState state(here, name);
   state.addOperands(operands);
   state.addTypes(results);
   state.addAttributes(attrs);
   return builder.create(state);
 }
 
-Value Placer::emitRead(Loc loc, std::optional<int64_t> pin) {
-  Operation *op = make("tau.i.read", {}, {word},
-                       {attr("slice", loc.slice), attr("addr", loc.addr)});
-  setPin(op, pin);
-  return op->getResult(0);
+/// A read of the word at `position` of buffer `buf`.
+Value Placer::readWord(int buf, int64_t position) {
+  return make("tau.i.read", {}, {wordType},
+              {attr("slice", bufLoc[buf].first),
+               attr("addr", bufLoc[buf].second + position)})
+      ->getResult(0);
 }
 
-void Placer::emitWrite(Value value, Loc loc, std::optional<int64_t> pin) {
-  setPin(make("tau.i.write", {value}, {},
-              {attr("slice", loc.slice), attr("addr", loc.addr)}),
-         pin);
-}
+/// Matrix times vector: keep `x`, start from the bias if there is one, take
+/// one column per instruction, and give the accumulator.
+bool Placer::placeProduct(size_t index) {
+  const Node &node = nodes[index];
+  Matrix matrix{node.buf, node.base, node.n};
 
-Error Placer::placeComputed(int index) {
-  struct Member {
-    int index;
-    int slice;
-    MatMode mode;
-  };
-  auto place = [&](int i, int from) {
-    const Node &node = nodes[i];
-    Member member{i, -1, {}};
-    if (node.kind == Node::MatVec) {
-      member.mode = decide(i, from);
-      member.slice = member.mode.slice;
-    } else {
-      member.slice = sliceOf(node, from);
+  // The slice: the one that already stores the columns, or the nearest.
+  int slice = -1;
+  bool stored = false;
+  for (const auto &entry : installed)
+    if (entry.second == matrix) {
+      slice = entry.first;
+      stored = true;
     }
-    return member;
-  };
-  auto accept = [&](const Member &member) {
-    const Node &node = nodes[member.index];
-    if (node.kind == Node::MatVec && member.mode.stored)
-      installed[member.slice] = Matrix{node.buf, node.base, node.n};
-  };
-
-  // The first operation. If operands that must arrive together sit in one
-  // memory slice, copy all but one to scratch words in other slices.
-  const Node &head = nodes[index];
-  Member first = place(index, origin(head));
-  if (first.slice < 0)
-    return createStringError("the machine has no slice for an operation");
-  std::set<int> readSlices;
-  for (int attempt = 0; !admit(head, -1, first.mode, readSlices); ++attempt) {
-    if (attempt >= 3)
-      return createStringError("cannot place an operation");
-    std::set<int> seen;
-    std::set<int> taken;
-    for (int arg : head.args)
-      taken.insert(valueLoc[arg]->slice);
-    int victim = -1;
-    std::set<Loc> words;
-    for (int arg : head.args) {
-      Loc loc = *valueLoc[arg];
-      if (!words.insert(loc).second)
-        continue;
-      if (!seen.insert(loc.slice).second) {
-        victim = arg;
-        break;
+  if (slice < 0) {
+    slice = nearest(mxms, cameFrom(node));
+    if (slice < 0) {
+      emitError(node.loc, "the machine has no matrix slice for this product");
+      return false;
+    }
+    // Store the columns first if the matrix is used again.
+    if (node.n <= machine.mxmWeights && usedAgain(index)) {
+      Value previous;
+      for (int64_t j = 0; j < node.n; ++j) {
+        SmallVector<Value> operands{readWord(node.buf, node.base + j)};
+        if (previous)
+          operands.push_back(previous);
+        previous = make("tau.i.install", operands, {accType},
+                        {attr("j", j), attr("slice", slice)})
+                       ->getResult(0);
       }
-    }
-    if (victim < 0)
-      return createStringError("cannot place an operation");
-    Loc to = newScratch(taken);
-    if (to.slice < 0)
-      return createStringError(
-          "an operation needs more memory slices than the machine has");
-    emitWrite(emitRead(*valueLoc[victim], takePin(victim)), to);
-    valueLoc[victim] = to;
-    readSlices.clear();
-  }
-  accept(first);
-
-  // The cycles of the chain, counted from the first instruction of the head
-  // that takes an operand. `start` is the cycle the pins so far put that
-  // instruction on, once there is a pin.
-  std::optional<int64_t> start;
-  // The cycle on which a member's first instruction is issued, and the
-  // cycle of the instruction that issues its result. `use` is the cycle on
-  // which the word arriving from the member before it is taken. A matrix
-  // product loads its vector, takes its bias on the next cycle if it has
-  // one, then one column per cycle, and emits.
-  struct Clock {
-    int64_t first;
-    int64_t result;
-  };
-  auto clockOf = [&](const Node &node, int flight, int64_t use) -> Clock {
-    if (node.kind != Node::MatVec)
-      return {use, use};
-    bool bias = node.args.size() > 1;
-    int64_t load =
-        bias && flight == node.args[1] && flight != node.args[0] ? use - 1 : use;
-    return {load, load + (bias ? 1 : 0) + node.n + 1};
-  };
-  // The cycle on which the member takes its operand number `k`.
-  auto takes = [&](const Node &node, size_t k, Clock clock) {
-    if (node.kind != Node::MatVec)
-      return clock.result;
-    return k == 0 ? clock.first : clock.first + 1;
-  };
-  // The cycle of the read that brings a pinned load to a member.
-  auto readCycle = [&](const Member &member, size_t k, Clock clock) {
-    const Node &node = nodes[member.index];
-    return takes(node, k, clock) -
-           lag("read", valueLoc[node.args[k]]->slice, member.slice);
-  };
-
-  // The head. Its own pin comes first. A pinned load among its operands
-  // whose pin disagrees is read on its own cycle into a scratch word.
-  Clock clock = clockOf(head, -1, 0);
-  if (head.pin)
-    start = *head.pin - clock.result;
-  for (size_t k = 0; k < head.args.size(); ++k) {
-    int arg = head.args[k];
-    if (!loadPin[arg])
-      continue;
-    int64_t wanted = *loadPin[arg] - readCycle(first, k, clock);
-    if (!start || *start == wanted) {
-      start = wanted;
-      continue;
-    }
-    std::set<int> avoid = readSlices;
-    for (int other : head.args)
-      avoid.insert(valueLoc[other]->slice);
-    Loc to = newScratch(avoid);
-    if (to.slice < 0)
-      return createStringError(
-          "a pinned load needs more memory slices than the machine has");
-    emitWrite(emitRead(*valueLoc[arg], takePin(arg)), to);
-    valueLoc[arg] = to;
-    readSlices.insert(to.slice);
-  }
-
-  // Grow the chain while each result feeds the next operation directly, and
-  // the pins of the next operation agree with the pins so far.
-  std::vector<Member> chain{first};
-  while (true) {
-    int next = chainNext(chain.back().index);
-    if (next < 0 || nodes[next].kind == Node::Store)
-      break;
-    const Node &node = nodes[next];
-    int flight = nodes[chain.back().index].dst;
-    Member member = place(next, chain.back().slice);
-    if (member.slice < 0)
-      break;
-    Clock nextClock =
-        clockOf(node, flight,
-                clock.result + lag(issuer(nodes[chain.back().index]),
-                                   chain.back().slice, member.slice));
-    std::optional<int64_t> wanted = start;
-    bool agree = true;
-    auto pinAt = [&](int64_t pin, int64_t cycle) {
-      if (wanted && *wanted != pin - cycle)
-        agree = false;
-      wanted = pin - cycle;
-    };
-    if (node.pin)
-      pinAt(*node.pin, nextClock.result);
-    for (size_t k = 0; k < node.args.size(); ++k)
-      if (node.args[k] != flight && loadPin[node.args[k]])
-        pinAt(*loadPin[node.args[k]], readCycle(member, k, nextClock));
-    if (!agree)
-      break;
-    if (!admit(node, flight, member.mode, readSlices))
-      break;
-    accept(member);
-    chain.push_back(member);
-    clock = nextClock;
-    start = wanted;
-  }
-
-  for (const Member &member : chain)
-    if (member.slice < 0)
-      return createStringError("the machine has no slice for an operation");
-
-  // Columns to be stored are installed first, in a group of their own, on
-  // consecutive cycles.
-  for (const Member &member : chain) {
-    const Node &node = nodes[member.index];
-    if (node.kind != Node::MatVec || !member.mode.install)
-      continue;
-    Loc columns = bufLoc[node.buf];
-    columns.addr += node.base;
-    Value previous;
-    for (int64_t j = 0; j < node.n; ++j) {
-      SmallVector<Value> operands{emitRead({columns.slice, columns.addr + j})};
-      if (previous)
-        operands.push_back(previous);
-      previous = make("tau.i.install", operands, {acc},
-                      {attr("j", j), attr("slice", member.slice)})
-                     ->getResult(0);
+      installed[slice] = matrix;
+      stored = true;
     }
   }
 
-  // Emit the chain. `flight` is the previous result, on its way.
-  Value flight;
-  int flightValue = -1;
-  for (const Member &member : chain) {
-    const Node &node = nodes[member.index];
-    here = node.loc;
-    int slice = member.slice;
-    // A word needed twice by one operation is read once.
-    std::map<Loc, Value> reads;
-    auto operand = [&](int value) {
-      if (value == flightValue)
-        return flight;
-      Loc loc = *valueLoc[value];
-      auto found = reads.find(loc);
-      if (found != reads.end())
-        return found->second;
-      return reads[loc] = emitRead(loc, takePin(value));
-    };
+  Value state = make("tau.i.load", {words[node.args[0]]}, {accType},
+                     {attr("slice", slice)})
+                    ->getResult(0);
+  if (node.args.size() > 1)
+    state = make("tau.i.seed", {state, words[node.args[1]]}, {accType},
+                 {attr("slice", slice)})
+                ->getResult(0);
+  for (int64_t j = 0; j < node.n; ++j) {
+    if (stored) {
+      state = make("tau.i.macw", {state}, {accType},
+                   {attr("j", j), attr("slice", slice)})
+                  ->getResult(0);
+    } else {
+      Value column = readWord(node.buf, node.base + j);
+      state = make("tau.i.mac", {state, column}, {accType},
+                   {attr("j", j), attr("slice", slice)})
+                  ->getResult(0);
+    }
+  }
+  words[node.dst] =
+      make("tau.i.emit", {state}, {wordType}, {attr("slice", slice)})
+          ->getResult(0);
+  return true;
+}
 
+/// The instructions of one operation of the kernel.
+bool Placer::place(size_t index) {
+  const Node &node = nodes[index];
+  here = node.loc;
+  Operation *issuer = nullptr;
+
+  switch (node.kind) {
+  case Node::Load:
+    words[node.dst] = readWord(node.buf, node.base);
+    issuer = words[node.dst].getDefiningOp();
+    break;
+  case Node::Store:
+    issuer = make("tau.i.write", {words[node.args[0]]}, {},
+                  {attr("slice", bufLoc[node.buf].first),
+                   attr("addr", bufLoc[node.buf].second + node.base)});
+    // A store makes any stored copy of the buffer's columns stale.
+    for (auto it = installed.begin(); it != installed.end();)
+      it = it->second.buf == node.buf ? installed.erase(it) : std::next(it);
+    break;
+  case Node::MatVec:
+    if (!placeProduct(index))
+      return false;
+    issuer = words[node.dst].getDefiningOp();
+    break;
+  case Node::Un:
+  case Node::Bin:
+  case Node::Sel:
+  case Node::Const: {
+    bool rearrangement =
+        node.kind == Node::Un && tau::isRearrangement(node.fn);
+    int slice = nearest(rearrangement ? sxms : vxms, cameFrom(node));
+    if (slice < 0) {
+      emitError(node.loc, "the machine has no ")
+          << (rearrangement ? "rearrangement" : "vector")
+          << " slice for this operation";
+      return false;
+    }
+    SmallVector<Value> operands;
+    for (int arg : node.args)
+      operands.push_back(words[arg]);
+    SmallVector<NamedAttribute> attrs{attr("slice", slice)};
+    StringRef name;
     if (node.kind == Node::Un) {
-      Value a = operand(node.args[0]);
-      SmallVector<NamedAttribute> attrs{
-          builder.getNamedAttr("fn", builder.getStringAttr(node.fn)),
-          attr("slice", slice)};
+      name = "tau.i.un";
+      attrs.push_back(builder.getNamedAttr("fn", builder.getStringAttr(node.fn)));
       if (node.k)
         attrs.push_back(attr("k", *node.k));
       if (!node.table.empty())
         attrs.push_back(builder.getNamedAttr(
             "table", builder.getDenseI64ArrayAttr(node.table)));
-      flight = make("tau.i.un", {a}, {word}, attrs)->getResult(0);
     } else if (node.kind == Node::Bin) {
-      Value a = operand(node.args[0]);
-      Value b = operand(node.args[1]);
-      flight = make("tau.i.bin", {a, b}, {word},
-                    {builder.getNamedAttr("fn", builder.getStringAttr(node.fn)),
-                     attr("slice", slice)})
-                   ->getResult(0);
+      name = "tau.i.bin";
+      attrs.push_back(builder.getNamedAttr("fn", builder.getStringAttr(node.fn)));
     } else if (node.kind == Node::Sel) {
-      Value m = operand(node.args[0]);
-      Value a = operand(node.args[1]);
-      Value b = operand(node.args[2]);
-      flight =
-          make("tau.i.sel", {m, a, b}, {word}, {attr("slice", slice)})
-              ->getResult(0);
-    } else if (node.kind == Node::Const) {
-      flight = make("tau.i.const", {}, {word},
-                    {builder.getNamedAttr(
-                         "values", builder.getDenseI64ArrayAttr(node.values)),
-                     attr("slice", slice)})
-                   ->getResult(0);
+      name = "tau.i.sel";
     } else {
-      // Matrix times vector: keep x, start from the bias if there is one,
-      // then take one column per cycle.
-      Value state = make("tau.i.load", {operand(node.args[0])}, {acc},
-                         {attr("slice", slice)})
-                        ->getResult(0);
-      if (node.args.size() > 1)
-        state = make("tau.i.seed", {state, operand(node.args[1])}, {acc},
-                     {attr("slice", slice)})
-                    ->getResult(0);
-      Loc columns = bufLoc[node.buf];
-      columns.addr += node.base;
-      for (int64_t j = 0; j < node.n; ++j) {
-        if (member.mode.stored) {
-          state = make("tau.i.macw", {state}, {acc},
-                       {attr("j", j), attr("slice", slice)})
-                      ->getResult(0);
-        } else {
-          Value column = emitRead({columns.slice, columns.addr + j});
-          state = make("tau.i.mac", {state, column}, {acc},
-                       {attr("j", j), attr("slice", slice)})
-                      ->getResult(0);
-        }
-      }
-      flight =
-          make("tau.i.emit", {state}, {word}, {attr("slice", slice)})
-              ->getResult(0);
+      name = "tau.i.const";
+      attrs.push_back(builder.getNamedAttr(
+          "values", builder.getDenseI64ArrayAttr(node.values)));
     }
-    setPin(flight.getDefiningOp(), node.pin);
-    flightValue = node.dst;
-    done[member.index] = true;
+    issuer = make(name, operands, {wordType}, attrs);
+    words[node.dst] = issuer->getResult(0);
+    break;
   }
-
-  // Where the last result goes: the buffer the kernel stores it in, a
-  // scratch word if it is needed later, or nowhere.
-  int last = chain.back().index;
-  int next = chainNext(last);
-  Loc target;
-  bool direct = next >= 0 && nodes[next].kind == Node::Store;
-  if (direct) {
-    target = bufLoc[nodes[next].buf];
-    target.addr += nodes[next].base;
-    // A pinned store takes the result directly only if its pin agrees.
-    int64_t written = clock.result + lag(issuer(nodes[last]),
-                                         chain.back().slice, target.slice);
-    if (nodes[next].pin && start && *start != *nodes[next].pin - written)
-      direct = false;
   }
-  if (direct) {
-    here = nodes[next].loc;
-    emitWrite(flight, target, nodes[next].pin);
-    forget(nodes[next].buf);
-    done[next] = true;
-  } else if (!uses[flightValue].empty()) {
-    Loc scratch = newScratch({});
-    emitWrite(flight, scratch);
-    valueLoc[flightValue] = scratch;
-  }
-  return Error::success();
+  if (node.pin)
+    tau::setIntAttr(*issuer, "pin", *node.pin);
+  return true;
 }
 
-Error Placer::run() {
-  if (Error e = read())
-    return e;
+bool Placer::run() {
+  if (!read())
+    return false;
 
   int positions = static_cast<int>(machine.kinds.size());
   for (int p = 0; p < positions; ++p) {
     const std::string &kind = machine.kinds[p];
-    if (kind == "mem")
-      mems.push_back(p);
-    else if (kind == "sxm")
-      sxms.push_back(p);
-    else if (kind == "mxm")
-      mxms.push_back(p);
-    else if (kind == "vxm" && vxm < 0)
-      vxm = p;
+    (kind == "mem" ? mems : kind == "vxm" ? vxms : kind == "sxm" ? sxms : mxms)
+        .push_back(p);
   }
-  if (mems.empty())
-    return createStringError("the machine has no memory slice");
+  if (mems.empty()) {
+    func.emitError("the machine has no memory slice");
+    return false;
+  }
 
   // Buffers: spread over the memory slices in turn.
-  used.assign(positions, 0);
+  std::vector<int64_t> used(positions, 0);
   for (size_t b = 0; b < bufSizes.size(); ++b) {
     int slice = mems[b % mems.size()];
     bufLoc.push_back({slice, used[slice]});
     used[slice] += bufSizes[b];
   }
-
-  // A virtual load needs no instruction of its own: its word is read from
-  // the buffer wherever its value is used, and that read takes its pin.
-  for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i)
-    if (nodes[i].kind == Node::Load && isVirtual[i]) {
-      Loc cell = bufLoc[nodes[i].buf];
-      cell.addr += nodes[i].base;
-      valueLoc[nodes[i].dst] = cell;
-      loadPin[nodes[i].dst] = nodes[i].pin;
-    }
 
   // New instructions go in front of the old operations, which are removed
   // at the end.
@@ -814,45 +440,13 @@ Error Placer::run() {
     if (!isa<func::ReturnOp>(op))
       old.push_back(&op);
   builder.setInsertionPoint(block.getTerminator());
-  word = tau::WordType::get(func.getContext());
-  acc = tau::AccType::get(func.getContext());
+  wordType = tau::WordType::get(func.getContext());
+  accType = tau::AccType::get(func.getContext());
+  here = func.getLoc();
 
-  for (int i = 0, e = static_cast<int>(nodes.size()); i < e; ++i) {
-    if (done[i])
-      continue;
-    const Node &node = nodes[i];
-    here = node.loc;
-    Loc cell = node.buf >= 0 ? bufLoc[node.buf] : Loc{};
-    cell.addr += node.base;
-
-    if (node.kind == Node::Load) {
-      if (!isVirtual[i]) {
-        // A later store would overwrite the word, or the load is pinned to
-        // this cycle: take a copy now.
-        Loc scratch = newScratch({});
-        emitWrite(emitRead(cell, node.pin), scratch);
-        valueLoc[node.dst] = scratch;
-      }
-    } else if (node.kind == Node::Store) {
-      int arg = node.args[0];
-      if (!valueLoc[arg])
-        return createStringError("a stored value was never computed");
-      // A pinned load stored by a pinned store: one read and one write, a
-      // fixed distance apart. If the two pins disagree, the word waits.
-      if (loadPin[arg] && node.pin &&
-          *node.pin - *loadPin[arg] !=
-              lag("read", valueLoc[arg]->slice, cell.slice)) {
-        Loc scratch = newScratch({});
-        emitWrite(emitRead(*valueLoc[arg], takePin(arg)), scratch);
-        valueLoc[arg] = scratch;
-      }
-      emitWrite(emitRead(*valueLoc[arg], takePin(arg)), cell, node.pin);
-      forget(node.buf);
-    } else if (Error e = placeComputed(i)) {
-      return e;
-    }
-    done[i] = true;
-  }
+  for (size_t i = 0; i < nodes.size(); ++i)
+    if (!place(i))
+      return false;
 
   for (auto it = old.rbegin(); it != old.rend(); ++it)
     (*it)->erase();
@@ -863,9 +457,9 @@ Error Placer::run() {
   SmallVector<Attribute> map;
   for (size_t b = 0; b < bufSizes.size(); ++b)
     map.push_back(builder.getI64ArrayAttr(
-        {bufLoc[b].slice, bufLoc[b].addr, bufSizes[b]}));
+        {bufLoc[b].first, bufLoc[b].second, bufSizes[b]}));
   func->setAttr("tau.map", builder.getArrayAttr(map));
-  return Error::success();
+  return true;
 }
 
 struct PlacePass : PassWrapper<PlacePass, OperationPass<func::FuncOp>> {
@@ -894,10 +488,8 @@ struct PlacePass : PassWrapper<PlacePass, OperationPass<func::FuncOp>> {
       target = std::move(*read);
     }
     Placer placer(getOperation(), target);
-    if (Error e = placer.run()) {
-      getOperation().emitError(toString(std::move(e)));
+    if (!placer.run())
       signalPassFailure();
-    }
   }
 
   tau::Machine machine;

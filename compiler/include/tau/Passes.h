@@ -31,12 +31,14 @@ std::unique_ptr<mlir::Pass> createSimplifyPass();
 /// Lean model: spec/Tau/IR/Unroll.lean.
 std::unique_ptr<mlir::Pass> createUnrollPass();
 
-/// Chooses a memory slice and address for every buffer and a slice for every
-/// operation, and rewrites the kernel into instructions (`tau.i.*`). Decides
-/// which values travel directly between slices and which wait in memory.
+/// Decides where: chooses a memory slice and address for every buffer and a
+/// slice for every operation, and rewrites the kernel into instructions
+/// (`tau.i.*`). Decides nothing about time.
 std::unique_ptr<mlir::Pass> createPlacePass(const Machine &machine);
 
-/// Gives every instruction a cycle (`time`), and every travelling word a
+/// Decides when: gives every instruction a cycle (`time`), by list
+/// scheduling forward and backward, and sends every word that has to wait
+/// through a scratch word of memory. Then gives every travelling word a
 /// stream of its own (`east`, `stream`) on a machine widened to have enough
 /// of them. The machine's own number of streams is kept in `tau.streams`.
 std::unique_ptr<mlir::Pass> createSchedulePass();

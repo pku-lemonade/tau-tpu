@@ -38,6 +38,21 @@ Value tau::streamResult(Operation &op) {
   return Value();
 }
 
+std::optional<bool> tau::goesEast(Operation &op) {
+  int64_t from = intAttr(op, "slice");
+  bool east = true, west = true;
+  for (Operation *user : streamResult(op).getUsers()) {
+    int64_t to = intAttr(*user, "slice");
+    east &= to >= from;
+    west &= to <= from;
+  }
+  if (east)
+    return true;
+  if (west)
+    return false;
+  return std::nullopt;
+}
+
 StringRef tau::delayName(Operation &op) {
   if (auto un = dyn_cast<tau::IUnOp>(op))
     return un.getFn();

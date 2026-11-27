@@ -33,8 +33,8 @@ change nothing.
 | `tau-inline` | inline | copies each called kernel in, and adds the call's origin to its pins |
 | `tau-simplify` | simplify | three rewrites: `relu` of `relu`, and `max` or `min` of a word with itself; never removes a pinned operation |
 | `tau-unroll` | unroll | one copy of the body per iteration, with the iteration filled into positions and pins |
-| `tau-place` | place | buffers over the memories in turn; each operation on the nearest slice of its kind; chains of operations into *groups* whose words travel directly |
-| `tau-schedule` | schedule | the timing rule fixes the cycles within a group; a pinned group starts where its pin puts it, any other after the groups before it; then every word gets a stream of its own, on a machine widened to have enough |
+| `tau-place` | place | binding: buffers over the memories in turn; each operation on the nearest slice of its kind; a matrix that is multiplied again is stored in its matrix slice |
+| `tau-schedule` | schedule | list scheduling, run forward and backward, the shorter schedule kept; a word that does not arrive exactly when it is used waits in a scratch word; then every word gets a stream of its own, on a machine widened to have enough |
 | `tau-route` | route | on the machine's own streams, two words share a stream only if they are never in the same moving slot |
 | `tau-slice` | slice | replaces each operand by the stream its word is on, and sorts the entries by slice |
 | `tau-fold` | fold | in each slice, the longest runs of like entries at equal steps of cycle and address |
@@ -47,27 +47,55 @@ full.
 The program takes four shapes in the IR. Up to `tau-place` it is kernel
 operations (`tau.load`, `tau.add`). From `tau-place` to `tau-route` it is
 instructions joined by the words they pass on: the result of one is the
-operand of another. After `tau-slice` it is what the machine has: each slice's
+operand of others. After `tau-slice` it is what the machine has: each slice's
 own list of entries, which name streams. After `tau-encode` it is those
 entries as numbers, one `tau.image` for each slice.
 
+## Where, when, on which stream
+
+The three passes of the back end each decide one thing (Compiler 4), and
+none decides anything for a later one.
+
+`tau-place` decides where. Each operation of the kernel becomes its
+instructions, in the kernel's order, and every word goes straight from the
+instruction that makes it to the ones that use it. Nothing waits and there
+is no scratch space yet.
+
+`tau-schedule` decides when. It is a *list scheduler*: it takes the
+instructions one at a time, by priority, gives each a cycle on which
+everything it needs is free, and never moves it again. A word issued at one
+slice is at another a fixed number of cycles later and on no other cycle
+(Machine 3.4), so a word goes directly only if its two ends are exactly that
+far apart; otherwise the pass writes it to a scratch word and reads it back
+in time. That costs two instructions, so the first rule of the priority is
+to place an instruction on the cycle a word arrives. The walk is done twice,
+forward from the first cycle and backward from the last, and the shorter
+schedule is kept: a forward walk is weak where two words meet, a backward
+one where a word parts, and neither is shorter on every program.
+
+`tau-route` decides on which stream. `tau-schedule` leaves every word on a
+stream of its own, so its cycles can be checked before any stream is shared.
+
+`tau-check --decides` holds each of the three to this division (Compiler 8).
+
 ## How a pin is met
 
-`tau-place` puts each pin on the instruction that issues the word. The
-instructions of a group are a fixed distance apart, so the pins of a group
-have to agree with those distances. The pass works the distances out as it
-builds a group: a pinned operation joins only if its pin agrees with the pins
-already there, and otherwise the value between the two waits in memory.
-`tau-schedule` then starts each pinned group where its pins put it. Groups
-overlap in time when pins ask for it.
+`tau-place` puts each pin on the instruction that issues the word.
+`tau-schedule` gives each pinned instruction its cycle before anything else.
+What has to come before a pinned instruction for its words to reach it is
+then scheduled backward from the pin, as late as it can be, so that each
+word arrives exactly if it can; everything else is scheduled forward. A word
+between two pinned instructions that are not the right distance apart waits
+in memory. A program with pins is scheduled this one way: its cycles count
+from 0 and cannot be moved afterwards.
 
 The compiler refuses, with the line of the operation:
 
-- a pin too early for the instructions before it in its group;
-- two instructions at one slice on one cycle, or two results that would
-  leave one slice on one cycle (Machine 3.4);
-- a read of memory put before the write it depends on, or a matrix slice
-  given two products at once.
+- a pin on a cycle its slice already has an instruction on, or on which two
+  results would leave one slice (Machine 3.4);
+- a pin too early for what has to come before it, or with too little room
+  after another pin for the word between them;
+- a read of memory pinned before the write it depends on.
 
 The distance between two operations depends on the machine and on which memory
 `tau-place` gave each buffer. To pin a chain of operations that should stay
@@ -126,6 +154,14 @@ lake exe tau-check out/compiled.json out/image.json         # tau-encode
 lake exe tau-check out/source.json out/image.json           # all of it at once
 ```
 
+The three passes of the back end are also held to what each may decide:
+
+```bash
+lake exe tau-check --decides out/unrolled.json out/placed.json     # tau-place: where
+lake exe tau-check --decides out/placed.json out/scheduled.json    # tau-schedule: when
+lake exe tau-check --decides out/scheduled.json out/routed.json    # tau-route: on which stream
+```
+
 If a pass has a bug, the result is a rejected file that names the pass, not
 a wrong answer. The checks and their theorems are listed in [`spec/README.md`](../spec/README.md#the-map).
 
@@ -148,12 +184,13 @@ why its output is accepted.
 - A loop is unrolled before placement. A program is as large as its
   iterations until `tau-fold` merges what it can, and compiling and checking
   take time in proportion.
-- An operation runs on the slice of its kind nearest to its operand. Nothing
-  balances load between two slices of a kind.
-- A value that is not consumed by the very next operation waits in memory.
-- Without pins, groups of instructions run one after another; two groups
-  never overlap in time, even when they could. Storing a matrix therefore
-  saves instructions but not cycles. A pin is the only way to make groups
-  overlap.
-- A pinned load with more than one use is read into a scratch word, even if
-  one of its uses could have taken it directly.
+- An operation runs on the slice of its kind nearest to its first operand,
+  and buffers go to the memories in turn. Nothing balances load between two
+  slices of a kind, and nothing tries a second layout.
+- The scheduler is greedy. Each walk decides every instruction once, so the
+  schedule is short but not the shortest, and a set of pins that could be
+  met may be refused.
+- A word goes directly only to an instruction that is its one user. A word
+  with several users waits in a scratch word and each user reads it from
+  there, even where two of them could have taken it from the stream.
+- Every waiting word gets a scratch word of its own; none is used twice.

@@ -11,7 +11,8 @@ set_option pp.rawOnError true
 set_option verso.code.warnLineLength 100
 
 #doc (Manual) "The checker" =>
-*Terms to look up:* translation validation, symbolic execution, homomorphism.
+*Terms to look up:* translation validation, symbolic execution, homomorphism,
+binding, list scheduling.
 
 *Sources:* `docs/Compiler.md`, sections 2, 4, 5 and 7;
 `compiler/lib/Passes/Place.cpp`, `Schedule.cpp` and `Route.cpp`,
@@ -294,6 +295,35 @@ program that computes what the placed program computes, even one that uses
 different instructions. Nothing in Lean says what a valid schedule is. The
 chapter "End to end" comes back to this.
 
+# What a pass decides
+
+Section 4 of `docs/Compiler.md` gives each pass of the back end one thing to
+decide: `tau-place` where, `tau-schedule` when, `tau-route` on which stream.
+A check does not hold a pass to that. A placed program in which a word
+already waits in memory is accepted by `checkPlaced`, if it computes the
+kernel; it has made a decision about time that the scheduler can then not
+take back.
+
+`spec/Tau/Check/Decides.lean` has a _rule_ for each of the three. A rule
+compares the text of the output with the text of the input, and says whether
+they differ only in what the pass decides (section 8 of the doc).
+
+{docstring Tau.placeOnly}
+
+{docstring Tau.scheduleOnly}
+
+{docstring Tau.routeOnly}
+
+```
+lake exe tau-check --decides out/unrolled.json out/placed.json
+lake exe tau-check --decides out/placed.json out/scheduled.json
+lake exe tau-check --decides out/scheduled.json out/routed.json
+```
+
+Each prints `ONLY`. A rule is not a check. It has no theorem, and a program
+that breaks it can still be right. It is a frame condition: it says what a
+pass left alone, and nothing about whether what it did is right.
+
 # Three ways to specify a pass
 
 You have now seen two of the three ways to say, in Lean, what a compiler
@@ -393,9 +423,13 @@ and undo the change afterwards.
 2. In `compiler/lib/Passes/Route.cpp`, delete the loop
    `while (numbers.count(stream)) ++stream;`, so that every word gets
    stream 0.
-3. In `compiler/lib/Passes/Place.cpp`, at the end of `placeComputed`, delete
-   the line `emitWrite(flight, scratch);`, so that a value that should wait
-   in memory is never written there.
+3. In `compiler/lib/Passes/Schedule.cpp`, in `Scheduler::write`, delete the
+   statement that begins `writeWord(instrs[unit.result].op->getLoc(),`, so
+   that a word that should wait in memory is never written there.
+
+*By hand.* For each of the three changes above, say whether
+`tau-check --decides` notices it, before you try. Then say what that tells
+you about the difference between a rule and a check.
 
 *By hand.* The checker rejects some correct programs. Find one. A hint: the
 simplifier knows three rewrites, and addition is commutative. Write the

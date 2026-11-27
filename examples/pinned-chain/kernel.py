@@ -2,8 +2,8 @@
 
 `together` pins a load, the relu of it and the store of that, each to the
 cycle the timing rule gives it once the load is on cycle 2. The three pins
-agree, so the three instructions stay in one group and the word travels
-directly: read on 2, relu on 6, written on 9.
+agree, so the word travels directly from each instruction to the next: read
+on 2, relu on 6, written on 9.
 
 `apart` pins the same three operations, but leaves the relu until cycle 30.
 No word can spend that long on a stream. So the load is read on its cycle

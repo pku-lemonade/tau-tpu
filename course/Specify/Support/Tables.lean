@@ -694,7 +694,7 @@ def readDifferences (newNames nested outside : Option Bool) (timingLine : Nat) :
   [ ⟨"new value names", newNames == some true⟩,
     ⟨"a loop inside a loop", nested == some false⟩,
     ⟨"a statement outside every loop", outside == some true⟩,
-    ⟨"the line of Schedule.cpp that is the timing rule", timingLine == 93⟩ ]
+    ⟨"the line of Schedule.cpp that is the timing rule", timingLine == 301⟩ ]
 
 /-- The lines of the C++ that the reading exercise quotes. If the C++ moves,
 `course/tests/CourseTest/SpecSolutions.lean` fails here and the exercise has to be
@@ -711,7 +711,7 @@ def quotedLines : List (String × Nat × String) :=
     ("compiler/lib/Passes/Unroll.cpp", 79, "builder.clone(op, mapping)"),
     ("compiler/lib/Passes/Unroll.cpp", 82, "loop.erase()"),
     ("compiler/lib/Passes/Unroll.cpp", 89, "createUnrollPass"),
-    ("compiler/lib/Passes/Schedule.cpp", 93, "machine->delayOf(p, tau::delayName(*def)) + 1 + std::abs(q - p)") ]
+    ("compiler/lib/Passes/Schedule.cpp", 301, "return delay + 1 + std::abs(q - p);") ]
 
 /-- Whether every quoted line is still where the exercise says it is. -/
 def quotedLinesHold : IO (List Row) := do

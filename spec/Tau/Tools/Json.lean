@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import Tau.Check.Passes
+import Tau.Check.Decides
 import Tau.Isa.Encode
 
 /-!

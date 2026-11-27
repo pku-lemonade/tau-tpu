@@ -29,6 +29,21 @@ The verdict comes from the check in the table, each proved sound in
 `spec/Tau/Proofs/Check/`. The reason printed on rejection is extra and is not
 covered by a proof.
 
+    tau-check --decides <before.json> <after.json>
+
+A different question, with no proof behind it: does the output of a back-end
+pass differ from its input only in what the pass is there to decide
+(Compiler 4 and 8)? The rules are in `Tau.Check.Decides`.
+
+| before | after | Rule | For |
+|---|---|---|---|
+| kernel | placed | `placeOnly` | `tau-place` |
+| placed | compiled | `scheduleOnly` | `tau-schedule` |
+| compiled | compiled | `routeOnly` | `tau-route` |
+
+Prints `ONLY` and exits with status 0, or prints `MORE` with the part of the
+rule that does not hold and exits with status 1.
+
     tau-check --unroll <before.json> <after.json>
 
 A different question, with no proof behind it: is `after.json` the kernel
@@ -46,6 +61,19 @@ open Tau
 
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["--decides", bpath, apath] =>
+    let before ← Json.orFail bpath (Json.stage (← Json.readFile bpath))
+    let after ← Json.orFail apath (Json.stage (← Json.readFile apath))
+    match Tools.decidesPair before after with
+    | some true =>
+      IO.println "ONLY"
+      pure 0
+    | some false =>
+      IO.println s!"MORE: {Tools.explainDecides before after}"
+      pure 1
+    | none =>
+      IO.eprintln s!"tau-check: no rule compares a {Tools.stageName before} with a {Tools.stageName after}"
+      pure 2
   | ["--unroll", bpath, apath] =>
     let (_, before) ← Json.orFail bpath (Json.kernel (← Json.readFile bpath))
     let (_, after) ← Json.orFail apath (Json.kernel (← Json.readFile apath))
@@ -79,6 +107,7 @@ def main (args : List String) : IO UInt32 := do
       pure 2
   | _ =>
     IO.eprintln "usage: tau-check <before.json> <after.json>"
+    IO.eprintln "       tau-check --decides <before.json> <after.json>"
     IO.eprintln "       tau-check --unroll <before.json> <after.json>"
     IO.eprintln "       tau-check --encode <compiled.json> <image.json>"
     pure 2

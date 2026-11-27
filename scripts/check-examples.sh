@@ -22,6 +22,8 @@
 #     gives for simplified.json (`tau-check --unroll`).
 #   - image.json must be the image that the Lean encoding gives for
 #     compiled.json (`tau-check --encode`).
+#   - placed.json, scheduled.json and routed.json must each differ from the
+#     file before only in what its pass decides (`tau-check --decides`).
 #   - If the source has pins, a copy of compiled.json with every instruction
 #     one cycle late must be rejected against source.json: it computes the
 #     same buffers and misses every pin.
@@ -195,6 +197,14 @@ while IFS= read -r bfile; do
      ! "$CHECK" --encode "$out/compiled.json" "$out/image.json" > /dev/null; then
     failed="image: not the image the Lean encoding gives"
   fi
+
+  for pair in "unrolled placed" "placed scheduled" "scheduled routed"; do
+    [ -z "$failed" ] || break
+    set -- $pair
+    if ! "$CHECK" --decides "$out/$1.json" "$out/$2.json" > "$out/verdict"; then
+      failed="$2: decides more than its pass may: $(cat "$out/verdict")"
+    fi
+  done
 
   before=source
   for stage in $STAGES; do

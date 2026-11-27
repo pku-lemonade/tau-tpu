@@ -211,6 +211,8 @@ direction. A word that moves past the end of the row is gone. All slots are
 empty at cycle 0.
 
 A slice reads from, and places results on, the slots at its own position.
+Reading a word does not take it off its stream: the word moves on, and every
+slice it passes may read it, each on the cycle the word is at its position.
 
 ```
 ── east ──▶  [0] ──▶ [1] ──▶ [2] ──▶ [3] ──▶ [4] ──▶ [5] ──▶ [6] ──▶ [7] ──▶ [8]
