@@ -4,8 +4,11 @@ import Tau.Isa.Event
 /-!
 # Kernels
 
-A *kernel* is a program with no machine in it: load words from buffers, compute,
-and store words back. It says nothing about slices or streams, and about
+A *kernel* is a program with no machine in it: load values from buffers,
+compute, and store values back. A buffer is a row of words, and a value of a
+type (`Tau.Isa.Word`) is as many words of it as the type has bytes: the value
+at position `k` of a buffer of values of 4 bytes is its words `4 * k` to
+`4 * k + 3`. It says nothing about slices or streams, and about
 cycles only where a statement is pinned. It is the Lean model of one function
 of the compiler's `tau` dialect (see `compiler/`), and the second IR a
 program takes: a source program (`Tau.IR.Source`) is a kernel that may
@@ -47,41 +50,42 @@ structure Idx where
 /-- The position an index refers to on iteration `i`. -/
 def Idx.eval (ix : Idx) (i : Nat) : Nat := ix.base + ix.stride * i
 
-/-- One statement of a kernel. -/
+/-- One statement of a kernel. A statement that takes or gives a value says
+the type of the value. -/
 inductive Stmt where
-  /-- `dst = buf[ix]` -/
-  | load (dst : Var) (buf : Nat) (ix : Idx)
-  /-- `buf[ix] = src` -/
-  | store (src : Var) (buf : Nat) (ix : Idx)
-  /-- `dst = op a` -/
-  | un (dst : Var) (op : UnOp) (a : Var)
-  /-- `dst = op a b` -/
-  | bin (dst : Var) (op : BinOp) (a b : Var)
-  /-- `dst = M * x`, where the columns of the matrix `M` are the `n` words
-  `buf[ix]`, `buf[ix + 1]`, ... -/
+  /-- `dst = buf[ix]`, a value of type `ty`. -/
+  | load (dst : Var) (ty : DType) (buf : Nat) (ix : Idx)
+  /-- `buf[ix] = src`, a value of type `ty`. -/
+  | store (src : Var) (ty : DType) (buf : Nat) (ix : Idx)
+  /-- `dst = op a`, with `a` of type `ty`. -/
+  | un (dst : Var) (ty : DType) (op : UnOp) (a : Var)
+  /-- `dst = op a b`, all of type `ty`. -/
+  | bin (dst : Var) (ty : DType) (op : BinOp) (a b : Var)
+  /-- `dst = M * x`, where the matrix `M` is the `n` words `buf[ix]`,
+  `buf[ix + 1]`, ...: word `i` holds the weights of element `i` of the
+  product. `x` is a value of 8 bits and the product one of 32. -/
   | matvec (dst : Var) (x : Var) (buf : Nat) (ix : Idx) (n : Nat)
-  /-- `dst = M * x + bias`, with `M` as in `matvec`. -/
-  | affine (dst : Var) (x bias : Var) (buf : Nat) (ix : Idx) (n : Nat)
-  /-- `dst` is the constant word with lanes `xs`. -/
-  | const (dst : Var) (xs : List Int)
-  /-- `dst = sel m a b`: lane by lane, `a` where `m` is not zero, else `b`. -/
-  | sel (dst : Var) (m a b : Var)
-  /-- The statement `s`, with its word issued on cycle `t`. Inside a loop the
+  /-- `dst` is the constant of type `ty` with elements `xs`. -/
+  | const (dst : Var) (ty : DType) (xs : List Int)
+  /-- `dst = sel m a b`: element by element, `a` where `m` is not zero, else
+  `b`. All are of type `ty`. -/
+  | sel (dst : Var) (ty : DType) (m a b : Var)
+  /-- The statement `s`, with its value issued on cycle `t`. Inside a loop the
   cycle moves with the iteration, as a position does. -/
   | pin (t : Idx) (s : Stmt)
   deriving DecidableEq, Repr
 
-/-- The word a statement issues: the variable that holds it, and for a store
-the buffer and position it goes to, on loop iteration `i`. -/
+/-- The value a statement issues: the variable that holds it, and for a store
+the buffer and the word of it that the value's first word goes to, on loop
+iteration `i`. -/
 def Stmt.target (i : Nat) : Stmt → Var × Option (Nat × Nat)
-  | .load dst _ _ => (dst, none)
-  | .store src buf ix => (src, some (buf, ix.eval i))
-  | .un dst _ _ => (dst, none)
-  | .bin dst _ _ _ => (dst, none)
+  | .load dst _ _ _ => (dst, none)
+  | .store src ty buf ix => (src, some (buf, ty.bytes * ix.eval i))
+  | .un dst _ _ _ => (dst, none)
+  | .bin dst _ _ _ _ => (dst, none)
   | .matvec dst _ _ _ _ => (dst, none)
-  | .affine dst _ _ _ _ _ => (dst, none)
-  | .const dst _ => (dst, none)
-  | .sel dst _ _ _ => (dst, none)
+  | .const dst _ _ => (dst, none)
+  | .sel dst _ _ _ _ => (dst, none)
   | .pin _ s => s.target i
 
 /-- A statement, or a loop that runs its body `n` times. Loops do not nest. -/
@@ -100,72 +104,71 @@ variable {V : Type}
 /-- The values of a kernel's variables, the contents of its buffers, and the
 events of its pinned statements so far. -/
 structure Env (V : Type) where
-  /-- Variable bindings, most recent first. -/
-  vars : List (Var × V)
-  /-- The contents of each buffer. -/
+  /-- Variable bindings, most recent first. A value is a list of words. -/
+  vars : List (Var × List V)
+  /-- The words of each buffer. -/
   bufs : List (List V)
   /-- The events so far, most recent first. -/
   events : List (Event V)
 
 /-- Give variable `v` the value `x`. -/
-def Env.bind (env : Env V) (v : Var) (x : V) : Env V :=
+def Env.bind (env : Env V) (v : Var) (x : List V) : Env V :=
   { env with vars := (v, x) :: env.vars }
 
-/-- Record that the word of variable `v` is issued on cycle `t`. -/
+/-- The value of variable `v`, if it has one of type `ty`. -/
+def Env.get (env : Env V) (ty : DType) (v : Var) : Option (List V) :=
+  match env.vars.lookup v with
+  | some x => if x.length = ty.bytes then some x else none
+  | none => none
+
+/-- The one word of variable `v`, if its value is one word. -/
+def Env.word (env : Env V) (v : Var) : Option V :=
+  match env.vars.lookup v with
+  | some [w] => some w
+  | _ => none
+
+/-- The events of a value issued on cycle `t`: one for each of its words. The
+words of a store go to the words of the buffer from `store` on. -/
+def eventsOf (t : Nat) (store : Option (Nat × Nat)) (x : List V) : List (Event V) :=
+  (List.range x.length).zipWith (fun k w => ⟨t, store.map fun bk => (bk.1, bk.2 + k), w⟩) x
+
+/-- Record that the value of variable `v` is issued on cycle `t`. -/
 def Env.issue (env : Env V) (t : Nat) (target : Var × Option (Nat × Nat)) : Env V :=
   match env.vars.lookup target.1 with
-  | some w => { env with events := ⟨t, target.2, w⟩ :: env.events }
+  | some x => { env with events := eventsOf t target.2 x ++ env.events }
   | none => env
 
-/-- `init` plus the product of a matrix with `x`, built up one column at a
-time. `cols j` is column `j`; the result is `none` if a column is missing. -/
-def matvecFrom (S : Sem V) (x : V) (cols : Nat → Option V) (init : V) : Nat → Option V
-  | 0 => some init
-  | j + 1 =>
-    match matvecFrom S x cols init j, cols j with
-    | some acc, some w => some (S.mac j acc x w)
-    | _, _ => none
-
 /-- Run one statement on loop iteration `i`. The result is `none` if the
-statement uses a variable that has no value or a position outside a buffer. -/
+statement uses a variable that has no value of the type it needs, or a
+position outside a buffer. -/
 def Stmt.exec (S : Sem V) (i : Nat) (env : Env V) : Stmt → Option (Env V)
-  | .load dst buf ix =>
-    match (env.bufs[buf]?.getD [])[ix.eval i]? with
-    | some v => some (env.bind dst v)
+  | .load dst ty buf ix =>
+    match wordsAt (env.bufs[buf]?.getD []) (ty.bytes * ix.eval i) ty.bytes with
+    | some x => some (env.bind dst x)
     | none => none
-  | .store src buf ix =>
-    match env.vars.lookup src, env.bufs[buf]? with
-    | some v, some b =>
-      if ix.eval i < b.length then
-        some { env with bufs := env.bufs.set buf (b.set (ix.eval i) v) }
+  | .store src ty buf ix =>
+    match env.get ty src, env.bufs[buf]? with
+    | some x, some b =>
+      if ty.bytes * ix.eval i + ty.bytes ≤ b.length then
+        some { env with bufs := env.bufs.set buf (putAt b (ty.bytes * ix.eval i) x) }
       else none
     | _, _ => none
-  | .un dst op a =>
-    match env.vars.lookup a with
-    | some v => some (env.bind dst (S.un op v))
+  | .un dst ty op a =>
+    match env.get ty a with
+    | some x => some (env.bind dst (S.un ty op x))
     | none => none
-  | .bin dst op a b =>
-    match env.vars.lookup a, env.vars.lookup b with
-    | some va, some vb => some (env.bind dst (S.bin op va vb))
+  | .bin dst ty op a b =>
+    match env.get ty a, env.get ty b with
+    | some x, some y => some (env.bind dst (S.bin ty op x y))
     | _, _ => none
   | .matvec dst x buf ix n =>
-    match env.vars.lookup x with
-    | some xv =>
-      match matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) S.zero n with
-      | some r => some (env.bind dst r)
-      | none => none
-    | none => none
-  | .affine dst x bias buf ix n =>
-    match env.vars.lookup x, env.vars.lookup bias with
-    | some xv, some bv =>
-      match matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) bv n with
-      | some r => some (env.bind dst r)
-      | none => none
+    match env.word x, wordsAt (env.bufs[buf]?.getD []) (ix.eval i) n with
+    | some w, some rows => some (env.bind dst (S.matvec rows w))
     | _, _ => none
-  | .const dst xs => some (env.bind dst (S.const xs))
-  | .sel dst m a b =>
-    match env.vars.lookup m, env.vars.lookup a, env.vars.lookup b with
-    | some vm, some va, some vb => some (env.bind dst (S.sel vm va vb))
+  | .const dst ty xs => some (env.bind dst (S.const ty xs))
+  | .sel dst ty m a b =>
+    match env.get ty m, env.get ty a, env.get ty b with
+    | some vm, some va, some vb => some (env.bind dst (S.sel ty vm va vb))
     | _, _, _ => none
   | .pin t s =>
     match s.exec S i env with

@@ -45,27 +45,37 @@ structure State.Shaped (cfg : Config) (s : State V) : Prop where
   pipe : ∀ (p : Nat) (sl : Slice V), s.slices[p]? = some sl → sl.pipe.length = cfg.maxDelay
 
 /-- The result that the slice at `p` computes in the cycle that starts in
-`s`, with the stream it is meant for. This is what `exec` returns, before the
-result enters the pipe. `none` if no instruction is due or the instruction
-has no result. -/
+`s`: a value, with the first of the streams it is meant for. This is what `exec` returns for the
+instruction that computes a result (`Program.computes`), before the result
+enters the pipe. `none` if no instruction is due or the instruction has no
+result. -/
 def State.result (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat) :
-    Option (Stream × V) :=
-  match prog.dueAt p s.time, cfg.kindAt p, s.slices[p]? with
-  | [i], some kind, some sl =>
+    Option (Stream × List V) :=
+  match prog.computes p s.time, cfg.kindAt p, s.slices[p]? with
+  | some i, some kind, some sl =>
     match exec S cfg kind (s.sample p) sl i with
     | .ok (_, r) => r
     | .error _ => none
   | _, _, _ => none
 
 /-- What comes out of the pipe of the slice at `p` in the cycle that starts in
-`s`. This is the result that the machine places on a stream at position `p`. -/
+`s`. This is the value that the machine places on streams at position `p`. -/
 def State.out (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat) :
-    Option (Stream × V) :=
+    Option (Stream × List V) :=
   match s.slices[p]? with
   | some sl =>
     match stepSlice S cfg prog s p sl with
     | .ok (_, o) => o
     | .error _ => none
+  | none => none
+
+/-- The word that the slice at `p` places on stream `tr` in the cycle that
+starts in `s`, if it places one: a word of the value that comes out of its
+pipe. -/
+def State.placed (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
+    (tr : Stream) : Option V :=
+  match s.out S cfg prog p with
+  | some (first, vs) => if first.dir = tr.dir ∧ first.id ≤ tr.id then vs[tr.id - first.id]? else none
   | none => none
 
 /-- What stream `tr` holds one position upstream of `p`. This is the word

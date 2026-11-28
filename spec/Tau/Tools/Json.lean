@@ -60,6 +60,15 @@ def stream (j : Json) (key : String) : Except String Stream := do
     | s => throw s!"unknown direction '{s}'"
   pure ⟨d, ← nat t "id"⟩
 
+def dtype : String → Except String DType
+  | "i8" => pure .i8
+  | "i16" => pure .i16
+  | "i32" => pure .i32
+  | s => throw s!"unknown type '{s}'"
+
+/-- The type of an instruction or a statement: its field `ty`. -/
+def ty (j : Json) : Except String DType := do dtype (← str j "ty")
+
 def unOp (j : Json) : Except String UnOp := do
   match ← str j "fn" with
   | "relu" => pure .relu
@@ -74,7 +83,8 @@ def unOp (j : Json) : Except String UnOp := do
   | "reverse" => pure .reverse
   | "broadcast" => pure (.broadcast (← nat j "k"))
   | "permute" => pure (.permute (← nats j "table"))
-  | s => throw s!"unknown one-word operation '{s}'"
+  | "widen" => pure (.widen (← dtype (← str j "to")))
+  | s => throw s!"unknown one-value operation '{s}'"
 
 def binOp (j : Json) : Except String BinOp := do
   match ← str j "fn" with
@@ -87,22 +97,20 @@ def binOp (j : Json) : Except String BinOp := do
   | "or" => pure .or
   | "xor" => pure .xor
   | "lt" => pure .lt
-  | s => throw s!"unknown two-word operation '{s}'"
+  | s => throw s!"unknown two-value operation '{s}'"
 
 def instr (j : Json) : Except String Instr := do
   match ← str j "op" with
   | "read" => pure (.read (← nat j "addr") (← stream j "dst"))
   | "write" => pure (.write (← stream j "src") (← nat j "addr"))
-  | "un" => pure (.un (← unOp j) (← stream j "src") (← stream j "dst"))
-  | "bin" => pure (.bin (← binOp j) (← stream j "a") (← stream j "b") (← stream j "dst"))
-  | "load" => pure (.load (← stream j "src"))
-  | "mac" => pure (.mac (← nat j "j") (← stream j "src"))
-  | "emit" => pure (.emit (← stream j "dst"))
-  | "const" => pure (.const (← ints j "values") (← stream j "dst"))
-  | "sel" => pure (.sel (← stream j "m") (← stream j "a") (← stream j "b") (← stream j "dst"))
-  | "seed" => pure (.seed (← stream j "src"))
-  | "install" => pure (.install (← nat j "j") (← stream j "src"))
-  | "macw" => pure (.macw (← nat j "j"))
+  | "un" => pure (.un (← ty j) (← unOp j) (← stream j "src") (← stream j "dst"))
+  | "bin" =>
+    pure (.bin (← ty j) (← binOp j) (← stream j "a") (← stream j "b") (← stream j "dst"))
+  | "const" => pure (.const (← ty j) (← ints j "values") (← stream j "dst"))
+  | "sel" =>
+    pure (.sel (← ty j) (← stream j "m") (← stream j "a") (← stream j "b") (← stream j "dst"))
+  | "install" => pure (.install (← nat j "j") (← nat j "g") (← stream j "src"))
+  | "product" => pure (.product (← nat j "n") (← stream j "src") (← stream j "dst"))
   | s => throw s!"unknown instruction '{s}'"
 
 def timed (j : Json) : Except String TimedEntry := do
@@ -127,7 +135,8 @@ def config (j : Json) : Except String Config := do
   pure {
     kinds := ks
     streams := ← nat j "streams"
-    mxmWeights := natOr j "mxmWeights" 8
+    lanes := ← nat j "lanes"
+    bankSize := ← nat j "bankSize"
     memDelay := ← nat j "memDelay"
     vxmDelay := ← nat j "vxmDelay"
     sxmDelay := ← nat j "sxmDelay"
@@ -135,7 +144,8 @@ def config (j : Json) : Except String Config := do
     delays := ← delays j }
 
 def placement (j : Json) : Except String Placement := do
-  pure ⟨← nat j "slice", ← nat j "base", ← nat j "size"⟩
+  let parts ← (← arr j "parts").mapM fun p => do pure (Part.mk (← nat p "slice") (← nat p "base"))
+  pure ⟨parts, ← nat j "size"⟩
 
 def compiled (j : Json) : Except String Compiled := do
   pure {
@@ -149,16 +159,14 @@ def pinstr (j : Json) : Except String (Nat × PInstr) := do
   let i ← match ← str j "op" with
     | "read" => pure (PInstr.read (← nat j "dst") (← nat j "addr"))
     | "write" => pure (PInstr.write (← nat j "src") (← nat j "addr"))
-    | "un" => pure (PInstr.un (← nat j "dst") (← unOp j) (← nat j "src"))
-    | "bin" => pure (PInstr.bin (← nat j "dst") (← binOp j) (← nat j "a") (← nat j "b"))
-    | "load" => pure (PInstr.load (← nat j "src"))
-    | "mac" => pure (PInstr.mac (← nat j "j") (← nat j "src"))
-    | "emit" => pure (PInstr.emit (← nat j "dst"))
-    | "const" => pure (PInstr.const (← nat j "dst") (← ints j "values"))
-    | "sel" => pure (PInstr.sel (← nat j "dst") (← nat j "m") (← nat j "a") (← nat j "b"))
-    | "seed" => pure (PInstr.seed (← nat j "src"))
-    | "install" => pure (PInstr.install (← nat j "j") (← nat j "src"))
-    | "macw" => pure (PInstr.macw (← nat j "j"))
+    | "un" => pure (PInstr.un (← nats j "dst") (← ty j) (← unOp j) (← nats j "src"))
+    | "bin" =>
+      pure (PInstr.bin (← nats j "dst") (← ty j) (← binOp j) (← nats j "a") (← nats j "b"))
+    | "const" => pure (PInstr.const (← nats j "dst") (← ty j) (← ints j "values"))
+    | "sel" =>
+      pure (PInstr.sel (← nats j "dst") (← ty j) (← nats j "m") (← nats j "a") (← nats j "b"))
+    | "install" => pure (PInstr.install (← nat j "j") (← nats j "srcs"))
+    | "product" => pure (PInstr.product (← nats j "dst") (← nat j "n") (← nat j "src"))
     | s => throw s!"unknown instruction '{s}'"
   -- A pinned instruction has the cycle it must be issued on.
   let i := match (nat j "pin").toOption with
@@ -179,17 +187,14 @@ def idx (j : Json) : Except String Idx := do
 /-- A statement without its pin. -/
 def bareStmt (j : Json) : Except String Stmt := do
   match ← str j "op" with
-  | "load" => pure (.load (← nat j "dst") (← nat j "buf") (← idx j))
-  | "store" => pure (.store (← nat j "src") (← nat j "buf") (← idx j))
-  | "un" => pure (.un (← nat j "dst") (← unOp j) (← nat j "a"))
-  | "bin" => pure (.bin (← nat j "dst") (← binOp j) (← nat j "a") (← nat j "b"))
+  | "load" => pure (.load (← nat j "dst") (← ty j) (← nat j "buf") (← idx j))
+  | "store" => pure (.store (← nat j "src") (← ty j) (← nat j "buf") (← idx j))
+  | "un" => pure (.un (← nat j "dst") (← ty j) (← unOp j) (← nat j "a"))
+  | "bin" => pure (.bin (← nat j "dst") (← ty j) (← binOp j) (← nat j "a") (← nat j "b"))
   | "matvec" =>
     pure (.matvec (← nat j "dst") (← nat j "x") (← nat j "buf") (← idx j) (← nat j "n"))
-  | "affine" =>
-    pure (.affine (← nat j "dst") (← nat j "x") (← nat j "bias") (← nat j "buf") (← idx j)
-      (← nat j "n"))
-  | "const" => pure (.const (← nat j "dst") (← ints j "values"))
-  | "sel" => pure (.sel (← nat j "dst") (← nat j "m") (← nat j "a") (← nat j "b"))
+  | "const" => pure (.const (← nat j "dst") (← ty j) (← ints j "values"))
+  | "sel" => pure (.sel (← nat j "dst") (← ty j) (← nat j "m") (← nat j "a") (← nat j "b"))
   | s => throw s!"unknown statement '{s}'"
 
 /-- A statement. A pinned one has `at`, the cycle its word is issued on, and
@@ -275,19 +280,25 @@ def stage (j : Json) : Except String Stage := do
   else
     throw "not a source, kernel, placed, compiled or image file"
 
-/-- A buffers file: the number of lanes and, for every buffer, its words as
-lists of signed integers. -/
-def buffers (j : Json) : Except String (Nat × List (List (List Int))) := do
+/-- The contents of one buffer as a file gives them: the type of its values,
+and each value as the signed integers of its elements. -/
+abbrev Buffer := DType × List (List Int)
+
+/-- A buffers file: the number of lanes and, for every buffer, the type of
+its values and the values. -/
+def buffers (j : Json) : Except String (Nat × List Buffer) := do
   let lanes ← nat j "lanes"
   let bufs ← (← arr j "buffers").mapM fun b => do
-    (← b.getArr?).toList.mapM fun w => do
+    let values ← (← arr b "values").mapM fun w => do
       (← w.getArr?).toList.mapM fun x => x.getInt?
+    pure (← dtype (← str b "type"), values)
   pure (lanes, bufs)
 
-def ofBuffers (lanes : Nat) (bufs : List (List (List Int))) : Json :=
+def ofBuffers (lanes : Nat) (bufs : List Buffer) : Json :=
   Json.mkObj [
     ("lanes", Lean.toJson lanes),
-    ("buffers", Lean.toJson bufs) ]
+    ("buffers", Lean.Json.arr (bufs.map fun (ty, values) =>
+      Json.mkObj [("type", Lean.toJson ty.name), ("values", Lean.toJson values)]).toArray) ]
 
 /-- A timeline as JSON: for each event its cycle, its word, and for a store
 the buffer and the position. -/

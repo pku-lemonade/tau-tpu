@@ -93,12 +93,14 @@ definition here is a model of something outside Lean.
 
 | `docs/Machine.md` | Definition | Theorems |
 |---|---|---|
-| 1, lanes and words | `Isa/Word.lean` | `Proofs/Isa/Word.lean` |
+| 1, lanes, words and elements | `Isa/Word.lean` | `Proofs/Isa/Word.lean`: facts about one element |
+| 1, values | `Isa/Value.lean` | `Proofs/Isa/Value.lean`: an element is its bytes put together, and a value is its elements |
 | 2, the blocks | `Blocks/` | `Proofs/Blocks/`: for each block, its output at cycle `t` in terms of earlier inputs |
 | 3.1 to 3.3 and 3.5 to 3.8, the slice-level machine | `Isa/Op.lean`, `Isa/Instr.lean`; `step` and `execute` in `Machine/SliceLevel.lean` | `execute_map` (`Proofs/Machine/SliceLevel.lean`) |
 | 3.4, the timing rule | derived from `step`; stated with `Machine/Timing.lean` | `arrives_east`, `arrives_west` (`Proofs/Machine/Timing.lean`) |
 | 3.9, what a slice issues | `issues` in `Machine/Issues.lean` | `issues_map` (`Proofs/Machine/Issues.lean`) |
 | 3.10, the image | `Program.encode`, `Image.decode` in `Isa/Encode.lean` | `Image.decode_encode` (`Proofs/Isa/Encode.lean`) |
+| 3.11, the two banks of a memory slice | `stepSlice` in `Machine/SliceLevel.lean`, `Config.bank` in `Isa/Instr.lean` | as 3.1 to 3.3 |
 | 4, the cell-level machine | `cellExecute` in `Machine/CellLevel.lean` | `cellExecute_eq` (`Proofs/Machine/CellLevel.lean`) |
 
 Two of these carry everything else.
@@ -126,7 +128,8 @@ rule a person uses to write a schedule.
 | Compiled | `Compiled` in `IR/Compiled.lean` | `execute`, `Compiled.timeline` |
 
 The memory map, with `image` to load buffers and `extract` to read them
-back, is `IR/MemMap.lean`. Running on names is `Check/Expr.lean`.
+back, is `IR/MemMap.lean`. It may deal a buffer out over several memories
+(Compiler 3). Running on names is `Check/Expr.lean`.
 
 **The checks.** Compiler 5 says what every step must keep: the buffers, and
 the words issued on fixed cycles. A check decides that for one input and
@@ -217,7 +220,7 @@ above it, and `spec/Tau.lean` lists the modules in the same order.
 | Folder | Contents |
 |---|---|
 | `Blocks/` | Clocked components: shift register, accumulator, multiply-accumulate, pipeline, memory, sequencer, repeater, systolic array. |
-| `Isa/` | Lanes and words (`Word.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`, whose entries are the repeater's), events (`Event.lean`), and the image (`Encode.lean`). |
+| `Isa/` | Lanes, words and elements (`Word.lean`), values of 8, 16 and 32 bits (`Value.lean`), slice kinds, operations (`Op.lean`), instructions and programs (`Instr.lean`, whose entries are the repeater's), events (`Event.lean`), and the image (`Encode.lean`). |
 | `Machine/` | The machine: the slice-level machine (`SliceLevel.lean`), the timing rule (`Timing.lean`), issued words (`Issues.lean`), and the cell-level machine, built from blocks (`CellLevel.lean`). |
 | `IR/` | The four IRs of a program (`Source.lean`, `Kernel.lean`, `Placed.lean`, `Compiled.lean`), the memory map (`MemMap.lean`), and the Lean copy of unroll (`Unroll.lean`). |
 | `Check/` | Symbolic expressions (`Expr.lean`), expression simplification (`Simplify.lean`), the checks (`Checker.lean`, `Passes.lean`), and the rules for what a back-end pass may decide (`Decides.lean`). |
@@ -242,8 +245,8 @@ specifies.
 Each step is a section of a doc, then the file in `spec/Tau/` that specifies
 it.
 
-1. Machine 1, 3.5, 3.6: `Isa/Word.lean`, `Isa/Op.lean`, `Isa/Instr.lean`.
-2. Machine 3.1 to 3.4, 3.7, 3.8: `Machine/SliceLevel.lean`, then `Machine/Timing.lean`.
+1. Machine 1, 3.5, 3.6: `Isa/Word.lean`, `Isa/Value.lean`, `Isa/Op.lean`, `Isa/Instr.lean`.
+2. Machine 3.1 to 3.4, 3.7, 3.8, 3.11: `Machine/SliceLevel.lean`, then `Machine/Timing.lean`.
 3. Machine 3.9: `Isa/Event.lean`, `Machine/Issues.lean`.
 4. Programs: `IR/Kernel.lean`, `IR/Source.lean`.
 5. Compiler 2 and 3: `IR/MemMap.lean`, `IR/Placed.lean`, `IR/Compiled.lean`.
@@ -289,6 +292,9 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | If all eight per-pass checks accept, the finished program computes its source and keeps its pins | proved | `passes_sound`, `passes_pins`, `end_to_end_passes` |
 | `Kernel.unroll`, the Lean copy of `tau-unroll`, keeps what a kernel computes and its pins; the simplifier inside the checks keeps the value of an expression | proved | `Kernel.run_unroll`, `Kernel.timeline_unroll`, `Expr.denote_simp` |
 | An image written by the Lean encoding, read back, is the program | proved | `Image.decode_encode` |
+| An element is the bytes it is held as, put together, and a value of up to four words is the value with its own elements | proved | `Elem.byte_ofBytes`, `Value.ofElems_elem` (`Proofs/Isa/Value.lean`) |
+| The operations on real words give values of as many words as their type has, and obey the laws the simplifier uses | proved | `wordSem_sized`, `wordSem_lawful` |
+| The words an instruction takes as one value were made as one value, of the instruction's type | not stated; an instruction takes the words that are on its streams, and a kernel statement fails only on a value of the wrong number of words | |
 | The output of each C++ pass computes what its input computes and keeps its pins | checked | `tau-check`, once per pass |
 | The image is the finished program | checked | `tau-check`, on the image decoded |
 | The compiler's output is accepted | tested, on the examples | `scripts/check-examples.sh` |
@@ -300,13 +306,13 @@ The theorem rests on Lean's three standard axioms and nothing else.
 | The outputs of `tau-place`, `tau-schedule` and `tau-route` differ from their inputs only in what each pass decides: where, when, on which stream | tested, on the examples | `placeOnly`, `scheduleOnly`, `routeOnly` (`Check/Decides.lean`), by `tau-check --decides` |
 | The other four passes (inline, simplify, slice, fold) have a Lean copy, or a rule for how the output is built from the input | no; a check asks only whether the output computes the same thing on the same cycles | |
 | A schedule is as short as it can be, or a set of pins that can be met is met | no; a check says nothing about speed, and a pass may refuse | |
-| The timing rule: a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|`, where `delay` is the delay of its instruction | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
+| The timing rule: each word of a result is on its stream at slice `q` on cycle `t + delay + 1 + \|q - p\|`, where `delay` is the delay of its instruction | proved, when nothing else is put on that stream in its path | `arrives_east`, `arrives_west` |
 | The result is there on no other cycle | not stated | |
 | A pinned word is issued by the slice the user had in mind | not stated; a pin names a word and a cycle, not a slice | `Isa/Event.lean` |
 | The cell-level machine issues the words the slice-level machine issues, on the same cycles | not stated; only its final memory is compared | |
 | `source.json` says what `kernel.mlir` says | trusted; for programs written in Python, tested against the frontend's own file | MLIR's parser, `compiler/lib/Emit/EmitSource.cpp` |
 | The JSON files are read correctly | trusted | `Tools/Json.lean` |
-| The definitions in the theorems mean what is intended | trusted; read them against the docs | `Source.run`, `Source.timeline`, `cellExecute`, `Isa/Word.lean` |
+| The definitions in the theorems mean what is intended | trusted; read them against the docs | `Source.run`, `Source.timeline`, `cellExecute`, `Isa/Word.lean`, `Isa/Value.lean` |
 | The docs say what was meant | trusted; nothing can check it | `docs/` |
 | Lean checks proofs and compiles `tau-check` correctly | trusted | |
 | Anything about hardware | no; the machine is a Lean model | |

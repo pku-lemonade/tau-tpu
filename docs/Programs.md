@@ -2,27 +2,33 @@
 
 | | |
 |---|---|
-| Describes | What a user of tau-tpu writes: buffers and words, statements, loops, calls and pins; and the two things a program promises, what it computes and when. |
+| Describes | What a user of tau-tpu writes: buffers and values, statements, loops, calls and pins; and the two things a program promises, what it computes and when. |
 | Does not describe | The machine the program runs on ([`Machine.md`](Machine.md)), what the compiler does with the program ([`Compiler.md`](Compiler.md)), or the Python and MLIR notations beyond the table in section 7. |
 | Specified in | `spec/Tau/IR/Kernel.lean`, `spec/Tau/IR/Source.lean`, `spec/Tau/Isa/Event.lean` |
 | Tables tested by | `course/tests/CourseTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
 
-A program is written with no machine in mind. It names buffers, says how words
+A program is written with no machine in mind. It names buffers, says how values
 are loaded from them, combined and stored back, and it may say on which cycle
 some of that happens. Slices, streams and addresses are the compiler's
 business.
 
-## 1. Buffers, words and values
+## 1. Buffers and values
 
 A *buffer* is a row of words with a fixed length. A program has a fixed list
 of buffers, numbered from 0. Before a run the user fills them; after the run
 the user reads them back. That is all a program has to do with the outside.
 
-A *word* is a fixed number of lanes (Machine 1). A program never looks inside a
-word: it cannot test one, and nothing it does depends on what a word holds.
+A *value* is a row of integers of one type, and is 1, 2 or 4 words
+(Machine 1). A program never looks inside a value: it cannot test one, and
+nothing it does depends on what a value holds.
 
-A *value* is a word that a statement has produced. Values are numbered. A
-statement uses the values of earlier statements by number.
+A statement that produces a value gives it a number. A statement uses the
+values of earlier statements by number.
+
+A buffer holds values one after another. For a type of `w` words, position
+`k` of a buffer is its `w` words from word `w * k` on. In the notations of
+section 7 a buffer has a type, and every load and store of it is of that
+type.
 
 ## 2. Statements
 
@@ -30,22 +36,25 @@ A program is a list of statements, run in order.
 
 | Statement | Effect |
 |---|---|
-| load from buffer `b` at position `k` | the word at position `k` of buffer `b` is a new value |
-| store value `v` to buffer `b` at position `k` | position `k` of buffer `b` now holds the word of `v` |
-| a one-word operation of `v` | the result is a new value |
-| a two-word operation of `v` and `w` | the result is a new value |
-| a constant with given lanes | the word with those lanes is a new value; missing lanes are zero |
-| select by `m` from `v` and `w` | lane by lane, `v` where `m` is not zero and `w` elsewhere |
+| load, of type `ty`, from buffer `b` at position `k` | the value at position `k` of buffer `b` is a new value |
+| store value `v`, of type `ty`, to buffer `b` at position `k` | position `k` of buffer `b` now holds `v` |
+| a one-value operation, of type `ty`, of `v` | the result is a new value |
+| a two-value operation, of type `ty`, of `v` and `w` | the result is a new value |
+| a constant of type `ty` with given elements | the value with those elements is a new value; missing elements are zero |
+| select, of type `ty`, by `m` from `v` and `w` | element by element, `v` where `m` is not zero and `w` elsewhere |
 | matrix `M` times `v` | the product is a new value |
-| matrix `M` times `v`, plus `w` | the product with the word of `w` added |
 
-The operations are those of Machine 3.6, and compute what is said there.
+The operations are those of Machine 3.6, and compute what is said there. A
+statement cannot be run on a value that is not of its type.
 
 A matrix is `n` consecutive words of a buffer, from a given position on. Each
-word is a column. The product of the matrix with a word `v` is the sum, over
-`j`, of lane `j` of `v` times column `j`.
+word is a row: it holds the weights of one element of the product. The
+product of the matrix with a value `v` of type `i8` is a value of type
+`i32`: element `i` is the dot product of row `i` with `v` (Machine 3.5), and
+the elements from `n` on are zero.
 
-With buffer 0 holding the words `a` and `b`, and buffer 1 holding `c`:
+With buffer 0 holding the words `a` and `b`, and buffer 1 holding `c`, and
+every statement of type `i8` but the last:
 
 | Statement | After it |
 |---|---|
@@ -53,6 +62,7 @@ With buffer 0 holding the words `a` and `b`, and buffer 1 holding `c`:
 | store the value `b` to position 0 of buffer 1 | buffer 1 holds `b` |
 | relu of the value `a` | the new value is relu of `a` |
 | the value `a` plus the value `b` | the new value is `a` + `b` |
+| load, of type `i16`, position 0 of buffer 0 | the new value is the two words `a` and `b` |
 
 ## 3. Loops
 
@@ -66,7 +76,7 @@ A loop does not contain another loop.
 
 | Statement, on iteration 1 | After it |
 |---|---|
-| load `[0, 1]` of buffer 0 | the new value is `b`, the word at position 0 + 1 * 1 |
+| load `[0, 1]` of buffer 0 | the new value is `b`, the value at position 0 + 1 * 1 |
 
 ## 4. Calls
 
@@ -100,9 +110,10 @@ buffers 0, 1 and 2, holding `a`, `b` and `c`:
 A program does not say when anything happens. The compiler decides. A
 program may take that decision back for single statements: a statement may
 be *pinned* to a cycle, counted from the start of its kernel. The pin claims
-that the statement's word is *issued* on that cycle (Machine 3.9). For a
-statement with a result the word is the result. For a store it is the word
-stored, and the claim names the buffer and the position.
+that the words of the statement's value are *issued* on that cycle
+(Machine 3.9), every one of them. For a statement with a result the value is
+the result. For a store it is the value stored, and the claim names the
+buffer and, for each word, its place in the buffer.
 
 Inside a loop a pin may move with the iteration: `at t every d` is cycle
 `t + d * i` on iteration `i`.
@@ -115,7 +126,12 @@ Inside a loop a pin may move with the iteration: `at t every d` is cycle
 | relu of `a` | at 5 every 4 | 2 | relu of `a` is issued on cycle 13 |
 | store `a` to position `i` of buffer 1 | at 9 every 4 | 3 | `a` is stored to position 3 of buffer 1 on cycle 21 |
 
-A pin names a word and a cycle. It does not name a slice.
+The same statements name values of one word. A store of a value of type
+`i16`, with the words `a` and `b`, to position 1 of buffer 1, pinned at 6,
+claims that `a` is stored to word 2 of buffer 1 on cycle 6 and `b` to word 3
+on cycle 6.
+
+A pin names a value and a cycle. It does not name a slice.
 
 Not every set of pins can be met. A word takes a fixed number of cycles to
 get from one slice to another (Machine 3.4) and can wait only in a memory. How
@@ -130,7 +146,7 @@ Two things, and nothing else.
 **What it computes.** For any contents of its buffers before the run, the
 contents of its buffers after the run.
 
-**When.** For every pinned statement, the word and the cycle.
+**When.** For every pinned statement, the words and the cycle.
 
 A program that is run on a machine keeps these promises if, for every contents
 of the buffers, the machine ends with the same buffers and issues each pinned
@@ -148,14 +164,19 @@ Python. Both say the same things.
 
 | | MLIR | Python |
 |---|---|---|
-| a kernel | `func.func @k(%x: !tau.buf<4>)` | `@tau.kernel` on `def k(x: tau.Buf[4])` |
-| load | `%v = tau.load %x[0, 1] : !tau.buf<4>` | `v = tau.load(x, i)` |
-| an operation | `%r = tau.relu %v` | `r = tau.relu(v)` |
-| store | `tau.store %r, %y[0, 1] : !tau.buf<4>` | `tau.store(y, i, r)` |
+| a kernel | `func.func @k(%x: !tau.buf<4 x 8>)` | `@tau.kernel` on `def k(x: tau.Buf[4])` |
+| a buffer of 4 values of type `i32` | `!tau.buf<4 x 32>` | `tau.Buf[4, tau.i32]` |
+| load | `%v = tau.load %x[0, 1] : !tau.buf<4 x 8>` | `v = tau.load(x, i)` |
+| an operation | `%r = tau.relu %v : !tau.int<8>` | `r = tau.relu(v)` |
+| widen | `%w = tau.widen %v : !tau.int<8> to !tau.int<32>` | `w = tau.widen(v, tau.i32)` |
+| store | `tau.store %r, %y[0, 1] : !tau.buf<4 x 8>` | `tau.store(y, i, r)` |
 | a loop | `tau.for 4 { ... }` | `for i in tau.loop(4):` |
 | a pin | `at 6 every 4` after the operation | `at=T + 6 + 4 * i` |
 | a call | `tau.call @k(%x, %y) at 40 : (...)` | `k(x, y, at=T + 40)` |
 | a scratch buffer | one more argument of the last function | `tau.alloc(1)` |
+
+A buffer is of type `i8` unless it says otherwise. An operation has the type
+of its operands, which MLIR writes after it and Python does not write.
 
 In MLIR the program is the last function of the file and the kernels it
 calls are the functions before it.

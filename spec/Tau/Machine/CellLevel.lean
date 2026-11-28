@@ -13,12 +13,16 @@ built from the blocks in `spec/Tau/Blocks/`:
 
 * a **repeater** that issues the slice's instructions, counting down to each
   one with its own registers,
-* a **memory** that holds its words,
+* two **memories** that hold its words, one for each bank; a memory takes one
+  command in a cycle, which is why a read and a write on one cycle have to be
+  for different banks,
 * a **shift register** that carries each result for its delay: as deep as
   the longest delay of the machine, with a shorter result written into the
   slot that leaves after its delay,
-* one **multiply-accumulate cell** per lane, for the matrix slice,
-* a second small **memory** for the columns a matrix slice stores.
+* for the matrix slice, a square of **multiply-accumulate cells**: one row
+  of them for each lane of the result, and in each row one cell for each
+  lane of the word that is multiplied. A cell holds one lane of an installed
+  word, and a row adds up its products from cell to cell.
 
 There is no clock shared by the whole machine. Every slice counts for itself, in
 the registers of its repeater, and the slices agree only because they all
@@ -32,7 +36,7 @@ same as at the slice level.
 slice-level machine cannot be told apart: on every program they trap on the
 same cycle for the same reason, or end with the same memory contents.
 
-Docs: Machine 4 (`docs/`).
+Docs: Machine 3.11 and 4 (`docs/`).
 -/
 
 namespace Tau
@@ -47,38 +51,59 @@ structure Cell (lanes : Nat) where
   slots : List (Slot Instr)
   /-- Memory: the number of words. -/
   size : Nat
-  /-- Memory: the stored words. -/
-  mem : Vector (Word lanes) size
+  /-- Memory: the number of words the lower bank can hold. -/
+  bank : Nat
+  /-- Memory: the words of the lower bank, from address 0. -/
+  lower : Vector (Word lanes) (min bank size)
+  /-- Memory: the words of the upper bank, from address `bank`. -/
+  upper : Vector (Word lanes) (size - bank)
   /-- Shift register: its depth, which is the longest delay of the machine. -/
   depth : Nat
   /-- Shift register: results on their way out. The last slot leaves in the
   cycle about to run. -/
-  pipe : Vector (Option (Stream × Word lanes)) depth
-  /-- Matrix slice: the vector operand. -/
-  x : Option (Word lanes)
-  /-- Matrix slice: the total held by the multiply-accumulate cell of each lane. -/
-  acc : Vector Lane lanes
-  /-- Matrix slice: the number of columns it can store. -/
+  pipe : Vector (Option (Stream × Value lanes)) depth
+  /-- Matrix slice: the number of installed words. -/
   wsize : Nat
-  /-- Matrix slice: the stored columns, kept in a small memory. -/
+  /-- Matrix slice: the installed words. Lane `j` of word `i` is held by cell
+  `j` of row `i`. -/
   weights : Vector (Word lanes) wsize
 
-/-- Step the multiply-accumulate cell of every lane. `cmd k` is what the cell
-of lane `k` is told to do. -/
-def macLanes (acc : Vector Lane lanes) (cmd : Fin lanes → AccIn (Lane × Lane)) :
-    Vector Lane lanes :=
-  Vector.ofFn fun k => ((mac (0 : Lane)).step acc[k] (cmd k)).1
+/-- One row of multiply-accumulate cells: cell `j` holds lane `j` of `w` and
+is given lane `j` of `x`, both read as signed integers. The first cell
+starts from zero, and each adds its product to the total of 32 bits that the
+cell before it hands on. The result is the total after the last cell. -/
+def macRow (w x : Word lanes) : Elem :=
+  (List.finRange lanes).foldl
+    (fun acc j => ((mac (0 : Elem)).step acc (.add (w[j].signExtend 32, x[j].signExtend 32))).1) 0
+
+/-- Put the words `vs` into the installed words from place `j` on. -/
+def putRows {n : Nat} : Vector (Word lanes) n → Nat → List (Word lanes) → Vector (Word lanes) n
+  | ws, _, [] => ws
+  | ws, j, v :: vs => putRows (ws.setIfInBounds j v) (j + 1) vs
+
+/-- Step the memory of the bank that holds address `a`. The command is given
+as a function of the address within the bank. Returns the two banks and the
+output of the memory that was stepped. -/
+def Cell.stepBank (c : Cell lanes) (a : Nat) (cmd : Nat → MemIn (Word lanes)) :
+    Vector (Word lanes) (min c.bank c.size) × Vector (Word lanes) (c.size - c.bank) ×
+      Option (Word lanes) :=
+  if a < c.bank then
+    let r := (memory _ c.lower).step c.lower (cmd a)
+    (r.1, c.upper, r.2)
+  else
+    let r := (memory _ c.upper).step c.upper (cmd (a - c.bank))
+    (c.lower, r.1, r.2)
 
 /-- Carry out one instruction at one slice, by stepping its blocks. -/
 def cellExec (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
-    (c : Cell lanes) : Instr → Except TrapKind (Cell lanes × Option (Stream × Word lanes))
+    (c : Cell lanes) : Instr → Except TrapKind (Cell lanes × Option (Stream × Value lanes))
   | .read addr dst =>
     if kind ≠ .mem then .error .wrongSlice
     else if cfg.streams ≤ dst.id then .error .badStream
     else
-      match ((memory c.size c.mem).step c.mem (.read addr)).2 with
+      match (c.stepBank addr .read).2.2 with
       | none => .error .badAddress
-      | some v => .ok (c, some (dst, v))
+      | some v => .ok (c, some (dst, [v]))
   | .write src addr =>
     if kind ≠ .mem then .error .wrongSlice
     else if c.size ≤ addr then .error .badAddress
@@ -86,80 +111,63 @@ def cellExec (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
       match rd src with
       | none => .error .emptyRead
       | some v =>
-        .ok ({ c with mem := ((memory c.size c.mem).step c.mem (.write addr v)).1 }, none)
-  | .un op src dst =>
-    if op.kind ≠ kind then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badStream
-    else
-      match rd src with
-      | none => .error .emptyRead
-      | some v => .ok (c, some (dst, (wordSem lanes).un op v))
-  | .bin op a b dst =>
-    if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badStream
-    else
-      match rd a, rd b with
-      | some va, some vb => .ok (c, some (dst, (wordSem lanes).bin op va vb))
-      | _, _ => .error .emptyRead
-  | .load src =>
-    if kind ≠ .mxm then .error .wrongSlice
-    else
-      match rd src with
-      | none => .error .emptyRead
-      | some v => .ok ({ c with x := some v }, none)
-  | .mac j src =>
-    if kind ≠ .mxm then .error .wrongSlice
-    else
-      match c.x, rd src with
-      | none, _ => .error .noOperand
-      | some _, none => .error .emptyRead
-      | some x, some w =>
-        -- Lane `k` adds lane `j` of the vector operand times lane `k` of `w`.
-        .ok ({ c with acc := macLanes c.acc fun k => .add (x[j]?.getD 0, w[k]) }, none)
-  | .emit dst =>
-    if kind ≠ .mxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badStream
-    else .ok ({ c with acc := macLanes c.acc fun _ => .clear }, some (dst, c.acc))
-  | .const xs dst =>
-    if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badStream
-    else .ok (c, some (dst, (wordSem lanes).const xs))
-  | .sel m a b dst =>
-    if kind ≠ .vxm then .error .wrongSlice
-    else if cfg.streams ≤ dst.id then .error .badStream
-    else
-      match rd m, rd a, rd b with
-      | some vm, some va, some vb => .ok (c, some (dst, (wordSem lanes).sel vm va vb))
-      | _, _, _ => .error .emptyRead
-  | .seed src =>
-    if kind ≠ .mxm then .error .wrongSlice
-    else
-      match rd src with
-      | none => .error .emptyRead
-      -- Lane `k` loads lane `k` of the word.
-      | some v => .ok ({ c with acc := macLanes c.acc fun k => .load (v[k], 1) }, none)
-  | .install j src =>
-    if kind ≠ .mxm then .error .wrongSlice
-    else if c.wsize ≤ j then .error .badAddress
-    else
-      match rd src with
-      | none => .error .emptyRead
-      | some v =>
         .ok ({ c with
-          weights := ((memory c.wsize c.weights).step c.weights (.write j v)).1 }, none)
-  | .macw j =>
-    if kind ≠ .mxm then .error .wrongSlice
+          lower := (c.stepBank addr (.write · v)).1
+          upper := (c.stepBank addr (.write · v)).2.1 }, none)
+  | .un ty op src dst =>
+    if op.kind ≠ kind then .error .wrongSlice
+    else if !cfg.hasGroup dst (op.out ty).bytes || !src.aligned ty.bytes then .error .badStream
     else
-      match c.x, ((memory c.wsize c.weights).step c.weights (.read j)).2 with
-      | none, _ => .error .noOperand
-      | some _, none => .error .badAddress
-      | some x, some w =>
-        .ok ({ c with acc := macLanes c.acc fun k => .add (x[j]?.getD 0, w[k]) }, none)
+      match readGroup rd src ty.bytes with
+      | none => .error .emptyRead
+      | some v => .ok (c, some (dst, (wordSem lanes).un ty op v))
+  | .bin ty op a b dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if !cfg.hasGroup dst ty.bytes || !a.aligned ty.bytes || !b.aligned ty.bytes then
+      .error .badStream
+    else
+      match readGroup rd a ty.bytes, readGroup rd b ty.bytes with
+      | some va, some vb => .ok (c, some (dst, (wordSem lanes).bin ty op va vb))
+      | _, _ => .error .emptyRead
+  | .const ty xs dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if !cfg.hasGroup dst ty.bytes then .error .badStream
+    else .ok (c, some (dst, (wordSem lanes).const ty xs))
+  | .sel ty m a b dst =>
+    if kind ≠ .vxm then .error .wrongSlice
+    else if !cfg.hasGroup dst ty.bytes || !m.aligned ty.bytes || !a.aligned ty.bytes ||
+        !b.aligned ty.bytes then
+      .error .badStream
+    else
+      match readGroup rd m ty.bytes, readGroup rd a ty.bytes, readGroup rd b ty.bytes with
+      | some vm, some va, some vb => .ok (c, some (dst, (wordSem lanes).sel ty vm va vb))
+      | _, _, _ => .error .emptyRead
+  | .install j g src =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else if c.wsize < j + g then .error .badAddress
+    else
+      match readGroup rd src g with
+      | none => .error .emptyRead
+      | some vs => .ok ({ c with weights := putRows c.weights j vs }, none)
+  | .product n src dst =>
+    if kind ≠ .mxm then .error .wrongSlice
+    else if !cfg.hasGroup dst DType.i32.bytes then .error .badStream
+    else if c.wsize < n then .error .badAddress
+    else
+      match rd src with
+      | none => .error .emptyRead
+      | some x =>
+        -- Row `i` gives element `i` of the result, a value of 32 bits. Only
+        -- the first `n` rows are used.
+        .ok (c, some (dst, Value.ofElems DType.i32.bytes fun i : Fin lanes =>
+          match c.weights[i.val]? with
+          | some w => if i.val < n then macRow w x else 0
+          | none => 0))
 
 /-- Whether a result that leaves `d` cycles from now finds its slot of the
 shift register taken by an earlier result. The last slot leaves in this
 cycle. A result that enters at the front never clashes. -/
-def cellClash (c : Cell lanes) (entering : Option (Stream × Word lanes)) (d : Nat) : Bool :=
+def cellClash (c : Cell lanes) (entering : Option (Stream × Value lanes)) (d : Nat) : Bool :=
   match entering with
   | some _ => d < c.depth && (c.pipe[c.depth - 1 - d]?.getD none).isSome
   | none => false
@@ -169,8 +177,8 @@ step it, and take out the one that leaves it. A result whose delay is the
 depth of the register is its input. A result with a shorter delay is written
 into the slot that leaves after its delay, and the register steps with no
 input. -/
-def cellShift (c : Cell lanes) (entering : Option (Stream × Word lanes)) (d : Nat) :
-    Cell lanes × Option (Stream × Word lanes) :=
+def cellShift (c : Cell lanes) (entering : Option (Stream × Value lanes)) (d : Nat) :
+    Cell lanes × Option (Stream × Value lanes) :=
   let out :=
     match entering with
     | some r =>
@@ -180,26 +188,51 @@ def cellShift (c : Cell lanes) (entering : Option (Stream × Word lanes)) (d : N
     | none => (shiftRegister c.depth none).step c.pipe none
   ({ c with pipe := out.1 }, out.2)
 
+/-- Carry out a read and then a write at one slice. The result is the word
+read. -/
+def cellExecBoth (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
+    (c : Cell lanes) (r w : Instr) :
+    Except TrapKind (Cell lanes × Option (Stream × Value lanes)) :=
+  match cellExec cfg kind rd c r with
+  | .error k => .error k
+  | .ok (c', res) =>
+    match cellExec cfg kind rd c' w with
+    | .error k => .error k
+    | .ok (c'', _) => .ok (c'', res)
+
+/-- The end of a slice's cycle, given what its instructions did: a trap is
+reported with the slice and the cycle, and a result enters the shift register
+to leave `d` cycles from now, unless its slot is taken. -/
+def cellLeave (p t : Nat) (d : Nat) :
+    Except TrapKind (Cell lanes × Option (Stream × Value lanes)) →
+      Except Trap (Cell lanes × Option (Stream × Value lanes))
+  | .error k => .error ⟨k, p, t⟩
+  | .ok (c, r) =>
+    if cellClash c r d then .error ⟨.twoResults, p, t⟩ else .ok (cellShift c r d)
+
 /-- One cycle of the slice at position `p`. The repeater issues the
-instructions due and advances its registers. -/
+instructions due and advances its registers. Each bank of the memory is one
+memory block and takes one command, so a read and a write are both carried
+out only if they are for different banks. -/
 def cellStep (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes)) (p : Nat)
-    (c : Cell lanes) : Except Trap (Cell lanes × Option (Stream × Word lanes)) :=
+    (c : Cell lanes) : Except Trap (Cell lanes × Option (Stream × Value lanes)) :=
   let issued := (repeater (prog.entriesFor p)).step c.slots ()
-  let tick (r : Cell lanes × Option (Stream × Word lanes)) :
-      Cell lanes × Option (Stream × Word lanes) :=
-    ({ r.1 with clock := c.clock + 1, slots := issued.1 }, r.2)
-  match issued.2 with
-  | [] => .ok (tick (cellShift c none 0))
-  | [i] =>
-    match cfg.kindAt p with
-    | none => .error ⟨.noSlice, p, c.clock⟩
-    | some kind =>
-      match cellExec cfg kind rd c i with
-      | .ok (c', r) =>
-        if cellClash c' r (cfg.delayOf kind i) then .error ⟨.twoResults, p, c.clock⟩
-        else .ok (tick (cellShift c' r (cfg.delayOf kind i)))
-      | .error k => .error ⟨k, p, c.clock⟩
-  | _ => .error ⟨.twoInstructions, p, c.clock⟩
+  let carried : Except Trap (Cell lanes × Option (Stream × Value lanes)) :=
+    match issued.2 with
+    | [] => .ok (cellShift c none 0)
+    | [i] =>
+      match cfg.kindAt p with
+      | none => .error ⟨.noSlice, p, c.clock⟩
+      | some kind => cellLeave p c.clock (cfg.delayOf kind i) (cellExec cfg kind rd c i)
+    | [i, j] =>
+      match Instr.readWrite i j, cfg.kindAt p with
+      | none, _ => .error ⟨.twoInstructions, p, c.clock⟩
+      | some _, none => .error ⟨.noSlice, p, c.clock⟩
+      | some (r, w), some kind =>
+        if cfg.bank r.addr = cfg.bank w.addr then .error ⟨.sameBank, p, c.clock⟩
+        else cellLeave p c.clock (cfg.delayOf kind r) (cellExecBoth cfg kind rd c r w)
+    | _ => .error ⟨.twoInstructions, p, c.clock⟩
+  carried.map fun r => ({ r.1 with clock := c.clock + 1, slots := issued.1 }, r.2)
 
 /-- The state of the whole machine: the streams and the slices. -/
 structure CellState (lanes : Nat) where
@@ -218,7 +251,7 @@ def CellState.sample (s : CellState lanes) (p : Nat) (tr : Stream) : Option (Wor
 
 /-- One cycle of every slice, starting from position `p`. -/
 def cellSteps (cfg : Config) (prog : Program) (s : CellState lanes) :
-    Nat → List (Cell lanes) → Except Trap (List (Cell lanes × Option (Stream × Word lanes)))
+    Nat → List (Cell lanes) → Except Trap (List (Cell lanes × Option (Stream × Value lanes)))
   | _, [] => .ok []
   | p, c :: rest =>
     match cellStep cfg prog (s.sample p) p c with
@@ -258,17 +291,17 @@ def CellState.init (cfg : Config) (prog : Program) (image : List (List (Word lan
     { clock := 0
       slots := (prog.entriesFor p).map Entry.start
       size := (image[p]?.getD []).length
-      mem := ⟨(image[p]?.getD []).toArray, by simp⟩
+      bank := cfg.bankSize
+      lower := ⟨((image[p]?.getD []).take cfg.bankSize).toArray, by simp⟩
+      upper := ⟨((image[p]?.getD []).drop cfg.bankSize).toArray, by simp⟩
       depth := cfg.maxDelay
       pipe := Vector.replicate _ none
-      x := none
-      acc := Vector.replicate lanes 0
-      wsize := cfg.mxmWeights
+      wsize := cfg.lanes
       weights := Vector.replicate _ Word.zero }
 
 /-- The contents of every slice's memory. -/
 def CellState.memory (s : CellState lanes) : List (List (Word lanes)) :=
-  s.cells.map fun c => c.mem.toList
+  s.cells.map fun c => c.lower.toList ++ c.upper.toList
 
 /-- Run a program for `n` cycles from a memory image and return the final
 memory contents. -/

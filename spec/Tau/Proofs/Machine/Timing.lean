@@ -38,33 +38,24 @@ variable {V : Type}
 
 /-- An instruction does not touch the pipe of its slice. -/
 theorem exec_pipe (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
-    (sl sl' : Slice V) (i : Instr) (r : Option (Stream × V))
+    (sl sl' : Slice V) (i : Instr) (r : Option (Stream × List V))
     (h : exec S cfg kind rd sl i = .ok (sl', r)) : sl'.pipe = sl.pipe := by
   cases i <;> simp only [exec] at h <;> (repeat' split at h) <;>
     first
     | contradiction
     | (cases h; rfl)
 
-/-- A result is always meant for a stream that exists. -/
-theorem exec_track (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
-    (sl sl' : Slice V) (i : Instr) (tr : Stream) (v : V)
-    (h : exec S cfg kind rd sl i = .ok (sl', some (tr, v))) : tr.id < cfg.streams := by
-  cases i <;> simp only [exec] at h <;> (repeat' split at h) <;>
-    first
-    | contradiction
-    | (cases h; omega)
-    | cases h
-
 /-- The delay that `stepSlice` gives the result of the slice at `p` in the
-cycle that starts in `s`: that of the instruction due, if one is. -/
+cycle that starts in `s`: that of the instruction that computes it, if one
+does. -/
 def State.resultDelay (cfg : Config) (prog : Program) (s : State V) (p : Nat) : Nat :=
-  match prog.dueAt p s.time, cfg.kindAt p with
-  | [i], some kind => cfg.delayOf kind i
+  match prog.computes p s.time, cfg.kindAt p with
+  | some i, some kind => cfg.delayOf kind i
   | _, _ => 0
 
 theorem State.resultDelay_eq (cfg : Config) (prog : Program) (s : State V) (p : Nat)
     (kind : Kind) (i : Instr) (hk : cfg.kindAt p = some kind)
-    (hi : prog.dueAt p s.time = [i]) : s.resultDelay cfg prog p = cfg.delayOf kind i := by
+    (hi : prog.computes p s.time = some i) : s.resultDelay cfg prog p = cfg.delayOf kind i := by
   simp [State.resultDelay, hk, hi]
 
 /-- No delay is longer than the longest. -/
@@ -92,14 +83,14 @@ theorem State.resultDelay_le (cfg : Config) (prog : Program) (s : State V) (p : 
   · exact cfg.delayOf_le_maxDelay _ _
   · omega
 
-theorem Slice.slots_length (sl : Slice V) (e : Option (Stream × V)) (d : Nat) :
+theorem Slice.slots_length (sl : Slice V) (e : Option (Stream × List V)) (d : Nat) :
     (sl.slots e d).length = sl.pipe.length + 1 := by
   cases e <;> simp [Slice.slots]
 
 /-- A result already in a slot stays there when the result entering does not
 clash with it. -/
-theorem Slice.slots_getElem? (sl : Slice V) (e : Option (Stream × V)) (d i : Nat)
-    (x : Stream × V) (hc : sl.clash e d = false) (hi : (none :: sl.pipe)[i]? = some (some x)) :
+theorem Slice.slots_getElem? (sl : Slice V) (e : Option (Stream × List V)) (d i : Nat)
+    (x : Stream × List V) (hc : sl.clash e d = false) (hi : (none :: sl.pipe)[i]? = some (some x)) :
     (sl.slots e d)[i]? = some (some x) := by
   cases e with
   | none => exact hi
@@ -111,59 +102,117 @@ theorem Slice.slots_getElem? (sl : Slice V) (e : Option (Stream × V)) (d i : Na
     · rw [List.getElem?_set_ne h]
       exact hi
 
+/-- A read and then a write leave the pipe of their slice alone, and give
+the result of the read. -/
+theorem execBoth_ok (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V)
+    (sl sl' : Slice V) (r w : Instr) (res : Option (Stream × List V))
+    (h : execBoth S cfg kind rd sl r w = .ok (sl', res)) :
+    sl'.pipe = sl.pipe ∧ ∃ sl1, exec S cfg kind rd sl r = .ok (sl1, res) := by
+  unfold execBoth at h
+  cases h1 : exec S cfg kind rd sl r with
+  | error k => simp [h1] at h
+  | ok a =>
+    obtain ⟨sl1, res1⟩ := a
+    simp only [h1] at h
+    cases h2 : exec S cfg kind rd sl1 w with
+    | error k => simp [h2] at h
+    | ok b =>
+      obtain ⟨sl2, res2⟩ := b
+      simp only [h2, Except.ok.injEq, Prod.mk.injEq] at h
+      obtain ⟨hsl, hres⟩ := h
+      subst hsl hres
+      exact ⟨(exec_pipe S cfg kind rd sl1 sl2 w res2 h2).trans
+        (exec_pipe S cfg kind rd sl sl1 r res1 h1), sl1, rfl⟩
+
+/-- What `leave` answers when it does not trap: the result is written into
+the slots of the pipe, all but the last are kept, and the last is taken out.
+The result does not clash. -/
+theorem leave_ok (p t d : Nat) (sl sl' : Slice V) (r o : Option (Stream × List V))
+    (h : leave p t d (.ok (sl, r)) = .ok (sl', o)) :
+    sl'.pipe = (sl.slots r d).dropLast ∧ o = (sl.slots r d).getLast?.getD none ∧
+      sl.clash r d = false := by
+  simp only [leave] at h
+  split at h
+  · cases h
+  · rename_i hc
+    simp only [shiftPipe, Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨h1, h2⟩ := h
+    subst h1
+    exact ⟨rfl, h2.symm, by simpa using hc⟩
+
 /-- One cycle of a slice writes its result into the slots of its pipe, keeps
 all but the last, and takes the last out. The result does not clash. -/
 theorem stepSlice_pipe (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
-    (sl sl' : Slice V) (o : Option (Stream × V)) (hsl : s.slices[p]? = some sl)
+    (sl sl' : Slice V) (o : Option (Stream × List V)) (hsl : s.slices[p]? = some sl)
     (h : stepSlice S cfg prog s p sl = .ok (sl', o)) :
     sl'.pipe = (sl.slots (s.result S cfg prog p) (s.resultDelay cfg prog p)).dropLast ∧
       o = (sl.slots (s.result S cfg prog p) (s.resultDelay cfg prog p)).getLast?.getD none ∧
       sl.clash (s.result S cfg prog p) (s.resultDelay cfg prog p) = false := by
   -- Split on the instructions due, as `stepSlice` does. With none due the
-  -- result is `none`. With one due, `exec` leaves the pipe alone
-  -- (`exec_pipe`), and a clash would have trapped. The other cases trap.
+  -- result is `none`. With one due, or a read and a write, the instructions
+  -- leave the pipe alone (`exec_pipe`, `execBoth_ok`), and a clash would
+  -- have trapped (`leave_ok`). The other cases trap.
+  have hslots : ∀ sl1 : Slice V, sl1.pipe = sl.pipe → sl1.slots = sl.slots := by
+    intro sl1 hp
+    funext e d
+    cases e <;> simp [Slice.slots, hp]
+  have hclash : ∀ sl1 : Slice V, sl1.pipe = sl.pipe → sl1.clash = sl.clash := by
+    intro sl1 hp
+    funext e d
+    simp [Slice.clash, hp]
   cases hdue : prog.dueAt p s.time with
   | nil =>
     simp only [stepSlice, hdue, shiftPipe, Except.ok.injEq, Prod.mk.injEq] at h
-    simp only [State.result, State.resultDelay, hdue]
+    simp only [State.result, State.resultDelay, Program.computes, hdue]
     obtain ⟨h1, h2⟩ := h
     subst h1
     exact ⟨rfl, h2.symm, rfl⟩
   | cons i rest =>
     cases rest with
-    | cons j rest' => simp [stepSlice, hdue] at h
     | nil =>
       cases hk : cfg.kindAt p with
       | none => simp [stepSlice, hdue, hk] at h
       | some kind =>
         cases he : exec S cfg kind (s.sample p) sl i with
-        | error k => simp [stepSlice, hdue, hk, he] at h
+        | error k => simp [stepSlice, hdue, hk, he, leave] at h
         | ok r =>
           obtain ⟨sl1, r1⟩ := r
           simp only [stepSlice, hdue, hk, he] at h
-          simp only [State.result, State.resultDelay, hdue, hk, hsl, he]
+          simp only [State.result, State.resultDelay, Program.computes, hdue, hk, hsl, he]
           have hp := exec_pipe S cfg kind _ sl sl1 i r1 he
-          have hslots : sl1.slots = sl.slots := by
-            funext e d
-            cases e <;> simp [Slice.slots, hp]
-          have hclash : sl1.clash = sl.clash := by
-            funext e d
-            simp [Slice.clash, hp]
-          split at h
-          · cases h
-          · rename_i hc
-            simp only [shiftPipe, Except.ok.injEq, Prod.mk.injEq] at h
-            obtain ⟨h1, h2⟩ := h
-            subst h1
-            rw [← hslots, ← hclash]
-            exact ⟨rfl, h2.symm, by simpa using hc⟩
+          rw [← hslots sl1 hp, ← hclash sl1 hp]
+          exact leave_ok p s.time _ sl1 sl' r1 o h
+    | cons j rest' =>
+      cases rest' with
+      | cons k rest'' => simp [stepSlice, hdue] at h
+      | nil =>
+        cases hrw : Instr.readWrite i j with
+        | none => simp [stepSlice, hdue, hrw] at h
+        | some rw' =>
+          obtain ⟨r, w⟩ := rw'
+          cases hk : cfg.kindAt p with
+          | none => simp [stepSlice, hdue, hrw, hk] at h
+          | some kind =>
+            simp only [stepSlice, hdue, hrw, hk] at h
+            split at h
+            · cases h
+            · cases he : execBoth S cfg kind (s.sample p) sl r w with
+              | error k => simp [he, leave] at h
+              | ok a =>
+                obtain ⟨sl2, res⟩ := a
+                rw [he] at h
+                obtain ⟨hp, sl1, h1⟩ := execBoth_ok S cfg kind _ sl sl2 r w res he
+                simp only [State.result, State.resultDelay, Program.computes, hdue, hrw,
+                  Option.map_some, hk, hsl, h1]
+                rw [← hslots sl2 hp, ← hclash sl2 hp]
+                exact leave_ok p s.time _ sl2 sl' res o h
 
 /-! ## One cycle of the machine, taken apart -/
 
 /-- If `stepSlices` does not trap, entry `i` of its answer is `stepSlice` of
 entry `i` of the slices. -/
 theorem stepSlices_getElem? (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × V)))
+    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × List V)))
     (h : stepSlices S cfg prog s p0 sls = .ok rs) (i : Nat) (sl : Slice V)
     (hsl : sls[i]? = some sl) :
     ∃ r, rs[i]? = some r ∧ stepSlice S cfg prog s (p0 + i) sl = .ok r := by
@@ -191,7 +240,7 @@ theorem stepSlices_getElem? (S : Sem V) (cfg : Config) (prog : Program) (s : Sta
 
 /-- If `stepSlices` does not trap, it answers for every slice. -/
 theorem stepSlices_length (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × V)))
+    (p0 : Nat) (sls : List (Slice V)) (rs : List (Slice V × Option (Stream × List V)))
     (h : stepSlices S cfg prog s p0 sls = .ok rs) : rs.length = sls.length := by
   induction sls generalizing p0 rs with
   | nil =>
@@ -240,7 +289,7 @@ theorem step_slice (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
 /-- The list of results that `step` hands to the streams is `State.out` at
 every position. -/
 theorem outs_getD (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
-    (rs : List (Slice V × Option (Stream × V)))
+    (rs : List (Slice V × Option (Stream × List V)))
     (hrs : stepSlices S cfg prog s 0 s.slices = .ok rs) (p : Nat) :
     (rs.map (·.2))[p]?.getD none = s.out S cfg prog p := by
   cases hsl : s.slices[p]? with
@@ -258,7 +307,7 @@ theorem outs_getD (S : Sem V) (cfg : Config) (prog : Program) (s : State V)
 /-! ## The shape of the state is kept -/
 
 /-- Stream `i` after a cycle is `advanceRow` of stream `i` before it. -/
-theorem advance_getElem? (outs : List (Option (Stream × V))) (d : Dir) (id i : Nat)
+theorem advance_getElem? (outs : List (Option (Stream × List V))) (d : Dir) (id i : Nat)
     (rows : List (List (Option V))) :
     (advance outs d id rows)[i]? = (rows[i]?).map (advanceRow outs d (id + i)) := by
   induction rows generalizing id i with
@@ -271,14 +320,14 @@ theorem advance_getElem? (outs : List (Option (Stream × V))) (d : Dir) (id i : 
       rw [ih (id + 1) i, show id + 1 + i = id + (i + 1) by omega]
 
 /-- A cycle keeps the number of streams. -/
-theorem advance_length (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
+theorem advance_length (outs : List (Option (Stream × List V))) (d : Dir) (id : Nat)
     (rows : List (List (Option V))) : (advance outs d id rows).length = rows.length := by
   induction rows generalizing id with
   | nil => rfl
   | cons row rest ih => simp [advance, ih]
 
 /-- A cycle keeps the length of a stream. -/
-theorem advanceRow_length (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
+theorem advanceRow_length (outs : List (Option (Stream × List V))) (d : Dir) (id : Nat)
     (row : List (Option V)) : (advanceRow outs d id row).length = row.length := by
   simp [advanceRow]
 
@@ -377,7 +426,7 @@ one slot on in each cycle: `j` cycles after it was computed it is at place
 `maxDelay - delay + j` of the slots that `shiftPipe` looks at. -/
 theorem pipe_getElem? (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V)
     (n : Nat) (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p : Nat) (kind : Kind)
-    (hk : cfg.kindAt p = some kind) (t : Nat) (r : Stream × V)
+    (hk : cfg.kindAt p = some kind) (t : Nat) (r : Stream × List V)
     (hr : (st t).result S cfg prog p = some r) (j : Nat)
     (hj : j ≤ (st t).resultDelay cfg prog p) (hn : t + j < n) :
     ∃ sl, (st (t + j)).slices[p]? = some sl ∧
@@ -423,7 +472,7 @@ cycle `t + delay`, where `delay` is the delay of `ins`. -/
 theorem out_delay (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat)
     (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p : Nat) (kind : Kind)
     (hk : cfg.kindAt p = some kind) (t : Nat) (ins : Instr)
-    (hi : prog.dueAt p (st t).time = [ins]) (r : Stream × V)
+    (hi : prog.computes p (st t).time = some ins) (r : Stream × List V)
     (hr : (st t).result S cfg prog p = some r) (hn : t + cfg.delayOf kind ins < n) :
     (st (t + cfg.delayOf kind ins)).out S cfg prog p = some r := by
   -- After its delay the result is in the last slot (`pipe_getElem?`), and
@@ -447,7 +496,7 @@ theorem out_delay (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → Stat
 
 /-- Slot `p` of a stream after a cycle: a newly placed result if there is
 one, else the word from one position upstream. -/
-theorem advanceRow_getElem? (outs : List (Option (Stream × V))) (d : Dir) (id : Nat)
+theorem advanceRow_getElem? (outs : List (Option (Stream × List V))) (d : Dir) (id : Nat)
     (row : List (Option V)) (p : Nat) (hp : p < row.length) :
     (advanceRow outs d id row)[p]? = some
       (match inject outs d id p with
@@ -466,8 +515,8 @@ theorem sample_step (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
     (hs : s.Shaped cfg) (h : step S cfg prog s = .ok s') (p : Nat) (tr : Stream)
     (hp : p < cfg.kinds.length) (hid : tr.id < cfg.streams) :
     s'.sample p tr =
-      match s.out S cfg prog p with
-      | some (tr', v) => if tr' = tr then some v else s.upstream p tr
+      match s.placed S cfg prog p tr with
+      | some v => some v
       | none => s.upstream p tr := by
   -- The new streams are `advance` of the old ones (`step_ok`). Find the row
   -- of `tr` before the cycle, read slot `p` of the advanced row
@@ -491,152 +540,101 @@ theorem sample_step (S : Sem V) (cfg : Config) (prog : Program) (s s' : State V)
   have hsample : ∀ q, s.sample q tr = row[q]?.getD none := by
     intro q
     simp only [State.sample, hrow]
+  have hplaced : inject (rs.map (·.2)) tr.dir tr.id p = s.placed S cfg prog p tr := by
+    simp only [inject, State.placed, outs_getD S cfg prog s rs hrs p]
+    cases State.out S cfg prog s p with
+    | none => rfl
+    | some r => rfl
   simp only [State.sample, hbelt, advance_getElem?, hrow, Option.map_some, Nat.zero_add]
   rw [advanceRow_getElem? _ _ _ _ _ (by omega)]
-  simp only [Option.getD_some, inject, outs_getD S cfg prog s rs hrs p]
-  cases ho : s.out S cfg prog p with
+  simp only [Option.getD_some, hplaced]
+  cases s.placed S cfg prog p tr with
+  | some v => rfl
   | none =>
     simp only [State.upstream, hsample]
     cases tr.dir <;> rfl
-  | some r =>
-    obtain ⟨tr', v⟩ := r
-    by_cases heq : tr' = tr
-    · subst heq
-      simp
-    · have hne : ¬ (tr'.dir = tr.dir ∧ tr'.id = tr.id) := by
-        intro hand
-        apply heq
-        cases tr'
-        cases tr
-        simp_all
-      simp only [hne, heq, ↓reduceIte, State.upstream, hsample]
-      cases tr.dir <;> rfl
 
 /-! ## The timing rule -/
 
-/-- A result is always meant for a stream that exists. -/
-theorem State.result_track (S : Sem V) (cfg : Config) (prog : Program) (s : State V) (p : Nat)
-    (tr : Stream) (v : V) (h : s.result S cfg prog p = some (tr, v)) : tr.id < cfg.streams := by
-  cases hdue : prog.dueAt p s.time with
-  | nil => simp [State.result, hdue] at h
-  | cons i rest =>
-    cases rest with
-    | cons j rest' => simp [State.result, hdue] at h
-    | nil =>
-      cases hk : cfg.kindAt p with
-      | none => simp [State.result, hdue, hk] at h
-      | some kind =>
-        cases hsl : s.slices[p]? with
-        | none => simp [State.result, hdue, hk, hsl] at h
-        | some sl =>
-          cases he : exec S cfg kind (s.sample p) sl i with
-          | error e => simp [State.result, hdue, hk, hsl, he] at h
-          | ok r =>
-            obtain ⟨sl', r'⟩ := r
-            simp only [State.result, hdue, hk, hsl, he] at h
-            subst h
-            exact exec_track S cfg kind _ sl sl' i tr v he
-
 /-- **The timing rule, going east.** Suppose the slice at `p`, of kind `kind`,
-computes the word `v` with the instruction `ins` on cycle `t` for the stream
-`id` going east, and no
-slice between `p + 1` and `p + k` places a word of its own on that stream
-just as `v` arrives there. Then on cycle `t + delay + 1 + k`, where `delay`
-is the delay of `ins`, the slice at `p + k` finds `v` in the slot of that
-stream. -/
+computes a value with the instruction `ins` on cycle `t` for the streams
+going east from `id` on, and `v` is word `j` of the value. Suppose no slice
+between `p + 1` and `p + k` places a word of its own on stream `id + j` just
+as `v` arrives there. Then on cycle `t + delay + 1 + k`, where `delay` is the
+delay of `ins`, the slice at `p + k` finds `v` in the slot of that stream. -/
 theorem arrives_east (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat)
-    (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p t id : Nat) (kind : Kind)
-    (ins : Instr) (v : V) (hk : cfg.kindAt p = some kind)
-    (hi : prog.dueAt p (st t).time = [ins])
-    (hres : (st t).result S cfg prog p = some (⟨.east, id⟩, v)) (k : Nat)
+    (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p t id j : Nat) (kind : Kind)
+    (ins : Instr) (vs : List V) (v : V) (hk : cfg.kindAt p = some kind)
+    (hi : prog.computes p (st t).time = some ins)
+    (hres : (st t).result S cfg prog p = some (⟨.east, id⟩, vs)) (hv : vs[j]? = some v)
+    (hid : id + j < cfg.streams) (k : Nat)
     (hq : p + k < cfg.kinds.length) (hn : t + cfg.delayOf kind ins + 1 + k ≤ n)
-    (hfree : ∀ i, 1 ≤ i → i ≤ k → ∀ w,
-      (st (t + cfg.delayOf kind ins + i)).out S cfg prog (p + i) ≠ some (⟨.east, id⟩, w)) :
-    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p + k) ⟨.east, id⟩ = some v := by
-  -- Induction on the distance `k`. At distance 0 the word comes out of the
-  -- slice after `delay` cycles (`out_delay`) and is on the stream one cycle
-  -- later (`sample_step`). Each further position costs one more cycle
-  -- (`sample_step` again, with nothing placed in the way).
-  have hid : id < cfg.streams := State.result_track S cfg prog _ p _ v hres
+    (hfree : ∀ i, 1 ≤ i → i ≤ k →
+      (st (t + cfg.delayOf kind ins + i)).placed S cfg prog (p + i) ⟨.east, id + j⟩ = none) :
+    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p + k) ⟨.east, id + j⟩ = some v := by
+  -- Induction on the distance `k`. At distance 0 the value comes out of the
+  -- slice after `delay` cycles (`out_delay`) and its word is on the stream
+  -- one cycle later (`sample_step`). Each further position costs one more
+  -- cycle (`sample_step` again, with nothing placed in the way).
   induction k with
   | zero =>
     have hout := out_delay S cfg prog st n hrun h0 p kind hk t ins hi _ hres (by omega)
     have hs := IsRun.shaped S cfg prog st n hrun h0 (t + cfg.delayOf kind ins) (by omega)
     have hstep := hrun (t + cfg.delayOf kind ins) (by omega)
-    have h1 := sample_step S cfg prog _ _ hs hstep p ⟨.east, id⟩ (by omega) hid
-    rw [hout] at h1
-    simpa using h1
+    have h1 := sample_step S cfg prog _ _ hs hstep p ⟨.east, id + j⟩ (by omega) hid
+    simpa [State.placed, hout, hv] using h1
   | succ k ih =>
     have ih' := ih (by omega) (by omega) (fun i hi1 hi2 => hfree i hi1 (by omega))
     have hs := IsRun.shaped S cfg prog st n hrun h0 (t + cfg.delayOf kind ins + 1 + k) (by omega)
     have hstep := hrun (t + cfg.delayOf kind ins + 1 + k) (by omega)
-    have h1 := sample_step S cfg prog _ _ hs hstep (p + (k + 1)) ⟨.east, id⟩ hq hid
+    have h1 := sample_step S cfg prog _ _ hs hstep (p + (k + 1)) ⟨.east, id + j⟩ hq hid
     have hfr := hfree (k + 1) (by omega) (Nat.le_refl _)
     rw [show t + cfg.delayOf kind ins + (k + 1) = t + cfg.delayOf kind ins + 1 + k by omega] at hfr
-    have hup : (st (t + cfg.delayOf kind ins + 1 + k)).upstream (p + (k + 1)) ⟨.east, id⟩ = some v := by
+    have hup : (st (t + cfg.delayOf kind ins + 1 + k)).upstream (p + (k + 1)) ⟨.east, id + j⟩ =
+        some v := by
       have hne0 : p + (k + 1) ≠ 0 := by omega
       simp only [State.upstream, hne0, ↓reduceIte]
       rw [show p + (k + 1) - 1 = p + k by omega]
       exact ih'
-    cases ho : (st (t + cfg.delayOf kind ins + 1 + k)).out S cfg prog (p + (k + 1)) with
-    | none =>
-      rw [ho] at h1
-      exact h1.trans hup
-    | some r =>
-      obtain ⟨tr', w⟩ := r
-      by_cases heq : tr' = ⟨.east, id⟩
-      · subst heq
-        exact absurd ho (hfr w)
-      · rw [ho] at h1
-        simp only [heq, ↓reduceIte] at h1
-        exact h1.trans hup
+    rw [hfr] at h1
+    exact h1.trans hup
 
-/-- **The timing rule, going west.** The mirror image of `arrives_east`: a
-word computed at `p` on cycle `t` for a stream going west is at `p - k` on
-cycle `t + delay + 1 + k`. -/
+/-- **The timing rule, going west.** The mirror image of `arrives_east`: word
+`j` of a value computed at `p` on cycle `t` for the streams going west from
+`id` on is at `p - k` on cycle `t + delay + 1 + k`. -/
 theorem arrives_west (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat)
-    (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p t id : Nat) (kind : Kind)
-    (ins : Instr) (v : V) (hk : cfg.kindAt p = some kind)
-    (hi : prog.dueAt p (st t).time = [ins])
-    (hres : (st t).result S cfg prog p = some (⟨.west, id⟩, v)) (k : Nat)
+    (hrun : IsRun S cfg prog st n) (h0 : (st 0).Shaped cfg) (p t id j : Nat) (kind : Kind)
+    (ins : Instr) (vs : List V) (v : V) (hk : cfg.kindAt p = some kind)
+    (hi : prog.computes p (st t).time = some ins)
+    (hres : (st t).result S cfg prog p = some (⟨.west, id⟩, vs)) (hv : vs[j]? = some v)
+    (hid : id + j < cfg.streams) (k : Nat)
     (hq : k ≤ p) (hn : t + cfg.delayOf kind ins + 1 + k ≤ n)
-    (hfree : ∀ i, 1 ≤ i → i ≤ k → ∀ w,
-      (st (t + cfg.delayOf kind ins + i)).out S cfg prog (p - i) ≠ some (⟨.west, id⟩, w)) :
-    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p - k) ⟨.west, id⟩ = some v := by
+    (hfree : ∀ i, 1 ≤ i → i ≤ k →
+      (st (t + cfg.delayOf kind ins + i)).placed S cfg prog (p - i) ⟨.west, id + j⟩ = none) :
+    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p - k) ⟨.west, id + j⟩ = some v := by
   -- As `arrives_east`, with positions going down.
-  have hid : id < cfg.streams := State.result_track S cfg prog _ p _ v hres
   have hp := cfg.kindAt_lt p kind hk
   induction k with
   | zero =>
     have hout := out_delay S cfg prog st n hrun h0 p kind hk t ins hi _ hres (by omega)
     have hs := IsRun.shaped S cfg prog st n hrun h0 (t + cfg.delayOf kind ins) (by omega)
     have hstep := hrun (t + cfg.delayOf kind ins) (by omega)
-    have h1 := sample_step S cfg prog _ _ hs hstep p ⟨.west, id⟩ hp hid
-    rw [hout] at h1
-    simpa using h1
+    have h1 := sample_step S cfg prog _ _ hs hstep p ⟨.west, id + j⟩ hp hid
+    simpa [State.placed, hout, hv] using h1
   | succ k ih =>
     have ih' := ih (by omega) (by omega) (fun i hi1 hi2 => hfree i hi1 (by omega))
     have hs := IsRun.shaped S cfg prog st n hrun h0 (t + cfg.delayOf kind ins + 1 + k) (by omega)
     have hstep := hrun (t + cfg.delayOf kind ins + 1 + k) (by omega)
-    have h1 := sample_step S cfg prog _ _ hs hstep (p - (k + 1)) ⟨.west, id⟩ (by omega) hid
+    have h1 := sample_step S cfg prog _ _ hs hstep (p - (k + 1)) ⟨.west, id + j⟩ (by omega) hid
     have hfr := hfree (k + 1) (by omega) (Nat.le_refl _)
     rw [show t + cfg.delayOf kind ins + (k + 1) = t + cfg.delayOf kind ins + 1 + k by omega] at hfr
-    have hup : (st (t + cfg.delayOf kind ins + 1 + k)).upstream (p - (k + 1)) ⟨.west, id⟩ = some v := by
+    have hup : (st (t + cfg.delayOf kind ins + 1 + k)).upstream (p - (k + 1)) ⟨.west, id + j⟩ =
+        some v := by
       simp only [State.upstream]
       rw [show p - (k + 1) + 1 = p - k by omega]
       exact ih'
-    cases ho : (st (t + cfg.delayOf kind ins + 1 + k)).out S cfg prog (p - (k + 1)) with
-    | none =>
-      rw [ho] at h1
-      exact h1.trans hup
-    | some r =>
-      obtain ⟨tr', w⟩ := r
-      by_cases heq : tr' = ⟨.west, id⟩
-      · subst heq
-        exact absurd ho (hfr w)
-      · rw [ho] at h1
-        simp only [heq, ↓reduceIte] at h1
-        exact h1.trans hup
+    rw [hfr] at h1
+    exact h1.trans hup
 
 /-! ## Runs exist -/
 

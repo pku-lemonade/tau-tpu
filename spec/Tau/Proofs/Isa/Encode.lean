@@ -24,9 +24,12 @@ theorem decodeInt_encodeInt (z : Int) : decodeInt (encodeInt z) = z := by
 theorem decodeInt_comp_encodeInt : decodeInt ∘ encodeInt = id :=
   funext decodeInt_encodeInt
 
+theorem DType.decode_encode (ty : DType) : DType.decode ty.encode = some ty := by
+  cases ty <;> rfl
+
 theorem UnOp.decode_encode (op : UnOp) (r : List Nat) :
     UnOp.decode (op.encode ++ r) = some (op, r) := by
-  cases op <;> simp [UnOp.encode, UnOp.decode, decodeInt_encodeInt]
+  cases op <;> simp [UnOp.encode, UnOp.decode, decodeInt_encodeInt, DType.decode_encode]
 
 theorem BinOp.decode_encode (op : BinOp) : BinOp.decode op.encode = some op := by
   cases op <;> rfl
@@ -35,7 +38,7 @@ theorem Instr.decode_encode (i : Instr) (r : List Nat) :
     Instr.decode (i.encode ++ r) = some (i, r) := by
   cases i <;>
     simp [Instr.encode, Instr.decode, Stream.decode_encode, UnOp.decode_encode,
-      BinOp.decode_encode, decodeInt_comp_encodeInt]
+      BinOp.decode_encode, DType.decode_encode, decodeInt_comp_encodeInt]
 
 /-- An entry read back is the entry, at the slice whose list it was in. -/
 theorem TimedEntry.decode_encode (p : Nat) (e : TimedEntry) (r : List Nat) :

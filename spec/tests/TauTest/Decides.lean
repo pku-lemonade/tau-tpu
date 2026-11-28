@@ -21,6 +21,8 @@ open Tau
 def cfg (streams : Nat) : Config where
   kinds := [.mem, .vxm, .mem, .mem]
   streams := streams
+  lanes := 2
+  bankSize := 8
   memDelay := 1
   vxmDelay := 1
   sxmDelay := 1
@@ -30,15 +32,15 @@ def e (id : Nat) : Stream := ⟨.east, id⟩
 
 /-- `y[0] = z[0] = relu x[0]`. -/
 def kernel : Kernel :=
-  [ .stmt (.load 0 0 ⟨0, 0⟩),
-    .stmt (.un 1 .relu 0),
-    .stmt (.store 1 1 ⟨0, 0⟩),
-    .stmt (.store 1 2 ⟨0, 0⟩) ]
+  [ .stmt (.load 0 .i8 0 ⟨0, 0⟩),
+    .stmt (.un 1 .i8 .relu 0),
+    .stmt (.store 1 .i8 1 ⟨0, 0⟩),
+    .stmt (.store 1 .i8 2 ⟨0, 0⟩) ]
 
 def sizes : List Nat := [1, 1, 1]
 
 /-- `x` in slice 0, `y` in slice 2, `z` in slice 3. -/
-def map : MemMap := [⟨0, 0, 1⟩, ⟨2, 0, 1⟩, ⟨3, 0, 1⟩]
+def map : MemMap := [.one 0 0 1, .one 2 0 1, .one 3 0 1]
 
 /-! ## Place -/
 
@@ -46,7 +48,7 @@ def placed : Placed where
   cfg := cfg 1
   memSizes := [1, 0, 1, 1]
   map := map
-  instrs := [(0, .read 0 0), (1, .un 1 .relu 0), (2, .write 1 0), (3, .write 1 0)]
+  instrs := [(0, .read 0 0), (1, .un [1] .i8 .relu [0]), (2, .write 1 0), (3, .write 1 0)]
 
 #guard checkPlaced kernel sizes placed
 #guard placeOnly kernel placed
@@ -58,7 +60,7 @@ def placedWaiting : Placed where
   memSizes := [1, 0, 2, 1]
   map := map
   instrs :=
-    [(0, .read 0 0), (1, .un 1 .relu 0), (2, .write 1 0), (2, .write 1 1), (2, .read 2 1),
+    [(0, .read 0 0), (1, .un [1] .i8 .relu [0]), (2, .write 1 0), (2, .write 1 1), (2, .read 2 1),
      (3, .write 2 0)]
 
 #guard checkPlaced kernel sizes placedWaiting
@@ -67,7 +69,7 @@ def placedWaiting : Placed where
 
 /-- The same as `placed`, with a relu that nothing uses. -/
 def placedTwice : Placed :=
-  { placed with instrs := placed.instrs ++ [(1, .un 2 .relu 0)] }
+  { placed with instrs := placed.instrs ++ [(1, .un [2] .i8 .relu [0])] }
 
 #guard checkPlaced kernel sizes placedTwice
 #guard !sameOperations kernel placedTwice
@@ -82,7 +84,7 @@ def scheduled : Compiled where
   map := map
   prog :=
     [ .once 0 0 (.read 0 (e 0)),
-      .once 1 3 (.un .relu (e 0) (e 1)),
+      .once 1 3 (.un .i8 .relu (e 0) (e 1)),
       .once 2 6 (.write (e 1) 0),
       .once 3 7 (.write (e 1) 0) ]
   cycles := 8
@@ -100,10 +102,10 @@ def scheduledWaiting : Compiled where
   prog :=
     [ .once 0 0 (.read 0 (e 0)),
       .once 0 1 (.read 0 (e 3)),
-      .once 1 3 (.un .relu (e 0) (e 1)),
+      .once 1 3 (.un .i8 .relu (e 0) (e 1)),
       .once 2 6 (.write (e 1) 0),
       -- the same word again, into scratch on cycle 7, out on cycle 8
-      .once 1 4 (.un .relu (e 3) (e 3)),
+      .once 1 4 (.un .i8 .relu (e 3) (e 3)),
       .once 2 7 (.write (e 3) 1),
       .once 2 8 (.read 1 (e 2)),
       .once 3 11 (.write (e 2) 0) ]
@@ -121,7 +123,7 @@ def scheduledOnce : Compiled :=
     prog :=
       [ .once 0 0 (.read 0 (e 0)),
         .once 0 1 (.read 0 (e 3)),
-        .once 1 3 (.un .relu (e 0) (e 1)),
+        .once 1 3 (.un .i8 .relu (e 0) (e 1)),
         .once 2 6 (.write (e 1) 1),
         .once 2 7 (.read 1 (e 2)),
         .once 2 9 (.write (e 2) 0),
@@ -134,7 +136,7 @@ def scheduledOnce : Compiled :=
 
 /-- A schedule may not move a buffer. -/
 def scheduledMoved : Compiled :=
-  { scheduled with map := [⟨0, 0, 1⟩, ⟨3, 0, 1⟩, ⟨2, 0, 1⟩] }
+  { scheduled with map := [.one 0 0 1, .one 3 0 1, .one 2 0 1] }
 
 #guard !scheduleOnly placed scheduledMoved
 
@@ -147,7 +149,7 @@ def routed : Compiled where
   map := map
   prog :=
     [ .once 0 0 (.read 0 (e 0)),
-      .once 1 3 (.un .relu (e 0) (e 0)),
+      .once 1 3 (.un .i8 .relu (e 0) (e 0)),
       .once 2 6 (.write (e 0) 0),
       .once 3 7 (.write (e 0) 0) ]
   cycles := 8
@@ -168,7 +170,7 @@ def routedApart : Compiled :=
     cfg := cfg 2
     prog :=
       [ .once 0 0 (.read 0 (e 0)),
-        .once 1 3 (.un .relu (e 0) (e 0)),
+        .once 1 3 (.un .i8 .relu (e 0) (e 0)),
         .once 2 6 (.write (e 1) 0),
         .once 3 7 (.write (e 1) 0) ] }
 

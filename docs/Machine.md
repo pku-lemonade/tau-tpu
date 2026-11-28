@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Describes | The tau-tpu machine: its blocks, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, and the numbers a machine is loaded with. |
+| Describes | The tau-tpu machine: its blocks, its slices and streams, what one cycle does, the timing rule, the instructions, the traps, how a program is laid out in time, the numbers a machine is loaded with, and the two banks of a memory slice. |
 | Does not describe | What a user writes ([`Programs.md`](Programs.md)), how a program gets from there to the machine ([`Compiler.md`](Compiler.md)), or the files the tools exchange ([`Formats.md`](Formats.md)). |
 | Specified in | `spec/Tau/Isa/`, `spec/Tau/Blocks/`, `spec/Tau/Machine/` |
 | Tables tested by | `course/tests/CourseTest/Docs.lean`, with the rows in `course/Specify/Support/Tables.lean` |
@@ -27,9 +27,25 @@ of cycle `t + 1` is decided during cycle `t`.
 
 A table lists, for each cycle, the input and the output.
 
-A *lane* is a 32-bit value, read as a signed integer. Arithmetic on lanes
-wraps on overflow. A *word* is a fixed number of lanes side by side. The
-number of lanes is the same everywhere on a machine.
+A *lane* is 8 bits. A *word* is a fixed number of lanes side by side: it is
+what one address of a memory holds and what one slot of a stream carries.
+The number of lanes is the same everywhere on a machine, and is one of the
+numbers a machine is described with (3.1).
+
+A *value* is a row of signed integers, its *elements*, one for each lane.
+Its *type* is the size of an element:
+
+| Type | An element is | A value is |
+|---|---|---|
+| `i8` | 8 bits | 1 word |
+| `i16` | 16 bits | 2 words |
+| `i32` | 32 bits | 4 words |
+
+Word `k` of a value holds byte `k` of every element, the low byte in word 0.
+Arithmetic on elements wraps on overflow, at the size of the element.
+
+With two lanes, the value of type `i16` with the elements 258 and -2 is the
+words (2, -2) and (1, -1), each lane read as a signed integer.
 
 ## 2. Blocks
 
@@ -189,16 +205,17 @@ last position in the east. Each slice is of one of four kinds.
 | Kind | Name | What it does |
 |---|---|---|
 | memory | `mem` | stores words |
-| vector | `vxm` | arithmetic on words, lane by lane |
-| rearrangement | `sxm` | moves the lanes of a word around |
-| matrix | `mxm` | multiply-accumulate, for matrix times vector |
+| vector | `vxm` | arithmetic on values, element by element |
+| rearrangement | `sxm` | moves the elements of a value around |
+| matrix | `mxm` | multiplies a matrix by a word |
 
 A machine is described by the kind of slice at each position, the number of
-streams in each direction, the number of columns a matrix slice can store,
-one delay for each kind of slice, and a delay of its own for any instruction
+streams in each direction, the number of lanes of a word, the number of
+words in the lower bank of a memory slice (3.11), one delay
+for each kind of slice, and a delay of its own for any instruction
 or operation that takes a different number of cycles from the rest of its
-kind. For example, a nine-slice machine has the row: matrix, rearrangement,
-two memories, vector, two memories, rearrangement, matrix.
+kind. For example, a thirteen-slice machine has the row: matrix,
+rearrangement, four memories, vector, four memories, rearrangement, matrix.
 
 ### 3.2 Streams
 
@@ -215,14 +232,15 @@ Reading a word does not take it off its stream: the word moves on, and every
 slice it passes may read it, each on the cycle the word is at its position.
 
 ```
-── east ──▶  [0] ──▶ [1] ──▶ [2] ──▶ [3] ──▶ [4] ──▶ [5] ──▶ [6] ──▶ [7] ──▶ [8]
-             mxm     sxm     mem     mem     vxm     mem     mem     sxm     mxm
-◀─ west ──   [0] ◀── [1] ◀── [2] ◀── [3] ◀── [4] ◀── [5] ◀── [6] ◀── [7] ◀── [8]
+── east ──▶  [0] ─▶ [1] ─▶ [2] ─▶ [3] ─▶ [4] ─▶ [5] ─▶ [6] ─▶ [7] ─▶ [8] ─▶ [9] ─▶ [10] ─▶ [11] ─▶ [12]
+             mxm    sxm    mem    mem    mem    mem    vxm    mem    mem    mem    mem     sxm     mxm
+◀─ west ──   [0] ◀─ [1] ◀─ [2] ◀─ [3] ◀─ [4] ◀─ [5] ◀─ [6] ◀─ [7] ◀─ [8] ◀─ [9] ◀─ [10] ◀─ [11] ◀─ [12]
 ```
 
 ### 3.3 One cycle
 
-In every cycle each slice executes at most one instruction.
+In every cycle each slice executes at most one instruction. A memory slice
+may execute two, a read and a write (3.11).
 
 1. The slice reads its operands from the stream slots at its position and
    computes a result.
@@ -280,33 +298,67 @@ An instruction names its operands and its result by stream.
 |---|---|---|
 | memory | read `addr` to `dst` | the word at `addr` is the result |
 | memory | write `src` at `addr` | the word on `src` is stored at `addr` |
-| vector, rearrangement | `op` of `src` to `dst` | a one-word operation |
-| vector | `op` of `a` and `b` to `dst` | a two-word operation |
-| vector | constant to `dst` | a word with given lanes is the result |
-| vector | select by `m` from `a` and `b` to `dst` | lane by lane, `a` where `m` is not zero and `b` elsewhere |
-| matrix | load `src` | the word on `src` becomes the vector operand |
-| matrix | mac `j` with `src` | lane `j` of the vector operand, times the word on `src`, is added to the accumulator |
-| matrix | seed `src` | the accumulator is replaced by the word on `src` |
-| matrix | install `j` from `src` | the word on `src` becomes stored column `j` |
-| matrix | macw `j` | as mac, with stored column `j` in place of a stream |
-| matrix | emit to `dst` | the accumulator is the result, and is cleared |
+| vector, rearrangement | `op` of type `ty`, of `src` to `dst` | a one-value operation |
+| vector | `op` of type `ty`, of `a` and `b` to `dst` | a two-value operation |
+| vector | constant of type `ty` to `dst` | a value with given elements is the result |
+| vector | select of type `ty` by `m` from `a` and `b` to `dst` | element by element, `a` where `m` is not zero and `b` elsewhere |
+| matrix | install `g` words at `j` from `src` | the words on `src` and the `g - 1` streams after it become installed words `j` to `j + g - 1` |
+| matrix | product of `n` words with `src` to `dst` | a value of type `i32`: element `i` is the dot product of installed word `i` with the word on `src`, for `i` below `n`, and zero from `n` on |
 
-A matrix slice keeps a vector operand, an accumulator and a number of stored
-columns. "Times" in mac means: every lane of the word is multiplied by the
-one lane `j` of the vector operand.
+A memory slice moves one word. An instruction of a vector or a rearrangement
+slice has a type, and its operands and its result are values of that type,
+except where 3.6 says that the result has another. A value of `w` words is
+on `w` streams: the stream named and the `w - 1` streams after it, word 0 on
+the stream named. "The streams after `src`" are those with the next numbers,
+going the same way. The number of the stream named is a multiple of `w`. All
+the words of an operand are read on the one cycle, and all the words of a
+result leave on the one cycle.
+
+So a value of type `i32` is on streams 0 to 3 or on streams 4 to 7, and a
+memory slice reads or writes it one word at a time, on four cycles or in
+four slices.
+
+A vector slice of a machine with two streams each way. Streams 0 and 1 going
+east hold the words `u` and `v`, and the streams going west hold nothing:
+
+| Instruction | Result |
+|---|---|
+| relu, of type `i16`, of east 0 to west 0 | the two words of relu of the value (`u`, `v`), for west 0 and 1 |
+| relu, of type `i16`, of east 1 to west 0 | trap: bad stream |
+| relu, of type `i32`, of east 0 to west 0 | trap: bad stream |
+| relu, of type `i8`, of west 0 to east 0 | trap: empty read |
+
+A matrix slice keeps one *installed word* for each lane, numbered from 0.
+All are zero at cycle 0. An installed word holds the weights of one element
+of a product: the *dot product* of two words is the sum, over the lanes, of
+the lane of the one times the lane of the other, each lane read as a signed
+integer of 8 bits. The sum is an integer of 32 bits.
+
+Two lanes. Installed word 0 is (1, 2), installed word 1 is (3, 4), and the
+stream holds (10, 100):
+
+| Instruction | Result |
+|---|---|
+| product of 2 words | (210, 430) |
+| product of 1 word | (210, 0) |
 
 ### 3.6 Operations
 
-One-word operations of the vector slice: relu (negative lanes become zero),
-requantize by `k` (divide by 2 to the `k`, rounding down, then clamp to -128
-.. 127), negate, absolute value, shift bits left by `k`, add a constant,
-multiply by a constant.
+One-value operations of the vector slice: relu (negative elements become
+zero), requantize by `k` (divide by 2 to the `k`, rounding down, then clamp
+to -128 .. 127), widen to a type, negate, absolute value, shift bits left by
+`k`, add a constant, multiply by a constant.
 
-One-word operations of the rearrangement slice: shift lanes by `k`, rotate
-lanes by `k`, reverse, broadcast lane `j`, permute by a table.
+The result of requantize is a value of type `i8`, whatever the type of its
+operand. The result of widen has the type widened to, which has at least as
+many bits as the type of the operand, and the same elements. Every other
+result has the type of its instruction.
 
-Two-word operations of the vector slice: add, subtract, multiply, maximum,
-minimum, and, or, exclusive or, less-than (1 or 0 in each lane).
+One-value operations of the rearrangement slice: shift elements by `k`,
+rotate elements by `k`, reverse, broadcast element `j`, permute by a table.
+
+Two-value operations of the vector slice: add, subtract, multiply, maximum,
+minimum, and, or, exclusive or, less-than (1 or 0 in each element).
 
 ### 3.7 Traps
 
@@ -317,12 +369,12 @@ The machine never guesses and never waits.
 | Trap | Cause |
 |---|---|
 | empty read | an instruction read a stream slot that held nothing |
-| bad stream | an instruction named a stream that does not exist |
-| bad address | a memory address or a stored column was out of range |
+| bad stream | an instruction named a stream that does not exist, or one that a value of that many words cannot start on (3.5) |
+| bad address | a memory address or an installed word was out of range |
 | wrong slice | an instruction was sent to a slice of the wrong kind |
-| two instructions | two instructions were due at one slice on one cycle |
+| two instructions | more instructions were due at one slice on one cycle than it can execute |
+| same bank | a read and a write were due at one memory slice on one cycle, for the same bank (3.11) |
 | two results | an instruction's result would leave its slice on the same cycle as an earlier result |
-| no operand | a matrix slice was told to multiply before it was given a vector |
 | no slice | the program names a slice the machine does not have |
 
 ### 3.8 A program for the machine
@@ -332,8 +384,8 @@ instruction. There are no branches and no loops.
 
 A timed instruction may repeat, as an entry of a repeater does (2.7): it
 gives a number of further issues, a gap, and a stride. From one issue to the
-next the address of a memory instruction, or the column of a matrix
-instruction, grows by the stride.
+next the address of a memory instruction, or the first installed word of an
+install, grows by the stride.
 
 To run a program, the memories are loaded with their starting contents, the
 machine runs for a given number of cycles, and the result is the contents of
@@ -341,10 +393,10 @@ the memories at the end.
 
 ### 3.9 What a slice issues
 
-A slice *issues* a word on the cycle on which it runs an instruction that
-has a result, or one that writes a word to memory. The word is the result,
-or the word written. A matrix slice issues nothing when it loads, seeds,
-installs or multiplies; it issues its accumulator when it emits.
+A slice *issues* words on the cycle on which it runs an instruction that
+has a result, or one that writes a word to memory. The words are those of
+the result, or the word written. A matrix slice issues nothing when it
+installs, and the four words of its product when it multiplies.
 
 The three slices of 3.4 again. The memory at position 0 reads address 0 on
 cycle 0 to a stream going east, the vector slice applies relu on cycle 3,
@@ -358,6 +410,9 @@ and the memory at position 2 writes the result at address 0 on cycle 6:
 
 A word is issued when its instruction runs, not when it reaches a stream:
 the relu is issued on cycle 3 and is on its stream from cycle 5.
+
+A memory slice that reads and writes on one cycle (3.11) issues two words on
+that cycle: the word read and the word written.
 
 ### 3.10 The image
 
@@ -384,31 +439,73 @@ A stream is one number, and so is a signed integer:
 |---|---|---|
 | 0 | read | address, result stream |
 | 1 | write | source stream, address |
-| 2 | one-word operation | source stream, result stream, the operation |
-| 3 | two-word operation | the operation, stream `a`, stream `b`, result stream |
-| 4 | load | stream |
-| 5 | mac | column, stream |
-| 6 | emit | result stream |
-| 7 | constant | result stream, how many lanes, the lanes |
-| 8 | select | streams `m`, `a`, `b`, result stream |
-| 9 | seed | stream |
-| 10 | install | column, stream |
-| 11 | macw | column |
+| 2 | one-value operation | type, source stream, result stream, the operation |
+| 3 | two-value operation | type, the operation, stream `a`, stream `b`, result stream |
+| 4 | product | how many installed words, source stream, result stream |
+| 5 | install | first installed word, how many, first source stream |
+| 6 | constant | type, result stream, how many elements, the elements |
+| 7 | select | type, streams `m`, `a`, `b`, result stream |
 
-A one-word operation is its number in the order of 3.6, from 0 for relu to
-11 for permute, and then what it takes: nothing, `k`, a signed constant, or a
-table as its length and its items. A two-word operation is its number in the
-order of 3.6, from 0 for add to 8 for less-than.
+A type is 0 for `i8`, 1 for `i16` and 2 for `i32`. A stream is the first of
+the streams of its value (3.5).
+
+A one-value operation is a number and then what it takes: nothing, `k`, a
+signed constant, a type, or a table as its length and its items.
+
+| Operation | Numbers |
+|---|---|
+| relu | 0 |
+| requantize by 3 | 1, 3 |
+| negate | 2 |
+| absolute value | 3 |
+| shift bits left by 2 | 4, 2 |
+| add the constant 5 | 5, 10 |
+| multiply by the constant -5 | 6, 9 |
+| shift elements by 1 | 7, 1 |
+| rotate elements by 1 | 8, 1 |
+| reverse | 9 |
+| broadcast element 2 | 10, 2 |
+| permute by the table 1, 0 | 11, 2, 1, 0 |
+| widen to `i32` | 12, 2 |
+
+A two-value operation is its number in the order of 3.6, from 0 for add to
+8 for less-than.
 
 | Entry | Numbers |
 |---|---|
 | on cycle 2, read address 0 to stream 0 going east | 2, 0, 0, 0, 0, 0, 0 |
 | the same, 3 more times, 3 idle cycles apart, the address growing by 1 | 2, 3, 3, 1, 0, 0, 0 |
 | on cycle 9, write stream 0 going west at address 4 | 9, 0, 0, 0, 1, 1, 4 |
-| on cycle 6, relu of stream 0 going east to stream 0 going west | 6, 0, 0, 0, 2, 0, 1, 0 |
-| on cycle 7, add 5 to every lane of stream 1 going east, to stream 1 going east | 7, 0, 0, 0, 2, 2, 2, 5, 10 |
-| on cycle 8, stream 1 going east minus stream 2 going west, to stream 0 going east | 8, 0, 0, 0, 3, 1, 2, 5, 0 |
-| on cycle 4, the constant with lanes 3 and -4 to stream 2 going west | 4, 0, 0, 0, 7, 5, 2, 6, 7 |
+| on cycle 6, relu, of type `i8`, of stream 0 going east to stream 0 going west | 6, 0, 0, 0, 2, 0, 0, 1, 0 |
+| on cycle 7, add 5 to every element, of type `i8`, of stream 1 going east, to stream 1 going east | 7, 0, 0, 0, 2, 0, 2, 2, 5, 10 |
+| on cycle 8, of type `i8`, stream 1 going east minus stream 2 going west, to stream 0 going east | 8, 0, 0, 0, 3, 0, 1, 2, 5, 0 |
+| on cycle 8, of type `i32`, streams 0 to 3 going east plus streams 0 to 3 going west, to streams 4 to 7 going east | 8, 0, 0, 0, 3, 2, 0, 0, 1, 8 |
+| on cycle 3, stream 0 going east, of type `i8`, widened to `i32`, to streams 4 to 7 going west | 3, 0, 0, 0, 2, 0, 0, 9, 12, 2 |
+| on cycle 4, the constant of type `i8` with elements 3 and -4 to stream 2 going west | 4, 0, 0, 0, 6, 0, 5, 2, 6, 7 |
+| on cycle 5, install 2 words at 4 from stream 1 going west | 5, 0, 0, 0, 5, 4, 2, 3 |
+| on cycle 9, the product of 3 words with stream 0 going west, to streams 4 to 7 going east | 9, 0, 0, 0, 4, 3, 1, 8 |
+
+### 3.11 The two banks of a memory slice
+
+The words of a memory slice are in two *banks*. The lower bank holds the
+addresses below a number the machine is described with (3.1), and the upper
+bank holds the addresses from that number on.
+
+A memory slice executes a read and a write on one cycle if the two are for
+different banks. The result is the word read. Two reads, two writes, or a
+read and a write for the same bank cannot be executed on one cycle, and the
+machine traps (3.7).
+
+The three slices of 3.4, with two words in each lower bank. The memory at
+position 0 reads the word `a` on cycle 0 for a stream going east, and `a` is
+at position 2 on cycle 4. The memory at position 2 holds the words `p`, `q`
+and `r`:
+
+| On cycle 4 the slice at position 2 is told to | Result |
+|---|---|
+| write the word on the stream at address 2, and read address 0 | it holds `p`, `q`, `a` |
+| write the word on the stream at address 1, and read address 0 | trap: same bank |
+| read address 0, and read address 2 | trap: two instructions |
 
 ## 4. The cell-level machine
 
@@ -419,15 +516,17 @@ from the components of section 2.
 |---|---|
 | issuing the slice's instructions on their cycles | repeater (2.7) |
 | the pipe that holds results for their delays | shift register (2.1), as deep as the longest delay of the machine; a result is written into the slot that leaves after its delay |
-| the stored words of a memory slice | memory (2.5) |
-| the accumulator of a matrix slice | multiply-accumulate cells (2.3), one per lane |
-| the stored columns of a matrix slice | a second, small memory (2.5) |
+| the stored words of a memory slice | two memories (2.5), one for each bank (3.11) |
+| the installed words and the products of a matrix slice | multiply-accumulate cells (2.3): a row of them for each element of a product, and in a row one cell for each lane of a word. A cell holds one lane of an installed word, and a row adds up its products from cell to cell |
 
 ```
-repeater (2.7) ──▶ [ slice: mem (2.5) / vxm / sxm / mxm (mac 2.3 + mem 2.5) ]
-                         ▲                                       │
-                         │                                       ▼
-                   streams (in)                     shift register (2.1) ──▶ streams (out)
+repeater (2.7) ──▶ [ slice: mem (2.5) / vxm / sxm / mxm (mac 2.3) ]
+                         ▲                                 │
+                         │                                 ▼
+                   streams (in)               shift register (2.1) ──▶ streams (out)
 ```
+
+A memory (2.5) takes one command in a cycle. That is why a memory slice can
+read and write on one cycle only in different banks.
 
 A machine built this way behaves exactly as section 3 says.

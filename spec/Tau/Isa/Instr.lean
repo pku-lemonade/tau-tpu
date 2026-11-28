@@ -7,19 +7,23 @@ import Tau.Blocks.Repeater
 A tau-tpu machine is a row of slices. Between them run *streams*, which
 carry words east or west, one slice per cycle. An instruction tells one slice
 what to do on one cycle: which stream slots to read, what to compute, and which
-stream to put the result on.
+stream to put the result on. A value of several words (`Tau.Isa.Word`) is on
+as many streams that follow one another, its low word on the first, and an
+instruction names the first. A slice runs one instruction on a cycle. A
+memory slice can run two, a read and a write, if they are for different
+banks of its memory (`Config.bank`).
 
 A program is a list of instructions, each with its slice and its cycle. There
 are no branches and no waiting. Everything that will happen is in the list.
 
 An entry of the list may repeat: issue again a number of times, a fixed
-number of cycles apart, with the address or column index stepping by a fixed
-amount. What an entry issues at each cycle is given by `Entry.dueAt` in
+number of cycles apart, with the address, or the first installed word,
+stepping by a fixed amount. What an entry issues at each cycle is given by `Entry.dueAt` in
 `Tau.Blocks.Repeater`.
 
 Terms to look up: *instruction set architecture*, *static scheduling*.
 
-Docs: Machine 3.2, 3.5 and 3.8 (`docs/`).
+Docs: Machine 3.1, 3.2, 3.5 and 3.8 (`docs/`).
 -/
 
 namespace Tau
@@ -40,35 +44,37 @@ structure Stream where
   id : Nat
   deriving DecidableEq, Repr
 
+/-- The stream `k` places after `s`, going the same way. An instruction that
+takes several words at once names the first stream and takes the next ones
+too. -/
+def Stream.next (s : Stream) (k : Nat) : Stream := ⟨s.dir, s.id + k⟩
+
+/-- Whether a value of `w` words may start on the stream `s`: the number of
+`s` is a multiple of `w`. -/
+def Stream.aligned (s : Stream) (w : Nat) : Bool := s.id % w == 0
+
 /-- What a slice can be told to do. -/
 inductive Instr where
   /-- Memory: put the word at `addr` on `dst`. -/
   | read (addr : Nat) (dst : Stream)
   /-- Memory: store the word on `src` at `addr`. -/
   | write (src : Stream) (addr : Nat)
-  /-- Vector or rearrangement: apply `op` to the word on `src`. -/
-  | un (op : UnOp) (src dst : Stream)
-  /-- Vector: apply `op` to the words on `a` and `b`. -/
-  | bin (op : BinOp) (a b dst : Stream)
-  /-- Matrix: keep the word on `src` as the vector operand. -/
-  | load (src : Stream)
-  /-- Matrix: add lane `j` of the vector operand, times the word on `src`, to
-  the accumulator. -/
-  | mac (j : Nat) (src : Stream)
-  /-- Matrix: put the accumulator on `dst` and clear it. -/
-  | emit (dst : Stream)
-  /-- Vector: put the constant word with lanes `xs` on `dst`. -/
-  | const (xs : List Int) (dst : Stream)
-  /-- Vector: lane by lane, the word on `a` where the word on `m` is not zero
-  and the word on `b` elsewhere. -/
-  | sel (m a b dst : Stream)
-  /-- Matrix: replace the accumulator by the word on `src`. -/
-  | seed (src : Stream)
-  /-- Matrix: keep the word on `src` as stored column `j`. -/
-  | install (j : Nat) (src : Stream)
-  /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
-  the accumulator. -/
-  | macw (j : Nat)
+  /-- Vector or rearrangement: apply `op` to the value of type `ty` on
+  `src`. -/
+  | un (ty : DType) (op : UnOp) (src dst : Stream)
+  /-- Vector: apply `op` to the values of type `ty` on `a` and `b`. -/
+  | bin (ty : DType) (op : BinOp) (a b dst : Stream)
+  /-- Vector: put the constant of type `ty` with elements `xs` on `dst`. -/
+  | const (ty : DType) (xs : List Int) (dst : Stream)
+  /-- Vector: element by element, the value on `a` where the value on `m` is
+  not zero and the value on `b` elsewhere. All are of type `ty`. -/
+  | sel (ty : DType) (m a b dst : Stream)
+  /-- Matrix: keep the words on `src` and the `g - 1` streams after it as
+  installed words `j` to `j + g - 1`. -/
+  | install (j g : Nat) (src : Stream)
+  /-- Matrix: put the product of the first `n` installed words with the word
+  on `src` on `dst`, as a value of 32 bits. -/
+  | product (n : Nat) (src dst : Stream)
   deriving DecidableEq, Repr
 
 /-- The name of an instruction, as Formats 3 writes it: the operation of `un`
@@ -77,25 +83,33 @@ given by these names. -/
 def Instr.name : Instr → String
   | .read .. => "read"
   | .write .. => "write"
-  | .un op .. => op.name
-  | .bin op .. => op.name
-  | .load .. => "load"
-  | .mac .. => "mac"
-  | .emit .. => "emit"
+  | .un _ op .. => op.name
+  | .bin _ op .. => op.name
   | .const .. => "const"
   | .sel .. => "sel"
-  | .seed .. => "seed"
   | .install .. => "install"
-  | .macw .. => "macw"
+  | .product .. => "product"
 
-/-- Add `k` to the address of a memory instruction or to the column index of a
-matrix instruction. Other instructions are unchanged. -/
+/-- The address of a memory instruction. Other instructions have none, and
+give 0. -/
+def Instr.addr : Instr → Nat
+  | .read addr _ => addr
+  | .write _ addr => addr
+  | _ => 0
+
+/-- A read and a write, the read first, if `i` and `j` are one of each in
+either order. A memory slice can run such a pair on one cycle. -/
+def Instr.readWrite : Instr → Instr → Option (Instr × Instr)
+  | .read addr dst, .write src addr' => some (.read addr dst, .write src addr')
+  | .write src addr', .read addr dst => some (.read addr dst, .write src addr')
+  | _, _ => none
+
+/-- Add `k` to the address of a memory instruction or to the first installed
+word of an `install`. Other instructions are unchanged. -/
 def Instr.bump (k : Nat) : Instr → Instr
   | .read addr dst => .read (addr + k) dst
   | .write src addr => .write src (addr + k)
-  | .mac j src => .mac (j + k) src
-  | .install j src => .install (j + k) src
-  | .macw j => .macw (j + k)
+  | .install j g src => .install (j + k) g src
   | i => i
 
 /-- An instruction together with its slice and its cycle, and how it
@@ -111,7 +125,8 @@ structure TimedEntry where
   repeats : Nat := 0
   /-- The number of idle cycles between two issues. -/
   gap : Nat := 0
-  /-- How much the address or column index grows from one issue to the next. -/
+  /-- How much the address, or the first installed word, grows from one issue
+  to the next. -/
   stride : Nat := 0
   deriving DecidableEq, Repr
 
@@ -144,8 +159,12 @@ structure Config where
   kinds : List Kind
   /-- The number of streams in each direction. -/
   streams : Nat
-  /-- The number of columns a matrix slice can store. -/
-  mxmWeights : Nat := 8
+  /-- The number of lanes of a word. A matrix slice has one installed word
+  for each lane. -/
+  lanes : Nat
+  /-- The number of words in the lower bank of a memory slice. The addresses
+  from this number on are the upper bank. -/
+  bankSize : Nat
   /-- The number of cycles a result spends inside a memory slice. -/
   memDelay : Nat
   /-- The number of cycles a result spends inside a vector slice. -/
@@ -183,5 +202,22 @@ def Config.maxDelay (cfg : Config) : Nat :=
 
 /-- The kind of slice at position `p`. -/
 def Config.kindAt (cfg : Config) (p : Nat) : Option Kind := cfg.kinds[p]?
+
+/-- Whether the machine has the `w` streams from `s` on, and a value of `w`
+words may start there. -/
+def Config.hasGroup (cfg : Config) (s : Stream) (w : Nat) : Bool :=
+  s.aligned w && s.id + w ≤ cfg.streams
+
+/-- The bank of a memory slice that holds address `a`: 0 for the lower bank
+and 1 for the upper. -/
+def Config.bank (cfg : Config) (a : Nat) : Nat := if a < cfg.bankSize then 0 else 1
+
+/-- The instruction whose result the slice at `p` computes on cycle `t`: the
+one instruction due, or the read when a read and a write are due together. -/
+def Program.computes (prog : Program) (p t : Nat) : Option Instr :=
+  match prog.dueAt p t with
+  | [i] => some i
+  | [i, j] => (Instr.readWrite i j).map (·.1)
+  | _ => none
 
 end Tau

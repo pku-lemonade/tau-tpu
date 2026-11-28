@@ -52,7 +52,20 @@ def encodeInt : Int → Nat
 def decodeInt (n : Nat) : Int :=
   if n % 2 = 0 then .ofNat (n / 2) else .negSucc (n / 2)
 
-/-- A one-word operation as numbers: its code, then what it takes. -/
+/-- A type as a number. -/
+def DType.encode : DType → Nat
+  | .i8 => 0
+  | .i16 => 1
+  | .i32 => 2
+
+/-- The type a number stands for. -/
+def DType.decode : Nat → Option DType
+  | 0 => some .i8
+  | 1 => some .i16
+  | 2 => some .i32
+  | _ => none
+
+/-- A one-value operation as numbers: its code, then what it takes. -/
 def UnOp.encode : UnOp → List Nat
   | .relu => [0]
   | .requant k => [1, k]
@@ -66,8 +79,9 @@ def UnOp.encode : UnOp → List Nat
   | .reverse => [9]
   | .broadcast j => [10, j]
   | .permute table => 11 :: table.length :: table
+  | .widen to => [12, to.encode]
 
-/-- Read a one-word operation from the front of a list of numbers. Returns
+/-- Read a one-value operation from the front of a list of numbers. Returns
 the operation and the numbers after it. -/
 def UnOp.decode : List Nat → Option (UnOp × List Nat)
   | 0 :: r => some (.relu, r)
@@ -82,9 +96,10 @@ def UnOp.decode : List Nat → Option (UnOp × List Nat)
   | 9 :: r => some (.reverse, r)
   | 10 :: j :: r => some (.broadcast j, r)
   | 11 :: n :: r => if n ≤ r.length then some (.permute (r.take n), r.drop n) else none
+  | 12 :: to :: r => (DType.decode to).map fun to => (.widen to, r)
   | _ => none
 
-/-- A two-word operation as a number. -/
+/-- A two-value operation as a number. -/
 def BinOp.encode : BinOp → Nat
   | .add => 0
   | .sub => 1
@@ -96,7 +111,7 @@ def BinOp.encode : BinOp → Nat
   | .xor => 7
   | .lt => 8
 
-/-- The two-word operation a number stands for. -/
+/-- The two-value operation a number stands for. -/
 def BinOp.decode : Nat → Option BinOp
   | 0 => some .add
   | 1 => some .sub
@@ -113,40 +128,36 @@ def BinOp.decode : Nat → Option BinOp
 def Instr.encode : Instr → List Nat
   | .read addr dst => [0, addr, dst.encode]
   | .write src addr => [1, src.encode, addr]
-  | .un op src dst => 2 :: src.encode :: dst.encode :: op.encode
-  | .bin op a b dst => [3, op.encode, a.encode, b.encode, dst.encode]
-  | .load src => [4, src.encode]
-  | .mac j src => [5, j, src.encode]
-  | .emit dst => [6, dst.encode]
-  | .const xs dst => 7 :: dst.encode :: xs.length :: xs.map encodeInt
-  | .sel m a b dst => [8, m.encode, a.encode, b.encode, dst.encode]
-  | .seed src => [9, src.encode]
-  | .install j src => [10, j, src.encode]
-  | .macw j => [11, j]
+  | .un ty op src dst => 2 :: ty.encode :: src.encode :: dst.encode :: op.encode
+  | .bin ty op a b dst => [3, ty.encode, op.encode, a.encode, b.encode, dst.encode]
+  | .product n src dst => [4, n, src.encode, dst.encode]
+  | .install j g src => [5, j, g, src.encode]
+  | .const ty xs dst => 6 :: ty.encode :: dst.encode :: xs.length :: xs.map encodeInt
+  | .sel ty m a b dst => [7, ty.encode, m.encode, a.encode, b.encode, dst.encode]
 
 /-- Read an instruction from the front of a list of numbers. -/
 def Instr.decode : List Nat → Option (Instr × List Nat)
   | 0 :: addr :: dst :: r => some (.read addr (.decode dst), r)
   | 1 :: src :: addr :: r => some (.write (.decode src) addr, r)
-  | 2 :: src :: dst :: r =>
-    match UnOp.decode r with
-    | some (op, r') => some (.un op (.decode src) (.decode dst), r')
+  | 2 :: ty :: src :: dst :: r =>
+    match DType.decode ty, UnOp.decode r with
+    | some ty, some (op, r') => some (.un ty op (.decode src) (.decode dst), r')
+    | _, _ => none
+  | 3 :: ty :: op :: a :: b :: dst :: r =>
+    match DType.decode ty, BinOp.decode op with
+    | some ty, some op => some (.bin ty op (.decode a) (.decode b) (.decode dst), r)
+    | _, _ => none
+  | 4 :: n :: src :: dst :: r => some (.product n (.decode src) (.decode dst), r)
+  | 5 :: j :: g :: src :: r => some (.install j g (.decode src), r)
+  | 6 :: ty :: dst :: n :: r =>
+    match DType.decode ty with
+    | some ty =>
+      if n ≤ r.length then some (.const ty ((r.take n).map decodeInt) (.decode dst), r.drop n)
+      else none
     | none => none
-  | 3 :: op :: a :: b :: dst :: r =>
-    match BinOp.decode op with
-    | some op => some (.bin op (.decode a) (.decode b) (.decode dst), r)
-    | none => none
-  | 4 :: src :: r => some (.load (.decode src), r)
-  | 5 :: j :: src :: r => some (.mac j (.decode src), r)
-  | 6 :: dst :: r => some (.emit (.decode dst), r)
-  | 7 :: dst :: n :: r =>
-    if n ≤ r.length then some (.const ((r.take n).map decodeInt) (.decode dst), r.drop n)
-    else none
-  | 8 :: m :: a :: b :: dst :: r =>
-    some (.sel (.decode m) (.decode a) (.decode b) (.decode dst), r)
-  | 9 :: src :: r => some (.seed (.decode src), r)
-  | 10 :: j :: src :: r => some (.install j (.decode src), r)
-  | 11 :: j :: r => some (.macw j, r)
+  | 7 :: ty :: m :: a :: b :: dst :: r =>
+    (DType.decode ty).map fun ty =>
+      (.sel ty (.decode m) (.decode a) (.decode b) (.decode dst), r)
   | _ => none
 
 /-- An entry as numbers. Its slice is not stored. -/

@@ -13,8 +13,9 @@ or they end with the same memory contents.
 
 The proof relates the two states by an *abstraction function* (`Cell.abs`,
 `CellState.abs`) that forgets how a slice is built: a memory block's vector
-becomes a list of words, a shift register's vector becomes a list of pending
-results, the per-lane totals become one word. `CellState.step_abs` shows that
+becomes a list of words (the two banks of a memory slice, one after the
+other), a shift register's vector becomes a list of pending
+results, the installed words become a list. `CellState.step_abs` shows that
 taking a step and then abstracting is the same as abstracting and then taking
 a slice-level step. Everything else follows by induction on the number of
 cycles.
@@ -28,9 +29,7 @@ variable {lanes : Nat}
 
 /-- Forget how a slice is built. -/
 def Cell.abs (c : Cell lanes) : Slice (Word lanes) where
-  words := c.mem.toList
-  x := c.x
-  acc := c.acc
+  words := c.lower.toList ++ c.upper.toList
   weights := c.weights.toList
   pipe := c.pipe.toList
 
@@ -42,29 +41,22 @@ def CellState.abs (t : Nat) (s : CellState lanes) : State (Word lanes) where
   west := s.west
   slices := s.cells.map Cell.abs
 
-def absResult (r : Cell lanes × Option (Stream × Word lanes)) :
-    Slice (Word lanes) × Option (Stream × Word lanes) :=
+def absResult (r : Cell lanes × Option (Stream × Value lanes)) :
+    Slice (Word lanes) × Option (Stream × Value lanes) :=
   (r.1.abs, r.2)
 
-/-! ## The multiply-accumulate cells compute `Word.mac` -/
+/-! ## The rows of multiply-accumulate cells compute `Word.matvec` -/
 
-theorem macLanes_add (j : Nat) (acc x w : Word lanes) :
-    macLanes acc (fun k => .add (x[j]?.getD 0, w[k])) = Word.mac j acc x w := by
-  apply Vector.ext
-  intro k hk
-  simp [macLanes, Word.mac, mac, Block.mapIn, accumulator, AccIn.map]
+/-- A row of cells adds up the dot product of the word it holds with the
+word it is given. -/
+theorem macRow_eq (w x : Word lanes) : macRow w x = Word.dot w x := by
+  simp [macRow, Word.dot, mac, Block.mapIn, accumulator, AccIn.map]
 
-theorem macLanes_clear (acc : Word lanes) :
-    macLanes acc (fun _ => .clear) = Word.zero := by
-  apply Vector.ext
-  intro k hk
-  simp [macLanes, Word.zero, mac, Block.mapIn, accumulator, AccIn.map]
-
-theorem macLanes_load (acc w : Word lanes) :
-    macLanes acc (fun k => .load (w[k], 1)) = w := by
-  apply Vector.ext
-  intro k hk
-  simp [macLanes, mac, Block.mapIn, accumulator, AccIn.map]
+theorem toList_putRows {n : Nat} (ws : Vector (Word lanes) n) (j : Nat)
+    (vs : List (Word lanes)) : (putRows ws j vs).toList = putAt ws.toList j vs := by
+  induction vs generalizing ws j with
+  | nil => rfl
+  | cons v vs ih => simp only [putRows, putAt, ih, Vector.toList_setIfInBounds]
 
 /-! ## The shift register is the slice-level pipe -/
 
@@ -93,7 +85,7 @@ theorem last_shift {α : Type} (d : Nat) (s : Vector α d) (x dflt : α) :
     have hnil : s.toList = [] := List.eq_nil_of_length_eq_zero (by simp)
     simp [hnil]
 
-theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : Nat) :
+theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Value lanes)) (d : Nat) :
     absResult (cellShift c r d) = shiftPipe c.abs r d := by
   -- A result that enters at the front is the register's input. One written
   -- part way along is the same list as the slots with that place set.
@@ -113,7 +105,7 @@ theorem cellShift_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : 
       simp only [cellShift, hd, ↓reduceIte, absResult, shiftRegister_step, Cell.abs,
         toList_shift, last_shift c.depth c.pipe (some x) none]
 
-theorem cellClash_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : Nat) :
+theorem cellClash_abs (c : Cell lanes) (r : Option (Stream × Value lanes)) (d : Nat) :
     cellClash c r d = c.abs.clash r d := by
   have hlen : c.abs.pipe.length = c.depth := by simp [Cell.abs]
   cases r with
@@ -126,6 +118,44 @@ theorem cellClash_abs (c : Cell lanes) (r : Option (Stream × Word lanes)) (d : 
     · rw [show c.depth - d = 0 by omega]
       simp [hd]
 
+/-! ## The two banks are the slice-level memory -/
+
+/-- A read of the bank that holds an address gives the word at that address
+of the two banks laid end to end. -/
+theorem Cell.stepBank_read (c : Cell lanes) (a : Nat) :
+    (c.stepBank a .read).2.2 = (c.lower.toList ++ c.upper.toList)[a]? := by
+  -- Below `bank` the address is in the lower bank, or beyond a memory that
+  -- has no upper bank. From `bank` on it is in the upper bank, which starts
+  -- where the lower one ends if it has any words at all.
+  unfold Cell.stepBank
+  by_cases h : a < c.bank
+  · simp only [h, ↓reduceIte, memory_step]
+    by_cases h2 : a < c.size
+    · rw [List.getElem?_append_left (by simp; omega)]
+      simp
+    · rw [List.getElem?_eq_none (by simp; omega)]
+      exact Vector.getElem?_eq_none (by omega)
+  · simp only [h, ↓reduceIte, memory_step]
+    rw [List.getElem?_append_right (by simp; omega)]
+    simp only [Vector.length_toList, Vector.getElem?_toList]
+    by_cases h2 : c.bank ≤ c.size
+    · rw [Nat.min_eq_left h2]
+    · rw [Vector.getElem?_eq_none (by omega), Vector.getElem?_eq_none (by omega)]
+
+/-- A write to the bank that holds an address sets the word at that address
+of the two banks laid end to end. -/
+theorem Cell.stepBank_write (c : Cell lanes) (a : Nat) (v : Word lanes) (ha : a < c.size) :
+    (c.stepBank a (.write · v)).1.toList ++ (c.stepBank a (.write · v)).2.1.toList =
+      (c.lower.toList ++ c.upper.toList).set a v := by
+  unfold Cell.stepBank
+  by_cases h : a < c.bank
+  · simp only [h, ↓reduceIte, memory_step, Vector.toList_setIfInBounds]
+    rw [List.set_append_left _ _ (by simp; omega)]
+  · simp only [h, ↓reduceIte, memory_step, Vector.toList_setIfInBounds]
+    rw [List.set_append_right _ _ (by simp; omega)]
+    simp only [Vector.length_toList]
+    rw [show a - min c.bank c.size = a - c.bank by omega]
+
 /-! ## One instruction -/
 
 theorem cellExec_abs (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
@@ -137,96 +167,77 @@ theorem cellExec_abs (cfg : Config) (kind : Kind) (rd : Stream → Option (Word 
   -- The matrix cases use the lemmas about `macLanes`.
   cases i with
   | read addr dst =>
-    simp only [cellExec, exec, memory_step, Cell.abs, Vector.getElem?_toList]
+    simp only [cellExec, exec, Cell.stepBank_read, Cell.abs]
     split
     · rfl
     · split
       · rfl
-      · cases c.mem[addr]? <;> rfl
+      · cases (c.lower.toList ++ c.upper.toList)[addr]? <;> rfl
   | write src addr =>
-    simp only [cellExec, exec, memory_step, Cell.abs, Vector.length_toList]
+    have hlen : (c.lower.toList ++ c.upper.toList).length = c.size := by
+      simp only [List.length_append, Vector.length_toList]
+      omega
+    simp only [cellExec, exec, Cell.abs, hlen]
     split
     · rfl
     · split
       · rfl
-      · cases rd src <;> simp [Except.map, absResult, Cell.abs]
-  | un op src dst =>
-    simp only [cellExec, exec]
-    split
-    · rfl
-    · split
-      · rfl
-      · cases rd src <;> rfl
-  | bin op a b dst =>
-    simp only [cellExec, exec]
-    split
-    · rfl
-    · split
-      · rfl
-      · cases rd a <;> cases rd b <;> rfl
-  | load src =>
-    simp only [cellExec, exec]
-    split
-    · rfl
-    · cases rd src <;> rfl
-  | mac j src =>
-    simp only [cellExec, exec, Cell.abs]
-    split
-    · rfl
-    · cases c.x with
-      | none => rfl
-      | some x =>
+      · rename_i ha
         cases rd src with
         | none => rfl
-        | some w =>
-          simp only [Except.map, absResult, Cell.abs, macLanes_add]
-          rfl
-  | emit dst =>
+        | some v =>
+          simp only [Except.map, absResult, Cell.abs,
+            Cell.stepBank_write c addr v (by omega)]
+  | un ty op src dst =>
     simp only [cellExec, exec]
     split
     · rfl
     · split
       · rfl
-      · simp [Except.map, absResult, Cell.abs, macLanes_clear, wordSem]
-  | const xs dst =>
+      · cases readGroup rd src ty.bytes <;> rfl
+  | bin ty op a b dst =>
+    simp only [cellExec, exec]
+    split
+    · rfl
+    · split
+      · rfl
+      · cases readGroup rd a ty.bytes <;> cases readGroup rd b ty.bytes <;> rfl
+  | const ty xs dst =>
     simp only [cellExec, exec]
     split
     · rfl
     · split <;> rfl
-  | sel m a b dst =>
+  | sel ty m a b dst =>
     simp only [cellExec, exec]
     split
     · rfl
     · split
       · rfl
-      · cases rd m <;> cases rd a <;> cases rd b <;> rfl
-  | seed src =>
-    simp only [cellExec, exec]
-    split
-    · rfl
-    · cases rd src with
-      | none => rfl
-      | some v =>
-        simp only [Except.map, absResult, Cell.abs, macLanes_load]
-  | install j src =>
-    simp only [cellExec, exec, memory_step, Cell.abs, Vector.length_toList]
+      · cases readGroup rd m ty.bytes <;> cases readGroup rd a ty.bytes <;>
+          cases readGroup rd b ty.bytes <;> rfl
+  | install j g src =>
+    simp only [cellExec, exec, Cell.abs, Vector.length_toList]
     split
     · rfl
     · split
       · rfl
-      · cases rd src <;> simp [Except.map, absResult, Cell.abs]
-  | macw j =>
-    simp only [cellExec, exec, memory_step, Cell.abs, Vector.getElem?_toList]
+      · cases readGroup rd src g <;> simp [Except.map, absResult, Cell.abs, toList_putRows]
+  | product n src dst =>
+    simp only [cellExec, exec, Cell.abs, Vector.length_toList]
     split
     · rfl
-    · cases c.x with
-      | none => rfl
-      | some x =>
-        cases c.weights[j]? with
-        | none => rfl
-        | some w =>
-          simp only [Except.map, absResult, Cell.abs, macLanes_add]
-          rfl
+    · split
+      · rfl
+      · split
+        · rfl
+        · cases rd src with
+          | none => rfl
+          | some x =>
+            simp only [Except.map, absResult, Cell.abs, wordSem, Value.matvec, macRow_eq]
+            congr 5
+            funext i
+            simp only [List.getElem?_take, Vector.getElem?_toList]
+            cases c.weights[i.val]? <;> by_cases hn : i.val < n <;> simp [hn]
 
 /-! ## The repeaters stay in step
 
@@ -268,58 +279,100 @@ theorem cellRepeater_step (prog : Program) (t p : Nat) (c : Cell lanes)
   rw [hc.2, repeater_step]
   rfl
 
+theorem cellExecBoth_abs (cfg : Config) (kind : Kind) (rd : Stream → Option (Word lanes))
+    (c : Cell lanes) (r w : Instr) :
+    (cellExecBoth cfg kind rd c r w).map absResult =
+      execBoth (wordSem lanes) cfg kind rd c.abs r w := by
+  -- `cellExec_abs` for the read, and then for the write on the slice it
+  -- leaves.
+  unfold cellExecBoth execBoth
+  rw [← cellExec_abs cfg kind rd c r]
+  cases cellExec cfg kind rd c r with
+  | error k => rfl
+  | ok a =>
+    obtain ⟨c1, res⟩ := a
+    simp only [Except.map, absResult]
+    rw [← cellExec_abs cfg kind rd c1 w]
+    cases cellExec cfg kind rd c1 w with
+    | error k => rfl
+    | ok b => rfl
+
+theorem cellLeave_abs (p t d : Nat)
+    (x : Except TrapKind (Cell lanes × Option (Stream × Value lanes))) :
+    (cellLeave p t d x).map absResult = leave p t d (x.map absResult) := by
+  cases x with
+  | error k => rfl
+  | ok a =>
+    obtain ⟨c, r⟩ := a
+    simp only [cellLeave, leave, Except.map, absResult, ← cellClash_abs]
+    by_cases hcl : cellClash c r d = true
+    · simp only [hcl, ↓reduceIte]
+    · simp only [hcl, Bool.false_eq_true, ↓reduceIte]
+      exact congrArg Except.ok (cellShift_abs c r d)
+
 theorem cellStep_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p : Nat)
     (c : Cell lanes) (hc : c.InSync prog t p) :
     (cellStep cfg prog (s.sample p) p c).map absResult =
       stepSlice (wordSem lanes) cfg prog (s.abs t) p c.abs := by
-  -- The repeater, being in step, issues what the slice-level machine looks
-  -- up (`cellRepeater_step`). Then split on how many instructions are due,
-  -- and use `cellExec_abs`, `cellClash_abs` and `cellShift_abs`.
+  -- Counting the cycle and advancing the repeater does not change what the
+  -- slice is at the slice level (`htick`). The repeater, being in step,
+  -- issues what the slice-level machine looks up (`cellRepeater_step`). Then
+  -- split on how many instructions are due, and use `cellExec_abs` or
+  -- `cellExecBoth_abs`, and `cellLeave_abs`.
   have hseq := cellRepeater_step prog t p c hc
   have ht : (s.abs t).time = t := rfl
+  have htick : ∀ (g : Cell lanes → Cell lanes), (∀ c', (g c').abs = c'.abs) →
+      ∀ x : Except Trap (Cell lanes × Option (Stream × Value lanes)),
+      (x.map fun r => (g r.1, r.2)).map absResult = x.map absResult := by
+    intro g hg x
+    cases x with
+    | error e => rfl
+    | ok r => simp [Except.map, absResult, hg]
   unfold cellStep stepSlice
   simp only [hseq, ht, hc.1, CellState.sample_abs]
+  rw [htick (fun c' => { c' with clock := t + 1, slots := _ }) (fun _ => rfl)]
   cases prog.dueAt p t with
   | nil => exact congrArg Except.ok (cellShift_abs c none 0)
   | cons i rest =>
     cases rest with
-    | cons j rest => rfl
     | nil =>
       cases cfg.kindAt p with
       | none => rfl
       | some kind =>
         simp only
-        rw [← cellExec_abs cfg kind (s.sample p) c i]
-        cases cellExec cfg kind (s.sample p) c i with
-        | error k => rfl
-        | ok r =>
-          obtain ⟨c', r⟩ := r
-          simp only [Except.map, absResult]
-          rw [← cellClash_abs]
-          by_cases hcl : cellClash c' r (cfg.delayOf kind i) = true
-          · simp only [hcl, ↓reduceIte]
-          · simp only [hcl, Bool.false_eq_true, ↓reduceIte]
-            exact congrArg Except.ok (cellShift_abs c' r _)
+        rw [cellLeave_abs, cellExec_abs]
+    | cons j rest =>
+      cases rest with
+      | cons k rest => rfl
+      | nil =>
+        simp only
+        cases hrw : Instr.readWrite i j with
+        | none => rfl
+        | some rw' =>
+          obtain ⟨r, w⟩ := rw'
+          cases hk : cfg.kindAt p with
+          | none => rfl
+          | some kind =>
+            simp only
+            split
+            · rfl
+            · rw [cellLeave_abs, cellExecBoth_abs]
 
 /-- After one cycle a slice that was in step is in step with the next cycle. -/
 theorem cellStep_sync (cfg : Config) (prog : Program) (rd : Stream → Option (Word lanes))
-    (t p : Nat) (c : Cell lanes) (r : Cell lanes × Option (Stream × Word lanes))
+    (t p : Nat) (c : Cell lanes) (r : Cell lanes × Option (Stream × Value lanes))
     (hc : c.InSync prog t p) (h : cellStep cfg prog rd p c = .ok r) :
     r.1.InSync prog (t + 1) p := by
+  -- Whatever the instructions did, the clock counted one cycle and the
+  -- repeater's registers advanced.
   have hseq := congrArg Prod.fst (cellRepeater_step prog t p c hc)
   have hclock : c.clock + 1 = t + 1 := congrArg (· + 1) hc.1
   unfold cellStep at h
-  simp only at h
+  simp only [Except.map] at h
   split at h
-  · cases h; exact ⟨hclock, hseq⟩
-  · split at h
-    · cases h
-    · split at h
-      · split at h
-        · cases h
-        · cases h; exact ⟨hclock, hseq⟩
-      · cases h
   · cases h
+  · cases h
+    exact ⟨hclock, hseq⟩
 
 /-! ## Every slice, one cycle -/
 
@@ -344,7 +397,7 @@ theorem cellSteps_abs (cfg : Config) (prog : Program) (s : CellState lanes) (t p
 
 theorem cellSteps_synced (cfg : Config) (prog : Program) (s : CellState lanes) (t p : Nat)
     (cells : List (Cell lanes)) (h : Synced prog t p cells)
-    (rs : List (Cell lanes × Option (Stream × Word lanes)))
+    (rs : List (Cell lanes × Option (Stream × Value lanes)))
     (hr : cellSteps cfg prog s p cells = .ok rs) :
     Synced prog (t + 1) p (rs.map (·.1)) := by
   induction cells generalizing p rs with
@@ -418,6 +471,11 @@ theorem CellState.init_abs (cfg : Config) (prog : Program) (image : List (List (
     (CellState.init cfg prog image).abs 0 = State.init (wordSem lanes) cfg image := by
   simp only [CellState.init, CellState.abs, State.init, List.map_map]
   congr 1
+  apply List.map_congr_left
+  intro p _
+  simp only [Function.comp, Cell.abs, Vector.toList_mk, List.take_append_drop,
+    Vector.toList_replicate]
+  rfl
 
 theorem synced_map_range' (prog : Program) (f : Nat → Cell lanes)
     (hf : ∀ q, (f q).InSync prog 0 q) (p m : Nat) :

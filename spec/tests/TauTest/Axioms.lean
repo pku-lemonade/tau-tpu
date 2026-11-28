@@ -12,27 +12,27 @@ none of them uses `bv_decide`, whose proofs add an axiom that trusts the Lean
 compiler (see `Tau.Proofs.Isa.Word`).
 -/
 
-/-- info: 'Tau.check_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.check_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.check_sound
 
-/-- info: 'Tau.checkPlaced_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.checkPlaced_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.checkPlaced_sound
 
-/-- info: 'Tau.checkKernels_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.checkKernels_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.checkKernels_sound
 
-/-- info: 'Tau.checkScheduled_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.checkScheduled_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.checkScheduled_sound
 
-/-- info: 'Tau.checkRouted_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.checkRouted_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.checkRouted_sound
 
-/-- info: 'Tau.passes_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.passes_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.passes_sound
 
@@ -68,15 +68,15 @@ compiler (see `Tau.Proofs.Isa.Word`).
 #guard_msgs in
 #print axioms Tau.repeater_outAt
 
-/-- info: 'Tau.check_pins' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.check_pins' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.check_pins
 
-/-- info: 'Tau.checkInlined_sound' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.checkInlined_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.checkInlined_sound
 
-/-- info: 'Tau.passes_pins' depends on axioms: [propext, Quot.sound] -/
+/-- info: 'Tau.passes_pins' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Tau.passes_pins
 

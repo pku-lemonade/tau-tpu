@@ -46,12 +46,12 @@ theorem systolicArrayComputesMatVec : SystolicArrayComputesMatVec :=
   fun _ _ _ zero _ hn x A c hc i => systolicArray_matvec zero hn x A c hc i
 
 theorem timingRuleEast : TimingRuleEast :=
-  fun _ S cfg prog st n hrun h0 p t id kind ins v hk hi hres k hq hn hfree =>
-    arrives_east S cfg prog st n hrun h0 p t id kind ins v hk hi hres k hq hn hfree
+  fun _ S cfg prog st n hrun h0 p t id j kind ins vs v hk hi hres hv hid k hq hn hfree =>
+    arrives_east S cfg prog st n hrun h0 p t id j kind ins vs v hk hi hres hv hid k hq hn hfree
 
 theorem timingRuleWest : TimingRuleWest :=
-  fun _ S cfg prog st n hrun h0 p t id kind ins v hk hi hres k hq hn hfree =>
-    arrives_west S cfg prog st n hrun h0 p t id kind ins v hk hi hres k hq hn hfree
+  fun _ S cfg prog st n hrun h0 p t id j kind ins vs v hk hi hres hv hid k hq hn hfree =>
+    arrives_west S cfg prog st n hrun h0 p t id j kind ins vs v hk hi hres hv hid k hq hn hfree
 
 theorem machineIgnoresValues : MachineIgnoresValues :=
   fun _ _ S T f h cfg prog n image => execute_map S T f h cfg prog n image

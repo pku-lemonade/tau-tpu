@@ -34,7 +34,7 @@ On the way a program is written in four *intermediate representations*
 |---|---|---|
 | Source | kernels that call each other; statements, loops, pins | |
 | Kernel | one kernel, with no calls | slices, addresses, cycles but for its pins |
-| Placed | machine instructions in order, each with a slice; an address for every buffer | cycles but for its pins; scratch space; streams |
+| Placed | machine instructions in order, each with a slice; values taken apart into words; an address for every buffer | cycles but for its pins; scratch space; streams |
 | Compiled | instructions each with a slice, a cycle and the streams it reads and writes | |
 
 A compiled program is a program for the machine (Machine 3.8). The image
@@ -51,6 +51,19 @@ A program names buffers; a machine has memories with addresses. The placed and
 compiled IRs carry a *memory map*: for every buffer, the memory slice that
 holds it and its first address. Loading the buffers into the machine, and
 reading them back, go through the map.
+
+A buffer may be in several memory slices. The map then gives it several
+*parts*, each a slice and a first address, and its words are dealt out over
+the parts in turn: with `g` parts, word `k` is in part `k mod g`, at that
+part's first address plus `k / g`, rounded down. A memory slice reads one
+word on a cycle, so a buffer in `g` slices can give `g` of its words on one
+cycle. A buffer of five words with the parts (slice 2, address 0) and
+(slice 3, address 4) has its words 0, 2 and 4 at addresses 0, 1 and 2 of
+slice 2, and its words 1 and 3 at addresses 4 and 5 of slice 3.
+
+A buffer of values of `w` words (Programs 1) that has `w` parts has word
+`k` of every value in part `k`. All the words of a value can then be read on
+one cycle, and written on one cycle.
 
 Memory words that belong to no buffer are scratch space, for words that have
 to wait. A placed program has none: its memories hold the buffers and nothing
@@ -71,12 +84,18 @@ Compiled (scheduled) ◀──────────────────�
 | inline | source | kernel | nothing: each call is replaced by the kernel it calls |
 | simplify | kernel | kernel | which statements can go without changing any result |
 | unroll | kernel | kernel with no loops | nothing: each loop is replaced by its iterations |
-| place | kernel with no loops | placed | where: the memory and address of each buffer, and the slice that runs each statement |
+| place | kernel with no loops | placed | where: the memory and address of each buffer, and the slice that runs each statement. It decides nothing else, and takes every value apart into its words |
 | schedule | placed | compiled | when: the cycle of every instruction, and with it which words wait in memory, and in which scratch words |
-| route | compiled | compiled | on which stream: the stream of every word |
+| route | compiled | compiled | on which stream: the stream of every word, with the words of a value an instruction takes or gives on streams that follow one another (Machine 3.5) |
 | slice | compiled | compiled | nothing: each slice's entries, naming streams |
 | fold | compiled | compiled | which runs of entries become one repeating entry (Machine 2.7) |
 | encode | compiled | image | nothing: the numbers of Machine 3.10 |
+
+A kernel has values and the machine moves words. From the placed IR on a
+program names words: a load of a value of `w` words is `w` reads, a store is
+`w` writes, and an operation names each word of its operands and of its
+result. The words of one value need not stay together. They have to be side
+by side only where an instruction takes them as one value.
 
 Place decides nothing about time. In a placed program every word goes from
 the instruction that makes it straight to the instructions that use it, and
@@ -89,9 +108,9 @@ Schedule gives every word a stream to itself, on a machine with as many streams
 as that takes. Route fits the words onto the streams the machine has. So the
 cycles can be judged before any stream is shared.
 
-A pin goes with the instruction that issues its word. For a load that is the
-read, for a store the write, for a matrix product the instruction that puts
-the product on a stream.
+A pin goes with the instructions that issue the words of its value. For a
+load those are the reads, for a store the writes, for a matrix product the
+instruction that puts the product on its streams.
 
 ## 5. What a step must keep
 
@@ -159,7 +178,7 @@ either:
 
 | Step | Its output |
 |---|---|
-| place | has one instruction for each operation of the kernel, one write for each store, and no scratch space |
+| place | has one instruction for each operation of the kernel, one write for each word of each store, and no scratch space |
 | schedule | has the memory map of its input, every operation and every write to a buffer of its input, each on the same slice, and nothing else but reads of buffer words its input reads and writes and reads of scratch words |
 | route | is its input with other numbers for the streams |
 

@@ -19,14 +19,13 @@ def Idx.inst (k : Nat) (ix : Idx) : Idx := ⟨ix.eval k, 0⟩
 
 /-- Fix the loop index of a statement to `k`. -/
 def Stmt.inst (k : Nat) : Stmt → Stmt
-  | .load dst buf ix => .load dst buf (ix.inst k)
-  | .store src buf ix => .store src buf (ix.inst k)
-  | .un dst op a => .un dst op a
-  | .bin dst op a b => .bin dst op a b
+  | .load dst ty buf ix => .load dst ty buf (ix.inst k)
+  | .store src ty buf ix => .store src ty buf (ix.inst k)
   | .matvec dst x buf ix n => .matvec dst x buf (ix.inst k) n
-  | .affine dst x bias buf ix n => .affine dst x bias buf (ix.inst k) n
-  | .const dst xs => .const dst xs
-  | .sel dst m a b => .sel dst m a b
+  | .un dst ty op a => .un dst ty op a
+  | .bin dst ty op a b => .bin dst ty op a b
+  | .const dst ty xs => .const dst ty xs
+  | .sel dst ty m a b => .sel dst ty m a b
   | .pin t s => .pin (t.inst k) (s.inst k)
 
 /-- The first `n` iterations of a loop body, written out. -/

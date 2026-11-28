@@ -21,7 +21,7 @@ This file gives two descriptions of the same behaviour.
 
 `Tau.Proofs.Blocks.Repeater` proves they agree.
 
-In tau-tpu every slice has a repeater. Reading the columns of a matrix out of
+In tau-tpu every slice has a repeater. Reading the rows of a matrix out of
 memory on consecutive cycles is one entry: read, repeat, and add one to the
 address each time.
 

@@ -25,28 +25,46 @@ namespace Tau
 
 /-- The laws the simplifier relies on. -/
 structure Sem.Lawful {V : Type} (S : Sem V) : Prop where
+  /-- The operations give values of the right number of words. -/
+  sized : S.Sized
   /-- Applying `relu` twice is the same as applying it once. -/
-  relu_relu : ∀ a, S.un .relu (S.un .relu a) = S.un .relu a
+  relu_relu : ∀ ty a, S.un ty .relu (S.un ty .relu a) = S.un ty .relu a
   /-- The maximum of a value with itself is that value. -/
-  max_self : ∀ a, S.bin .max a a = a
+  max_self : ∀ ty a, a.length = ty.bytes → S.bin ty .max a a = a
   /-- The minimum of a value with itself is that value. -/
-  min_self : ∀ a, S.bin .min a a = a
+  min_self : ∀ ty a, a.length = ty.bytes → S.bin ty .min a a = a
 
-/-- Simplify a one-word operation whose operand is already simplified. -/
-def simpUn : UnOp → Expr → Expr
-  | .relu, .un .relu a => .un .relu a
-  | op, a => .un op a
+/-- Simplify a one-value operation whose operand is already simplified. -/
+def simpUn (ty : DType) (op : UnOp) (a : VExpr) : VExpr :=
+  match op, a with
+  | .relu, .un ty' .relu a' => if ty' = ty then .un ty .relu a' else .un ty op a
+  | _, _ => .un ty op a
 
-/-- Simplify a two-word operation whose operands are already simplified. -/
-def simpBin (op : BinOp) (a b : Expr) : Expr :=
-  if (op = .max ∨ op = .min) ∧ a = b then a else .bin op a b
+/-- Simplify a two-value operation whose operands are already simplified. -/
+def simpBin (ty : DType) (op : BinOp) (a b : VExpr) : VExpr :=
+  if (op = .max ∨ op = .min) ∧ a = b ∧ a.width = ty.bytes then a else .bin ty op a b
 
-/-- Simplify an expression, innermost parts first. -/
+mutual
+
+/-- Simplify the expression of a word: simplify the value it is a word of. -/
 def Expr.simp : Expr → Expr
-  | .un op a => simpUn op a.simp
-  | .bin op a b => simpBin op a.simp b.simp
-  | .mac j acc x w => .mac j acc.simp x.simp w.simp
-  | .sel m a b => .sel m.simp a.simp b.simp
+  | .word k v => .word k v.simp
   | e => e
+
+/-- Simplify the expression of a value, innermost parts first. -/
+def VExpr.simp : VExpr → VExpr
+  | .words ws => .words ws.simp
+  | .un ty op a => simpUn ty op a.simp
+  | .bin ty op a b => simpBin ty op a.simp b.simp
+  | .matvec rows x => .matvec rows.simp x.simp
+  | .sel ty m a b => .sel ty m.simp a.simp b.simp
+  | .const ty xs => .const ty xs
+
+/-- Simplify every word of a list. -/
+def Exprs.simp : Exprs → Exprs
+  | .nil => .nil
+  | .cons e rest => .cons e.simp rest.simp
+
+end
 
 end Tau

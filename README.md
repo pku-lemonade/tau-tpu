@@ -20,8 +20,8 @@ the published descriptions of tensor streaming processors (Abts et al., ISCA
   every pinned word on its cycle, end to end or one compiler pass at a time.
 
 ```
-Machine (9 slices, 1 hop/cycle along east & west streams):
-  ──east──▶ [0:mxm] [1:sxm] [2:mem] [3:mem] [4:vxm] [5:mem] [6:mem] [7:sxm] [8:mxm]
+Machine (13 slices, 1 hop/cycle along east & west streams of byte lanes):
+  ──east──▶ [0:mxm] [1:sxm] [2..5:mem] [6:vxm] [7..10:mem] [11:sxm] [12:mxm]
   ◀─west──
 
 Flow:

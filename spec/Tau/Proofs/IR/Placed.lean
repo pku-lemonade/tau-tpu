@@ -25,14 +25,43 @@ def PState.map (f : V → W) (st : PState V) : PState W where
   slices := st.slices.map (Slice.map f)
   issues := st.issues.map (Issue.map f)
 
+theorem lookupAll_map (f : V → W) (vars : List (Var × V)) (srcs : List Var) :
+    lookupAll (vars.map (Prod.map id f)) srcs = (lookupAll vars srcs).map (List.map f) := by
+  induction srcs with
+  | nil => rfl
+  | cons src rest ih =>
+    simp only [lookupAll, lookup_map, ih]
+    cases vars.lookup src <;> cases lookupAll vars rest <;> rfl
+
+theorem lookupValue_map (f : V → W) (vars : List (Var × V)) (ty : DType) (srcs : List Var) :
+    lookupValue (vars.map (Prod.map id f)) ty srcs =
+      (lookupValue vars ty srcs).map (List.map f) := by
+  unfold lookupValue
+  split
+  · exact lookupAll_map f vars srcs
+  · rfl
+
+theorem bindAll_map (f : V → W) (vars : List (Var × V)) (dst : List Var) (x : List V) :
+    bindAll (vars.map (Prod.map id f)) dst (x.map f) = (bindAll vars dst x).map (Prod.map id f) := by
+  simp only [bindAll, List.map_append]
+  congr 1
+  induction dst generalizing x with
+  | nil => rfl
+  | cons d rest ih =>
+    cases x with
+    | nil => rfl
+    | cons w ws => simp only [List.map_cons, List.zip_cons_cons, ih]; rfl
+
 theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (kind : Kind)
     (vars : List (Var × V)) (sl : Slice V) (i : PInstr) :
     i.exec T kind (vars.map (Prod.map id f)) (sl.map f) =
       (i.exec S kind vars sl).map fun r => (r.1.map (Prod.map id f), r.2.map f) := by
   -- One case per instruction, as in `exec_map` for the machine: unfold, move
-  -- the map out of each lookup (`lookup_map`), split on each check and on
-  -- what each lookup found. A pinned instruction does what the instruction
-  -- inside it does.
+  -- the map out of each lookup (`lookup_map`, `lookupValue_map`), split on
+  -- each check and on what each lookup found. Where a value is computed, `h`
+  -- says `f` commutes with the operation and `bindAll_map` that naming its
+  -- words does. A pinned instruction does what the instruction inside it
+  -- does.
   induction i with
   | pin t i ih =>
     simp only [PInstr.exec]
@@ -49,69 +78,55 @@ theorem PInstr.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (k
     · split
       · rfl
       · cases vars.lookup src <;> simp [List.map_set]
-  | un dst op src =>
-    simp only [PInstr.exec, lookup_map]
+  | un dst ty op src =>
+    simp only [PInstr.exec, lookupValue_map]
     split
     · rfl
-    · cases vars.lookup src <;> simp [h.un]
-  | bin dst op a b =>
-    simp only [PInstr.exec, lookup_map]
+    · cases lookupValue vars ty src <;> simp [← h.un, bindAll_map]
+  | bin dst ty op a b =>
+    simp only [PInstr.exec, lookupValue_map]
     split
     · rfl
-    · cases vars.lookup a <;> cases vars.lookup b <;> simp [h.bin]
-  | load src =>
-    simp only [PInstr.exec, lookup_map]
-    split
-    · rfl
-    · cases vars.lookup src <;> simp [Slice.map]
-  | mac j src =>
-    simp only [PInstr.exec, lookup_map, Slice.map]
-    split
-    · rfl
-    · cases sl.x <;> cases vars.lookup src <;> simp [h.mac]
-  | emit dst =>
+    · cases lookupValue vars ty a <;> cases lookupValue vars ty b <;>
+        simp [← h.bin, bindAll_map]
+  | const dst ty xs =>
     simp only [PInstr.exec]
     split
     · rfl
-    · simp [Slice.map, h.zero]
-  | const dst xs =>
-    simp only [PInstr.exec]
+    · simp [← h.const, bindAll_map]
+  | sel dst ty m a b =>
+    simp only [PInstr.exec, lookupValue_map]
     split
     · rfl
-    · simp [h.const]
-  | sel dst m a b =>
-    simp only [PInstr.exec, lookup_map]
+    · cases lookupValue vars ty m <;> cases lookupValue vars ty a <;>
+        cases lookupValue vars ty b <;> simp [← h.sel, bindAll_map]
+  | install j srcs =>
+    simp only [PInstr.exec, lookupAll_map, Slice.map, List.length_map]
     split
     · rfl
-    · cases vars.lookup m <;> cases vars.lookup a <;> cases vars.lookup b <;> simp [h.sel]
-  | seed src =>
-    simp only [PInstr.exec, lookup_map]
-    split
-    · rfl
-    · cases vars.lookup src <;> simp [Slice.map]
-  | install j src =>
+    · split
+      · rfl
+      · cases lookupAll vars srcs <;> simp [putAt_map]
+  | product dst n src =>
     simp only [PInstr.exec, lookup_map, Slice.map, List.length_map]
     split
     · rfl
     · split
       · rfl
-      · cases vars.lookup src <;> simp [List.map_set]
-  | macw j =>
-    simp only [PInstr.exec, Slice.map, List.getElem?_map]
-    split
-    · rfl
-    · cases sl.x <;> cases sl.weights[j]? <;> simp [h.mac]
+      · cases vars.lookup src with
+        | none => rfl
+        | some x => simp only [Option.map_some, ← List.map_take, ← h.matvec, bindAll_map]
 
 theorem PInstr.issues_map (f : V → W) (p : Nat) (i : PInstr) (vars : List (Var × V)) :
     i.issues p (vars.map (Prod.map id f)) = (i.issues p vars).map (Issue.map f) := by
   unfold PInstr.issues
-  cases i.target with
+  rw [List.map_flatMap]
+  congr 1
+  funext va
+  simp only [lookup_map]
+  cases vars.lookup va.1 with
   | none => rfl
-  | some va =>
-    simp only [lookup_map]
-    cases vars.lookup va.1 with
-    | none => rfl
-    | some w => simp [Issue.map, List.map_map, Function.comp_def]
+  | some w => simp [Issue.map, List.map_map, Function.comp_def]
 
 theorem PState.step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (st : PState V) (p : Nat) (i : PInstr) :

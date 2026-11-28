@@ -16,6 +16,7 @@ import Tau.Blocks.SystolicArray
 
 -- Words, operations, instructions, events and the image (Machine 1, 3).
 import Tau.Isa.Word
+import Tau.Isa.Value
 import Tau.Isa.Op
 import Tau.Isa.Instr
 import Tau.Isa.Event
@@ -62,6 +63,7 @@ import Tau.Proofs.Blocks.Repeater
 import Tau.Proofs.Blocks.SystolicArray
 
 import Tau.Proofs.Isa.Word
+import Tau.Proofs.Isa.Value
 import Tau.Proofs.Isa.Event
 import Tau.Proofs.Isa.Encode
 

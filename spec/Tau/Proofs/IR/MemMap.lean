@@ -43,12 +43,16 @@ theorem extract_map (f : V → W) (map : MemMap) (mem : List (List V)) (fill : V
   simp only [Function.comp, List.map_map]
   apply List.map_congr_left
   intro k _
-  simp only [Function.comp, List.getElem?_map]
-  cases mem[pl.slice]? with
+  simp only [Function.comp]
+  cases pl.locate k with
   | none => rfl
-  | some l =>
-    simp only [Option.map_some, Option.getD_some, List.getElem?_map]
-    cases l[pl.base + k]? <;> rfl
+  | some pa =>
+    simp only [List.getElem?_map]
+    cases mem[pa.1]? with
+    | none => rfl
+    | some l =>
+      simp only [Option.map_some, Option.getD_some, List.getElem?_map]
+      cases l[pa.2]? <;> rfl
 
 theorem Issue.event_map (f : V → W) (map : MemMap) (x : Issue V) :
     (x.map f).event map = (x.event map).map (Event.map f) := by

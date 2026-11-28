@@ -1,4 +1,5 @@
 import Tau.Machine.SliceLevel
+import Tau.Proofs.Isa.Event
 
 /-!
 # The machine does not look at its values
@@ -24,10 +25,8 @@ variable {V W : Type}
 /-- Apply `f` to every value in a slice. -/
 def Slice.map (f : V → W) (sl : Slice V) : Slice W where
   words := sl.words.map f
-  x := sl.x.map f
-  acc := f sl.acc
   weights := sl.weights.map f
-  pipe := sl.pipe.map (Option.map (Prod.map id f))
+  pipe := sl.pipe.map (Option.map (Prod.map id (List.map f)))
 
 /-- Apply `f` to every value in a machine state. -/
 def State.map (f : V → W) (s : State V) : State W where
@@ -37,9 +36,9 @@ def State.map (f : V → W) (s : State V) : State W where
   slices := s.slices.map (Slice.map f)
 
 /-- Apply `f` to what a slice step returns. -/
-def mapResult (f : V → W) (r : Slice V × Option (Stream × V)) :
-    Slice W × Option (Stream × W) :=
-  (r.1.map f, r.2.map (Prod.map id f))
+def mapResult (f : V → W) (r : Slice V × Option (Stream × List V)) :
+    Slice W × Option (Stream × List W) :=
+  (r.1.map f, r.2.map (Prod.map id (List.map f)))
 
 theorem State.sample_map (f : V → W) (s : State V) (p : Nat) (tr : Stream) :
     (s.map f).sample p tr = (s.sample p tr).map f := by
@@ -51,14 +50,24 @@ theorem State.sample_map (f : V → W) (s : State V) (p : Nat) (tr : Stream) :
         simp only [Option.map_some, List.getElem?_map]
         cases row[p]? <;> rfl
 
+theorem readGroup_map (f : V → W) (rd : Stream → Option V) (rd' : Stream → Option W)
+    (hrd : ∀ tr, rd' tr = (rd tr).map f) (src : Stream) (g : Nat) :
+    readGroup rd' src g = (readGroup rd src g).map (List.map f) := by
+  induction g with
+  | zero => rfl
+  | succ g ih =>
+    simp only [readGroup, ih, hrd]
+    cases readGroup rd src g <;> cases rd (src.next g) <;> simp
+
 theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (kind : Kind) (rd : Stream → Option V) (rd' : Stream → Option W)
     (hrd : ∀ tr, rd' tr = (rd tr).map f) (sl : Slice V) (i : Instr) :
     exec T cfg kind rd' (sl.map f) i = (exec S cfg kind rd sl i).map (mapResult f) := by
   -- One case per instruction, all of the same shape: unfold `exec`, rewrite
-  -- the mapped reads with `hrd`, split on each check, then split on what
-  -- each read found. Where a value is computed, `h` says `f` commutes with
-  -- the operation.
+  -- the mapped reads with `hrd` and `readGroup_map`, split on each check,
+  -- then split on what each read found. Where a value is computed, `h` says
+  -- `f` commutes with the operation.
+  have hg := readGroup_map f rd rd' hrd
   cases i with
   | read addr dst =>
     simp only [exec, Slice.map, List.getElem?_map]
@@ -74,87 +83,71 @@ theorem exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
     · split
       · rfl
       · cases rd src <;> simp [Except.map, mapResult, Slice.map, List.map_set]
-  | un op src dst =>
-    simp only [exec, hrd]
+  | un ty op src dst =>
+    simp only [exec, hg]
     split
     · rfl
     · split
       · rfl
-      · cases rd src <;> simp [Except.map, mapResult, h.un]
-  | bin op a b dst =>
-    simp only [exec, hrd]
+      · cases readGroup rd src ty.bytes <;> simp [Except.map, mapResult, h.un]
+  | bin ty op a b dst =>
+    simp only [exec, hg]
     split
     · rfl
     · split
       · rfl
-      · cases rd a <;> cases rd b <;> simp [Except.map, mapResult, h.bin]
-  | load src =>
-    simp only [exec, hrd]
-    split
-    · rfl
-    · cases rd src <;> simp [Except.map, mapResult, Slice.map]
-  | mac j src =>
-    simp only [exec, hrd, Slice.map]
-    split
-    · rfl
-    · cases sl.x <;> cases rd src <;> simp [Except.map, mapResult, Slice.map, h.mac]
-  | emit dst =>
-    simp only [exec]
-    split
-    · rfl
-    · split
-      · rfl
-      · simp [Except.map, mapResult, Slice.map, h.zero]
-  | const xs dst =>
+      · cases readGroup rd a ty.bytes <;> cases readGroup rd b ty.bytes <;>
+          simp [Except.map, mapResult, h.bin]
+  | const ty xs dst =>
     simp only [exec]
     split
     · rfl
     · split
       · rfl
       · simp [Except.map, mapResult, h.const]
-  | sel m a b dst =>
-    simp only [exec, hrd]
+  | sel ty m a b dst =>
+    simp only [exec, hg]
     split
     · rfl
     · split
       · rfl
-      · cases rd m <;> cases rd a <;> cases rd b <;> simp [Except.map, mapResult, h.sel]
-  | seed src =>
-    simp only [exec, hrd]
+      · cases readGroup rd m ty.bytes <;> cases readGroup rd a ty.bytes <;>
+          cases readGroup rd b ty.bytes <;> simp [Except.map, mapResult, h.sel]
+  | install j g src =>
+    simp only [exec, Slice.map, List.length_map, hg]
     split
     · rfl
-    · cases rd src <;> simp [Except.map, mapResult, Slice.map]
-  | install j src =>
+    · split
+      · rfl
+      · cases readGroup rd src g <;> simp [Except.map, mapResult, Slice.map, putAt_map]
+  | product n src dst =>
     simp only [exec, hrd, Slice.map, List.length_map]
     split
     · rfl
     · split
       · rfl
-      · cases rd src <;> simp [Except.map, mapResult, Slice.map, List.map_set]
-  | macw j =>
-    simp only [exec, Slice.map, List.getElem?_map]
-    split
-    · rfl
-    · cases sl.x <;> cases sl.weights[j]? <;> simp [Except.map, mapResult, Slice.map, h.mac]
+      · split
+        · rfl
+        · cases rd src <;> simp [Except.map, mapResult, Slice.map, h.matvec, List.map_take]
 
-theorem slots_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
-    (sl.map f).slots (r.map (Prod.map id f)) d =
-      (sl.slots r d).map (Option.map (Prod.map id f)) := by
+theorem slots_map (f : V → W) (sl : Slice V) (r : Option (Stream × List V)) (d : Nat) :
+    (sl.map f).slots (r.map (Prod.map id (List.map f))) d =
+      (sl.slots r d).map (Option.map (Prod.map id (List.map f))) := by
   cases r <;> simp [Slice.slots, Slice.map, List.map_set]
 
 /-- Whether a result clashes depends only on which slots are full. -/
-theorem clash_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
-    (sl.map f).clash (r.map (Prod.map id f)) d = sl.clash r d := by
+theorem clash_map (f : V → W) (sl : Slice V) (r : Option (Stream × List V)) (d : Nat) :
+    (sl.map f).clash (r.map (Prod.map id (List.map f))) d = sl.clash r d := by
   simp only [Slice.clash, Slice.map, Option.isSome_map, List.length_map]
   congr 1
-  rw [show (none : Option (Stream × W)) :: sl.pipe.map (Option.map (Prod.map id f)) =
-    (none :: sl.pipe).map (Option.map (Prod.map id f)) from rfl, List.getElem?_map]
+  rw [show (none : Option (Stream × List W)) :: sl.pipe.map (Option.map (Prod.map id (List.map f))) =
+    (none :: sl.pipe).map (Option.map (Prod.map id (List.map f))) from rfl, List.getElem?_map]
   cases (none :: sl.pipe)[sl.pipe.length - d]? with
   | none => rfl
   | some o => cases o <;> rfl
 
-theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d : Nat) :
-    shiftPipe (sl.map f) (r.map (Prod.map id f)) d = mapResult f (shiftPipe sl r d) := by
+theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × List V)) (d : Nat) :
+    shiftPipe (sl.map f) (r.map (Prod.map id (List.map f))) d = mapResult f (shiftPipe sl r d) := by
   unfold shiftPipe mapResult
   rw [slots_map]
   simp only [List.getLast?_map, Slice.map]
@@ -162,13 +155,44 @@ theorem shiftPipe_map (f : V → W) (sl : Slice V) (r : Option (Stream × V)) (d
   · simp
   · cases (sl.slots r d).getLast? <;> rfl
 
+theorem execBoth_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
+    (kind : Kind) (rd : Stream → Option V) (rd' : Stream → Option W)
+    (hrd : ∀ tr, rd' tr = (rd tr).map f) (sl : Slice V) (r w : Instr) :
+    execBoth T cfg kind rd' (sl.map f) r w =
+      (execBoth S cfg kind rd sl r w).map (mapResult f) := by
+  -- `exec_map` for the read, and then for the write on the slice it leaves.
+  unfold execBoth
+  rw [exec_map S T f h cfg kind rd rd' hrd sl r]
+  cases exec S cfg kind rd sl r with
+  | error k => rfl
+  | ok a =>
+    obtain ⟨sl1, res⟩ := a
+    simp only [Except.map, mapResult]
+    rw [exec_map S T f h cfg kind rd rd' hrd sl1 w]
+    cases exec S cfg kind rd sl1 w with
+    | error k => rfl
+    | ok b => rfl
+
+theorem leave_map (f : V → W) (p t d : Nat)
+    (x : Except TrapKind (Slice V × Option (Stream × List V))) :
+    leave p t d (x.map (mapResult f)) = (leave p t d x).map (mapResult f) := by
+  cases x with
+  | error k => rfl
+  | ok a =>
+    obtain ⟨sl, r⟩ := a
+    simp only [Except.map, mapResult, leave, clash_map]
+    split
+    · rfl
+    · exact congrArg Except.ok (shiftPipe_map f sl r d)
+
 theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (prog : Program) (s : State V) (p : Nat) (sl : Slice V) :
     stepSlice T cfg prog (s.map f) p (sl.map f) =
       (stepSlice S cfg prog s p sl).map (mapResult f) := by
   -- The time is the same in both states, so the same instructions are due.
-  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `clash_map` and
-  -- `shiftPipe_map`. Two or more: the same trap on both sides.
+  -- No instruction: `shiftPipe_map`. One: `exec_map`, then `leave_map`. A
+  -- read and a write: `execBoth_map`, then `leave_map`. Otherwise the same
+  -- trap on both sides.
   unfold stepSlice
   have ht : (s.map f).time = s.time := rfl
   rw [ht]
@@ -176,7 +200,6 @@ theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg
   | nil => exact congrArg Except.ok (shiftPipe_map f sl none 0)
   | cons i rest =>
     cases rest with
-    | cons j rest => rfl
     | nil =>
       cases cfg.kindAt p with
       | none => rfl
@@ -184,14 +207,25 @@ theorem stepSlice_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg
         simp only
         rw [exec_map S T f h cfg kind (s.sample p) ((s.map f).sample p)
           (State.sample_map f s p) sl i]
-        cases exec S cfg kind (s.sample p) sl i with
-        | error k => rfl
-        | ok r =>
-          obtain ⟨sl', r⟩ := r
-          simp only [Except.map, mapResult, clash_map]
-          split
-          · rfl
-          · exact congrArg Except.ok (shiftPipe_map f sl' r _)
+        exact leave_map f p s.time _ _
+    | cons j rest =>
+      cases rest with
+      | cons k rest => rfl
+      | nil =>
+        simp only
+        cases hrw : Instr.readWrite i j with
+        | none => rfl
+        | some rw' =>
+          obtain ⟨r, w⟩ := rw'
+          cases hk : cfg.kindAt p with
+          | none => rfl
+          | some kind =>
+            simp only
+            split
+            · rfl
+            · rw [execBoth_map S T f h cfg kind (s.sample p) ((s.map f).sample p)
+                (State.sample_map f s p) sl r w]
+              exact leave_map f p s.time _ _
 
 theorem stepSlices_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Config)
     (prog : Program) (s : State V) (p : Nat) (sls : List (Slice V)) :
@@ -208,8 +242,8 @@ theorem stepSlices_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cf
       | error e => rfl
       | ok rs => rfl
 
-theorem inject_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k p : Nat) :
-    inject (outs.map (Option.map (Prod.map id f))) d k p = (inject outs d k p).map f := by
+theorem inject_map (f : V → W) (outs : List (Option (Stream × List V))) (d : Dir) (k p : Nat) :
+    inject (outs.map (Option.map (Prod.map id (List.map f)))) d k p = (inject outs d k p).map f := by
   unfold inject
   simp only [List.getElem?_map]
   cases outs[p]? with
@@ -220,11 +254,13 @@ theorem inject_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) 
     | some tv =>
       obtain ⟨tr, v⟩ := tv
       simp only [Option.map_some, Option.getD_some, Prod.map, id]
-      split <;> rfl
+      split
+      · exact List.getElem?_map
+      · rfl
 
-theorem advanceRow_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k : Nat)
+theorem advanceRow_map (f : V → W) (outs : List (Option (Stream × List V))) (d : Dir) (k : Nat)
     (row : List (Option V)) :
-    advanceRow (outs.map (Option.map (Prod.map id f))) d k (row.map (Option.map f)) =
+    advanceRow (outs.map (Option.map (Prod.map id (List.map f)))) d k (row.map (Option.map f)) =
       (advanceRow outs d k row).map (Option.map f) := by
   unfold advanceRow
   simp only [List.length_map, List.map_map, inject_map]
@@ -244,9 +280,9 @@ theorem advanceRow_map (f : V → W) (outs : List (Option (Stream × V))) (d : D
       simp only [Option.map_none, List.getElem?_map]
       cases row[p + 1]? <;> rfl
 
-theorem advance_map (f : V → W) (outs : List (Option (Stream × V))) (d : Dir) (k : Nat)
+theorem advance_map (f : V → W) (outs : List (Option (Stream × List V))) (d : Dir) (k : Nat)
     (rows : List (List (Option V))) :
-    advance (outs.map (Option.map (Prod.map id f))) d k (rows.map (List.map (Option.map f))) =
+    advance (outs.map (Option.map (Prod.map id (List.map f)))) d k (rows.map (List.map (Option.map f))) =
       (advance outs d k rows).map (List.map (Option.map f)) := by
   induction rows generalizing k with
   | nil => rfl
@@ -263,7 +299,7 @@ theorem step_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (cfg : Co
   | error e => rfl
   | ok rs =>
     have h2 : (rs.map (mapResult f)).map (·.2) =
-        (rs.map (·.2)).map (Option.map (Prod.map id f)) := by
+        (rs.map (·.2)).map (Option.map (Prod.map id (List.map f))) := by
       simp [List.map_map, mapResult]
     have h1 : (rs.map (mapResult f)).map (·.1) = (rs.map (·.1)).map (Slice.map f) := by
       simp [List.map_map, mapResult]

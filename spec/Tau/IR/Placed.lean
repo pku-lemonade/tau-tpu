@@ -38,50 +38,42 @@ namespace Tau
 variable {V : Type}
 
 /-- An instruction before it has a cycle or streams. A word in transit is
-named by a variable, as in a kernel. -/
+named by a variable, as in a kernel, and a value of several words by a list
+of them, the low word first. -/
 inductive PInstr where
   /-- Memory: `dst` is the word at `addr`. -/
   | read (dst : Var) (addr : Nat)
   /-- Memory: store `src` at `addr`. -/
   | write (src : Var) (addr : Nat)
-  /-- Vector or rearrangement: `dst = op src`. -/
-  | un (dst : Var) (op : UnOp) (src : Var)
-  /-- Vector: `dst = op a b`. -/
-  | bin (dst : Var) (op : BinOp) (a b : Var)
-  /-- Matrix: keep `src` as the vector operand. -/
-  | load (src : Var)
-  /-- Matrix: add lane `j` of the vector operand, times `src`, to the
-  accumulator. -/
-  | mac (j : Nat) (src : Var)
-  /-- Matrix: `dst` is the accumulator, which is then cleared. -/
-  | emit (dst : Var)
-  /-- Vector: `dst` is the constant word with lanes `xs`. -/
-  | const (dst : Var) (xs : List Int)
-  /-- Vector: `dst = sel m a b`. -/
-  | sel (dst : Var) (m a b : Var)
-  /-- Matrix: replace the accumulator by `src`. -/
-  | seed (src : Var)
-  /-- Matrix: keep `src` as stored column `j`. -/
-  | install (j : Nat) (src : Var)
-  /-- Matrix: add lane `j` of the vector operand, times stored column `j`, to
-  the accumulator. -/
-  | macw (j : Nat)
+  /-- Vector or rearrangement: `dst = op src`, with `src` of type `ty`. -/
+  | un (dst : List Var) (ty : DType) (op : UnOp) (src : List Var)
+  /-- Vector: `dst = op a b`, all of type `ty`. -/
+  | bin (dst : List Var) (ty : DType) (op : BinOp) (a b : List Var)
+  /-- Vector: `dst` is the constant of type `ty` with elements `xs`. -/
+  | const (dst : List Var) (ty : DType) (xs : List Int)
+  /-- Vector: `dst = sel m a b`, all of type `ty`. -/
+  | sel (dst : List Var) (ty : DType) (m a b : List Var)
+  /-- Matrix: keep the words `srcs` as installed words `j`, `j + 1`, ... -/
+  | install (j : Nat) (srcs : List Var)
+  /-- Matrix: `dst` is the product of the first `n` installed words with
+  `src`, a value of 32 bits. -/
+  | product (dst : List Var) (n : Nat) (src : Var)
   /-- The instruction `i`, to be issued on cycle `t`. -/
   | pin (t : Nat) (i : PInstr)
   deriving DecidableEq, Repr
 
-/-- The word an instruction issues, if it issues one: the variable that holds
-it, and for a write the address. -/
-def PInstr.target : PInstr → Option (Var × Option Nat)
-  | .read dst _ => some (dst, none)
-  | .write src addr => some (src, some addr)
-  | .un dst _ _ => some (dst, none)
-  | .bin dst _ _ _ => some (dst, none)
-  | .emit dst => some (dst, none)
-  | .const dst _ => some (dst, none)
-  | .sel dst _ _ _ => some (dst, none)
-  | .pin _ i => i.target
-  | _ => none
+/-- The words an instruction issues: the variable that holds each, and for a
+write the address. -/
+def PInstr.targets : PInstr → List (Var × Option Nat)
+  | .read dst _ => [(dst, none)]
+  | .write src addr => [(src, some addr)]
+  | .un dst _ _ _ => dst.map (·, none)
+  | .bin dst _ _ _ _ => dst.map (·, none)
+  | .product dst _ _ => dst.map (·, none)
+  | .const dst _ _ => dst.map (·, none)
+  | .sel dst _ _ _ _ => dst.map (·, none)
+  | .pin _ i => i.targets
+  | _ => []
 
 /-- The cycles an instruction is pinned to. -/
 def PInstr.pins : PInstr → List Nat
@@ -89,14 +81,13 @@ def PInstr.pins : PInstr → List Nat
   | _ => []
 
 /-- What a pinned instruction at the slice at `p` issues, once it has run and
-the words in transit are `vars`: its word, on each cycle it is pinned to. -/
+the words in transit are `vars`: each of its words, on each cycle it is
+pinned to. -/
 def PInstr.issues (p : Nat) (i : PInstr) (vars : List (Var × V)) : List (Issue V) :=
-  match i.target with
-  | some (v, addr) =>
+  i.targets.flatMap fun (v, addr) =>
     match vars.lookup v with
     | some w => i.pins.map fun t => ⟨t, p, addr, w⟩
     | none => []
-  | none => []
 
 /-- The output of `tau-place`. -/
 structure Placed where
@@ -120,6 +111,23 @@ structure PState (V : Type) where
   /-- What the pinned instructions have issued, most recent first. -/
   issues : List (Issue V)
 
+/-- The words in transit that `srcs` name. `none` if one of them has no word
+yet. -/
+def lookupAll (vars : List (Var × V)) : List Var → Option (List V)
+  | [] => some []
+  | src :: rest =>
+    match vars.lookup src, lookupAll vars rest with
+    | some v, some vs => some (v :: vs)
+    | _, _ => none
+
+/-- The words in transit that `srcs` name, if they are a value of type `ty`. -/
+def lookupValue (vars : List (Var × V)) (ty : DType) (srcs : List Var) : Option (List V) :=
+  if srcs.length = ty.bytes then lookupAll vars srcs else none
+
+/-- Name the words of the value `x` by the variables `dst`. -/
+def bindAll (vars : List (Var × V)) (dst : List Var) (x : List V) : List (Var × V) :=
+  dst.zip x ++ vars
+
 /-- Carry out one instruction at a slice of the given kind. `none` if the
 slice is of the wrong kind, an address is out of range, or a word is used
 before it exists. -/
@@ -138,61 +146,41 @@ def PInstr.exec (S : Sem V) (kind : Kind) (vars : List (Var × V)) (sl : Slice V
       match vars.lookup src with
       | some v => some (vars, { sl with words := sl.words.set addr v })
       | none => none
-  | .un dst op src =>
+  | .un dst ty op src =>
     if op.kind ≠ kind then none
     else
-      match vars.lookup src with
-      | some v => some ((dst, S.un op v) :: vars, sl)
+      match lookupValue vars ty src with
+      | some v => some (bindAll vars dst (S.un ty op v), sl)
       | none => none
-  | .bin dst op a b =>
+  | .bin dst ty op a b =>
     if kind ≠ .vxm then none
     else
-      match vars.lookup a, vars.lookup b with
-      | some va, some vb => some ((dst, S.bin op va vb) :: vars, sl)
+      match lookupValue vars ty a, lookupValue vars ty b with
+      | some va, some vb => some (bindAll vars dst (S.bin ty op va vb), sl)
       | _, _ => none
-  | .load src =>
-    if kind ≠ .mxm then none
-    else
-      match vars.lookup src with
-      | some v => some (vars, { sl with x := some v })
-      | none => none
-  | .mac j src =>
-    if kind ≠ .mxm then none
-    else
-      match sl.x, vars.lookup src with
-      | some x, some w => some (vars, { sl with acc := S.mac j sl.acc x w })
-      | _, _ => none
-  | .emit dst =>
-    if kind ≠ .mxm then none
-    else some ((dst, sl.acc) :: vars, { sl with acc := S.zero })
-  | .const dst xs =>
+  | .const dst ty xs =>
     if kind ≠ .vxm then none
-    else some ((dst, S.const xs) :: vars, sl)
-  | .sel dst m a b =>
+    else some (bindAll vars dst (S.const ty xs), sl)
+  | .sel dst ty m a b =>
     if kind ≠ .vxm then none
     else
-      match vars.lookup m, vars.lookup a, vars.lookup b with
-      | some vm, some va, some vb => some ((dst, S.sel vm va vb) :: vars, sl)
+      match lookupValue vars ty m, lookupValue vars ty a, lookupValue vars ty b with
+      | some vm, some va, some vb => some (bindAll vars dst (S.sel ty vm va vb), sl)
       | _, _, _ => none
-  | .seed src =>
+  | .install j srcs =>
     if kind ≠ .mxm then none
+    else if sl.weights.length < j + srcs.length then none
+    else
+      match lookupAll vars srcs with
+      | some vs => some (vars, { sl with weights := putAt sl.weights j vs })
+      | none => none
+  | .product dst n src =>
+    if kind ≠ .mxm then none
+    else if sl.weights.length < n then none
     else
       match vars.lookup src with
-      | some v => some (vars, { sl with acc := v })
+      | some x => some (bindAll vars dst (S.matvec (sl.weights.take n) x), sl)
       | none => none
-  | .install j src =>
-    if kind ≠ .mxm then none
-    else if sl.weights.length ≤ j then none
-    else
-      match vars.lookup src with
-      | some v => some (vars, { sl with weights := sl.weights.set j v })
-      | none => none
-  | .macw j =>
-    if kind ≠ .mxm then none
-    else
-      match sl.x, sl.weights[j]? with
-      | some x, some w => some (vars, { sl with acc := S.mac j sl.acc x w })
-      | _, _ => none
   | .pin _ i => i.exec S kind vars sl
 
 /-- Carry out one instruction at the slice at position `p`. -/

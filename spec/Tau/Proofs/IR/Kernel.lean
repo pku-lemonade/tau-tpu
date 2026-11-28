@@ -1,4 +1,5 @@
 import Tau.IR.Kernel
+import Tau.Proofs.Isa.Event
 
 /-!
 # A kernel does not look at its values
@@ -14,13 +15,13 @@ namespace Tau
 
 variable {V W : Type}
 
-/-- Apply `f` to every value in an environment. -/
+/-- Apply `f` to every word in an environment. -/
 def Env.map (f : V → W) (env : Env V) : Env W where
-  vars := env.vars.map (Prod.map id f)
+  vars := env.vars.map (Prod.map id (List.map f))
   bufs := env.bufs.map (List.map f)
   events := env.events.map (Event.map f)
 
-theorem lookup_map (f : V → W) (v : Var) (l : List (Var × V)) :
+theorem lookup_map {α β : Type} (f : α → β) (v : Var) (l : List (Var × α)) :
     (l.map (Prod.map id f)).lookup v = (l.lookup v).map f := by
   induction l with
   | nil => rfl
@@ -31,112 +32,106 @@ theorem lookup_map (f : V → W) (v : Var) (l : List (Var × V)) :
     · rfl
     · exact ih
 
-theorem Env.bind_map (f : V → W) (env : Env V) (v : Var) (x : V) :
-    (env.map f).bind v (f x) = (env.bind v x).map f := rfl
+theorem Env.bind_map (f : V → W) (env : Env V) (v : Var) (x : List V) :
+    (env.map f).bind v (x.map f) = (env.bind v x).map f := rfl
+
+theorem Env.get_map (f : V → W) (env : Env V) (ty : DType) (v : Var) :
+    (env.map f).get ty v = (env.get ty v).map (List.map f) := by
+  unfold Env.get
+  have hv : (env.map f).vars = env.vars.map (Prod.map id (List.map f)) := rfl
+  rw [hv, lookup_map]
+  cases env.vars.lookup v with
+  | none => rfl
+  | some x =>
+    simp only [Option.map_some, List.length_map]
+    split <;> rfl
+
+theorem Env.word_map (f : V → W) (env : Env V) (v : Var) :
+    (env.map f).word v = (env.word v).map f := by
+  unfold Env.word
+  have hv : (env.map f).vars = env.vars.map (Prod.map id (List.map f)) := rfl
+  rw [hv, lookup_map]
+  cases env.vars.lookup v with
+  | none => rfl
+  | some x =>
+    cases x with
+    | nil => rfl
+    | cons w rest => cases rest <;> rfl
+
+theorem eventsOf_map (f : V → W) (t : Nat) (store : Option (Nat × Nat)) (x : List V) :
+    eventsOf t store (x.map f) = (eventsOf t store x).map (Event.map f) := by
+  simp only [eventsOf, List.length_map, List.zipWith_map_right, List.map_zipWith]
+  rfl
 
 theorem Env.issue_map (f : V → W) (env : Env V) (t : Nat) (target : Var × Option (Nat × Nat)) :
     (env.map f).issue t target = (env.issue t target).map f := by
   unfold Env.issue
-  have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
+  have hv : (env.map f).vars = env.vars.map (Prod.map id (List.map f)) := rfl
   rw [hv, lookup_map]
-  cases env.vars.lookup target.1 <;> rfl
-
-theorem bufGet_map (f : V → W) (bufs : List (List V)) (b k : Nat) :
-    ((bufs.map (List.map f))[b]?.getD [])[k]? = ((bufs[b]?.getD [])[k]?).map f := by
-  simp only [List.getElem?_map]
-  cases bufs[b]? with
+  cases env.vars.lookup target.1 with
   | none => rfl
-  | some l => simp
+  | some x => simp [Env.map, eventsOf_map]
 
-theorem matvecFrom_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (x : V)
-    (cols : Nat → Option V) (init : V) (n : Nat) :
-    matvecFrom T (f x) (fun j => (cols j).map f) (f init) n =
-      (matvecFrom S x cols init n).map f := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    simp only [matvecFrom, ih]
-    cases matvecFrom S x cols init n <;> cases cols n <;> simp [h.mac]
+theorem bufGet_map (f : V → W) (bufs : List (List V)) (b : Nat) :
+    (bufs.map (List.map f))[b]?.getD [] = (bufs[b]?.getD []).map f := by
+  rw [List.getElem?_map]
+  cases bufs[b]? <;> rfl
 
 theorem Stmt.exec_map (S : Sem V) (T : Sem W) (f : V → W) (h : S.Hom T f) (i : Nat)
     (env : Env V) (s : Stmt) :
     s.exec T i (env.map f) = (s.exec S i env).map (Env.map f) := by
-  -- One case per statement. Rewrite the fields of the mapped environment as
-  -- maps (`hb`, `hv`), move the map out of each lookup, and split on what
-  -- the lookups found. A pinned statement is the statement inside it, then
-  -- `Env.issue_map`.
+  -- One case per statement. Rewrite the buffers of the mapped environment
+  -- as a map (`hb`), move the map out of each lookup (`Env.get_map`,
+  -- `wordsAt_map`), and split on what the lookups found. Where a value is
+  -- computed, `h` says `f` commutes with the operation. A pinned statement
+  -- is the statement inside it, then `Env.issue_map`.
+  have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
   induction s generalizing env with
   | pin t s ih =>
-    simp only [Stmt.exec, ih]
+    simp only [Stmt.exec, ih env rfl]
     cases s.exec S i env with
     | none => rfl
     | some env' => simp only [Option.map_some, Env.issue_map]
-  | load dst buf ix =>
-    simp only [Stmt.exec]
-    have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
-    rw [hb, bufGet_map]
-    cases (env.bufs[buf]?.getD [])[ix.eval i]? <;> rfl
-  | store src buf ix =>
-    simp only [Stmt.exec]
-    have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hb, hv, lookup_map, List.getElem?_map]
-    cases env.vars.lookup src <;> cases env.bufs[buf]? <;>
-      simp [Env.map, List.map_set]
-  | un dst op a =>
-    simp only [Stmt.exec]
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hv, lookup_map]
-    cases env.vars.lookup a with
+  | load dst ty buf ix =>
+    simp only [Stmt.exec, hb, bufGet_map, wordsAt_map]
+    cases wordsAt (env.bufs[buf]?.getD []) (ty.bytes * ix.eval i) ty.bytes <;> rfl
+  | store src ty buf ix =>
+    simp only [Stmt.exec, Env.get_map, hb, List.getElem?_map]
+    cases env.get ty src <;> cases env.bufs[buf]? <;>
+      simp [Env.map, List.map_set, putAt_map]
+  | un dst ty op a =>
+    simp only [Stmt.exec, Env.get_map]
+    cases env.get ty a with
     | none => rfl
-    | some v => simp only [Option.map_some, ← h.un]; rfl
-  | bin dst op a b =>
-    simp only [Stmt.exec]
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hv, lookup_map, lookup_map]
-    cases env.vars.lookup a with
+    | some x => simp only [Option.map_some, ← h.un]; rfl
+  | bin dst ty op a b =>
+    simp only [Stmt.exec, Env.get_map]
+    cases env.get ty a with
     | none => rfl
-    | some va =>
-      cases env.vars.lookup b with
+    | some x =>
+      cases env.get ty b with
       | none => rfl
-      | some vb => simp only [Option.map_some, ← h.bin]; rfl
+      | some y => simp only [Option.map_some, ← h.bin]; rfl
   | matvec dst x buf ix n =>
-    simp only [Stmt.exec]
-    have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hb, hv, lookup_map]
-    cases env.vars.lookup x with
+    simp only [Stmt.exec, Env.word_map, hb, bufGet_map, wordsAt_map]
+    cases env.word x with
     | none => rfl
-    | some xv =>
-      simp only [Option.map_some, bufGet_map, ← h.zero, matvecFrom_map S T f h]
-      cases matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) S.zero n <;> rfl
-  | affine dst x bias buf ix n =>
-    simp only [Stmt.exec]
-    have hb : (env.map f).bufs = env.bufs.map (List.map f) := rfl
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hb, hv, lookup_map, lookup_map]
-    cases env.vars.lookup x with
-    | none => rfl
-    | some xv =>
-      cases env.vars.lookup bias with
+    | some w =>
+      cases wordsAt (env.bufs[buf]?.getD []) (ix.eval i) n with
       | none => rfl
-      | some bv =>
-        simp only [Option.map_some, bufGet_map, matvecFrom_map S T f h]
-        cases matvecFrom S xv (fun j => (env.bufs[buf]?.getD [])[ix.eval i + j]?) bv n <;> rfl
-  | const dst xs =>
+      | some rows => simp only [Option.map_some, ← h.matvec]; rfl
+  | const dst ty xs =>
     simp only [Stmt.exec, Option.map_some, ← h.const]
     rfl
-  | sel dst m a b =>
-    simp only [Stmt.exec]
-    have hv : (env.map f).vars = env.vars.map (Prod.map id f) := rfl
-    rw [hv, lookup_map, lookup_map, lookup_map]
-    cases env.vars.lookup m with
+  | sel dst ty m a b =>
+    simp only [Stmt.exec, Env.get_map]
+    cases env.get ty m with
     | none => rfl
     | some vm =>
-      cases env.vars.lookup a with
+      cases env.get ty a with
       | none => rfl
       | some va =>
-        cases env.vars.lookup b with
+        cases env.get ty b with
         | none => rfl
         | some vb => simp only [Option.map_some, ← h.sel]; rfl
 

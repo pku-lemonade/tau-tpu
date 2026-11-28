@@ -88,32 +88,37 @@ def SystolicArrayComputesMatVec : Prop :=
 /-! ## The machine -/
 
 /-- **The timing rule, going east.** In a run that does not trap, if the slice
-at `p` computes `v` with the instruction `ins` on cycle `t` for the stream `id`
-going east, and no slice on the way places a word of its own on that stream
-just as `v` arrives, then on cycle `t + delay + 1 + k`, where `delay` is the
-delay of `ins`, the stream holds `v` at position `p + k`. (`arrives_east`) -/
+at `p` computes a value with the instruction `ins` on cycle `t` for the
+streams going east from `id` on, `v` is word `j` of the value, and no slice
+on the way places a word of its own on stream `id + j` just as `v` arrives,
+then on cycle `t + delay + 1 + k`, where `delay` is the delay of `ins`, that
+stream holds `v` at position `p + k`. (`arrives_east`) -/
 def TimingRuleEast : Prop :=
   ∀ (V : Type) (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat),
     IsRun S cfg prog st n → (st 0).Shaped cfg →
-    ∀ (p t id : Nat) (kind : Kind) (ins : Instr) (v : V), cfg.kindAt p = some kind →
-    prog.dueAt p (st t).time = [ins] →
-    (st t).result S cfg prog p = some (⟨.east, id⟩, v) →
+    ∀ (p t id j : Nat) (kind : Kind) (ins : Instr) (vs : List V) (v : V),
+    cfg.kindAt p = some kind →
+    prog.computes p (st t).time = some ins →
+    (st t).result S cfg prog p = some (⟨.east, id⟩, vs) → vs[j]? = some v →
+    id + j < cfg.streams →
     ∀ (k : Nat), p + k < cfg.kinds.length → t + cfg.delayOf kind ins + 1 + k ≤ n →
-    (∀ i, 1 ≤ i → i ≤ k → ∀ w,
-      (st (t + cfg.delayOf kind ins + i)).out S cfg prog (p + i) ≠ some (⟨.east, id⟩, w)) →
-    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p + k) ⟨.east, id⟩ = some v
+    (∀ i, 1 ≤ i → i ≤ k →
+      (st (t + cfg.delayOf kind ins + i)).placed S cfg prog (p + i) ⟨.east, id + j⟩ = none) →
+    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p + k) ⟨.east, id + j⟩ = some v
 
 /-- **The timing rule, going west.** The mirror image. (`arrives_west`) -/
 def TimingRuleWest : Prop :=
   ∀ (V : Type) (S : Sem V) (cfg : Config) (prog : Program) (st : Nat → State V) (n : Nat),
     IsRun S cfg prog st n → (st 0).Shaped cfg →
-    ∀ (p t id : Nat) (kind : Kind) (ins : Instr) (v : V), cfg.kindAt p = some kind →
-    prog.dueAt p (st t).time = [ins] →
-    (st t).result S cfg prog p = some (⟨.west, id⟩, v) →
+    ∀ (p t id j : Nat) (kind : Kind) (ins : Instr) (vs : List V) (v : V),
+    cfg.kindAt p = some kind →
+    prog.computes p (st t).time = some ins →
+    (st t).result S cfg prog p = some (⟨.west, id⟩, vs) → vs[j]? = some v →
+    id + j < cfg.streams →
     ∀ (k : Nat), k ≤ p → t + cfg.delayOf kind ins + 1 + k ≤ n →
-    (∀ i, 1 ≤ i → i ≤ k → ∀ w,
-      (st (t + cfg.delayOf kind ins + i)).out S cfg prog (p - i) ≠ some (⟨.west, id⟩, w)) →
-    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p - k) ⟨.west, id⟩ = some v
+    (∀ i, 1 ≤ i → i ≤ k →
+      (st (t + cfg.delayOf kind ins + i)).placed S cfg prog (p - i) ⟨.west, id + j⟩ = none) →
+    (st (t + cfg.delayOf kind ins + 1 + k)).sample (p - k) ⟨.west, id + j⟩ = some v
 
 /-- **The machine does not look at its values.** Running a program and then
 applying a function that respects the operations gives what applying the

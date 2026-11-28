@@ -43,16 +43,6 @@ namespace Tau
 
 variable {V W : Type}
 
-/-- Evaluating expressions respects the operations. -/
-theorem denote_hom (S : Sem V) (bufs : List (List V)) (fill : V) :
-    exprSem.Hom S (Expr.denote S bufs fill) where
-  un _ _ := rfl
-  bin _ _ _ := rfl
-  zero := rfl
-  mac _ _ _ _ := rfl
-  const _ := rfl
-  sel _ _ _ := rfl
-
 /-- A list is the list of its own elements. -/
 theorem range_map_getD {α : Type} (l : List α) (d : α) :
     (List.range l.length).map (fun k => l[k]?.getD d) = l := by
@@ -61,6 +51,91 @@ theorem range_map_getD {α : Type} (l : List α) (d : α) :
   · intro i h1 h2
     simp at h1
     simp [h1]
+
+/-- The words a list of expressions stands for. -/
+theorem Exprs.denote_ofList (S : Sem V) (bufs : List (List V)) (fill : V) (es : List Expr) :
+    (Exprs.ofList es).denote S bufs fill = es.map (Expr.denote S bufs fill) := by
+  induction es with
+  | nil => simp [Exprs.ofList, Exprs.denote]
+  | cons e rest ih => simp [Exprs.ofList, Exprs.denote, ih]
+
+theorem Expr.eq_of_isWord (e : Expr) (k : Nat) (v : VExpr) (h : e.isWord k v = true) :
+    e = .word k v := by
+  cases e with
+  | word k' v' =>
+    simp only [Expr.isWord, withPtrEq, Bool.and_eq_true, beq_iff_eq] at h
+    rw [h.1, h.2]
+  | _ => simp [Expr.isWord] at h
+
+/-- Expressions that are the words `k`, `k + 1`, ... of a value stand for
+those words of it. -/
+theorem VExpr.denote_hasWords (S : Sem V) (bufs : List (List V)) (fill : V) (v : VExpr)
+    (k : Nat) (es : List Expr) (h : v.hasWords k es = true) :
+    es.map (Expr.denote S bufs fill) =
+      (List.range' k es.length).map fun j => (v.denote S bufs fill)[j]?.getD S.zero := by
+  induction es generalizing k with
+  | nil => rfl
+  | cons e rest ih =>
+    simp only [VExpr.hasWords, Bool.and_eq_true] at h
+    rw [Expr.eq_of_isWord e k v h.1]
+    simp only [List.map_cons, List.length_cons, List.range'_succ, Expr.denote, ih (k + 1) h.2]
+
+/-- The value with the words `es` stands for the words that `es` stand for. -/
+theorem VExpr.denote_ofWords (S : Sem V) (hS : S.Sized) (bufs : List (List V)) (fill : V)
+    (es : List Expr) :
+    (VExpr.ofWords es).denote S bufs fill = es.map (Expr.denote S bufs fill) := by
+  -- Either the words are kept as they are, or they are all the words of one
+  -- value `v`, in order, and `v` has as many words as there are.
+  unfold VExpr.ofWords
+  split
+  · rename_i v rest
+    split
+    · rename_i h
+      have hlen := VExpr.length_denote S hS bufs fill v
+      rw [h.1] at hlen
+      have hrest := VExpr.denote_hasWords S bufs fill v 1 rest h.2
+      have hall : (Expr.word 0 v :: rest).map (Expr.denote S bufs fill) =
+          (List.range (rest.length + 1)).map fun j =>
+            (v.denote S bufs fill)[j]?.getD S.zero := by
+        rw [List.range_eq_range', List.range'_succ, List.map_cons, List.map_cons, hrest]
+        rfl
+      rw [hall, ← hlen]
+      exact (range_map_getD _ _).symm
+    · simp only [VExpr.denote, Exprs.denote_ofList]
+  · simp only [VExpr.denote, Exprs.denote_ofList]
+
+/-- The first `n` words of a value of `n` words are the value. -/
+theorem VExpr.denote_toWords (S : Sem V) (bufs : List (List V)) (fill : V) (v : VExpr)
+    (n : Nat) (h : (v.denote S bufs fill).length = n) :
+    (v.toWords n).map (Expr.denote S bufs fill) = v.denote S bufs fill := by
+  subst h
+  simp only [VExpr.toWords, List.map_map, Function.comp_def, Expr.denote]
+  exact range_map_getD _ _
+
+/-- Evaluating expressions respects the operations. -/
+theorem denote_hom (S : Sem V) (hS : S.Sized) (bufs : List (List V)) (fill : V) :
+    exprSem.Hom S (Expr.denote S bufs fill) where
+  un ty op a := by
+    simp only [exprSem]
+    rw [VExpr.denote_toWords S bufs fill _ _ (by simp [VExpr.denote, hS.un])]
+    simp only [VExpr.denote, VExpr.denote_ofWords S hS]
+  bin ty op a b := by
+    simp only [exprSem]
+    rw [VExpr.denote_toWords S bufs fill _ _ (by simp [VExpr.denote, hS.bin])]
+    simp only [VExpr.denote, VExpr.denote_ofWords S hS]
+  zero := rfl
+  matvec rows x := by
+    simp only [exprSem]
+    rw [VExpr.denote_toWords S bufs fill _ _ (by simp [VExpr.denote, hS.matvec])]
+    simp only [VExpr.denote, Exprs.denote_ofList]
+  const ty xs := by
+    simp only [exprSem]
+    rw [VExpr.denote_toWords S bufs fill _ _ (by simp [VExpr.denote, hS.const])]
+    simp only [VExpr.denote]
+  sel ty m a b := by
+    simp only [exprSem]
+    rw [VExpr.denote_toWords S bufs fill _ _ (by simp [VExpr.denote, hS.sel])]
+    simp only [VExpr.denote, VExpr.denote_ofWords S hS]
 
 /-- Evaluating the symbolic buffers gives back the real buffers. -/
 theorem symBufs_denote (S : Sem V) (bufs : List (List V)) (fill : V) :
@@ -89,11 +164,11 @@ theorem symBufs_denote (S : Sem V) (bufs : List (List V)) (fill : V) :
 
 /-- If a kernel run on expressions ends with `e`, then run on real buffers it
 ends with `e` evaluated. -/
-theorem Kernel.run_of_exprs (S : Sem V) (k : Kernel) (bufs : List (List V)) (fill : V)
+theorem Kernel.run_of_exprs (S : Sem V) (hZ : S.Sized) (k : Kernel) (bufs : List (List V)) (fill : V)
     (e : List (List Expr)) (h : kernelExprs k (bufs.map List.length) = some e) :
     k.run S bufs = some (e.map (List.map (Expr.denote S bufs fill))) := by
   have hb := symBufs_denote S bufs fill
-  have hrun := Kernel.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) k
+  have hrun := Kernel.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S hZ bufs fill) k
     (symBufs (bufs.map List.length))
   unfold kernelExprs at h
   rw [hb, h] at hrun
@@ -167,11 +242,11 @@ theorem covers_denote (S : Sem V) (hS : S.Lawful) (bufs : List (List V)) (fill :
 
 /-- If a source program run on expressions ends with `e`, then run on real
 buffers it ends with `e` evaluated. -/
-theorem Source.run_of_exprs (S : Sem V) (s : Source) (bufs : List (List V)) (fill : V)
+theorem Source.run_of_exprs (S : Sem V) (hZ : S.Sized) (s : Source) (bufs : List (List V)) (fill : V)
     (e : List (List Expr)) (h : sourceExprs s (bufs.map List.length) = some e) :
     s.run S bufs = some (e.map (List.map (Expr.denote S bufs fill))) := by
   have hb := symBufs_denote S bufs fill
-  have hrun := Source.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) s
+  have hrun := Source.run_map exprSem S (Expr.denote S bufs fill) (denote_hom S hZ bufs fill) s
     (symBufs (bufs.map List.length))
   unfold sourceExprs at h
   rw [hb, h] at hrun
@@ -179,22 +254,22 @@ theorem Source.run_of_exprs (S : Sem V) (s : Source) (bufs : List (List V)) (fil
 
 /-- The timeline of a source program on real buffers is its timeline on
 expressions, evaluated. -/
-theorem Source.timeline_of_events (S : Sem V) (s : Source) (bufs : List (List V)) (fill : V) :
+theorem Source.timeline_of_events (S : Sem V) (hZ : S.Sized) (s : Source) (bufs : List (List V)) (fill : V) :
     s.timeline S bufs =
       (sourceEvents s (bufs.map List.length)).map (Event.map (Expr.denote S bufs fill)) := by
   have hb := symBufs_denote S bufs fill
-  have ht := Source.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) s
+  have ht := Source.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S hZ bufs fill) s
     (symBufs (bufs.map List.length))
   rw [hb] at ht
   exact ht
 
 /-- The timeline of a kernel on real buffers is its timeline on expressions,
 evaluated. -/
-theorem Kernel.timeline_of_events (S : Sem V) (k : Kernel) (bufs : List (List V)) (fill : V) :
+theorem Kernel.timeline_of_events (S : Sem V) (hZ : S.Sized) (k : Kernel) (bufs : List (List V)) (fill : V) :
     k.timeline S bufs =
       (kernelEvents k (bufs.map List.length)).map (Event.map (Expr.denote S bufs fill)) := by
   have hb := symBufs_denote S bufs fill
-  have ht := Kernel.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S bufs fill) k
+  have ht := Kernel.timeline_map exprSem S (Expr.denote S bufs fill) (denote_hom S hZ bufs fill) k
     (symBufs (bufs.map List.length))
   rw [hb] at ht
   exact ht
@@ -210,16 +285,16 @@ theorem image_denote (S : Sem V) (map : MemMap) (memSizes : List Nat) (bufs : Li
 
 /-- The timeline of the machine on real buffers is its timeline on
 expressions, evaluated. -/
-theorem timeline_of_events (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill : V) :
+theorem timeline_of_events (S : Sem V) (hZ : S.Sized) (c : Compiled) (bufs : List (List V)) (fill : V) :
     c.timeline S bufs fill =
       (machineEvents c).map (Event.map (Expr.denote S bufs fill)) := by
   unfold Compiled.timeline machineEvents Compiled.image
-  rw [image_denote S, Compiled.timelineFrom_map exprSem S _ (denote_hom S bufs fill)]
+  rw [image_denote S, Compiled.timelineFrom_map exprSem S _ (denote_hom S hZ bufs fill)]
 
 /-- If the machine run on expressions ends with the table `m`, then run on
 real buffers it does not trap, and the buffers it ends with are `m`
 evaluated. -/
-theorem execute_of_exprs (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill : V)
+theorem execute_of_exprs (S : Sem V) (hZ : S.Sized) (c : Compiled) (bufs : List (List V)) (fill : V)
     (m : List (List Expr)) (h : machineExprs c = some m) :
     ∃ mem,
       execute S c.cfg c.prog c.cycles (c.image bufs fill) = .ok mem ∧
@@ -230,7 +305,7 @@ theorem execute_of_exprs (S : Sem V) (c : Compiled) (bufs : List (List V)) (fill
   -- so the real run is the symbolic run with f applied (`execute_map`).
   -- Reading the buffers back commutes with f (`extract_map`).
   let f := Expr.denote S bufs fill
-  have hf : exprSem.Hom S f := denote_hom S bufs fill
+  have hf : exprSem.Hom S f := denote_hom S hZ bufs fill
   unfold machineExprs at h
   cases hx : execute exprSem c.cfg c.prog c.cycles (image c.map c.memSizes Expr.init .fill) with
   | error e => simp [hx] at h
@@ -266,8 +341,8 @@ theorem check_sound (S : Sem V) (hS : S.Lawful) (s : Source) (c : Compiled)
   unfold check at h
   simp only [Bool.and_eq_true] at h
   obtain ⟨a, b, hk, hm, hab⟩ := agree_exprs h.2
-  obtain ⟨mem, hrun, hx⟩ := execute_of_exprs S c bufs fill b hm
-  refine ⟨mem, _, hrun, Source.run_of_exprs S s bufs fill a hk, ?_⟩
+  obtain ⟨mem, hrun, hx⟩ := execute_of_exprs S hS.sized c bufs fill b hm
+  refine ⟨mem, _, hrun, Source.run_of_exprs S hS.sized s bufs fill a hk, ?_⟩
   rw [hx]
   exact (denote_of_sameExprs S hS bufs fill a b hab).symm
 
@@ -283,7 +358,7 @@ theorem check_pins (S : Sem V) (hS : S.Lawful) (s : Source) (c : Compiled)
   -- first inside the second, and that survives evaluating (`covers_denote`).
   unfold check at h
   simp only [Bool.and_eq_true] at h
-  rw [Source.timeline_of_events S s bufs fill, timeline_of_events S c bufs fill]
+  rw [Source.timeline_of_events S hS.sized s bufs fill, timeline_of_events S hS.sized c bufs fill]
   exact covers_denote S hS bufs fill _ _ (agree_events h.2)
 
 /-- **Safety.** A program the checker accepts never traps. -/

@@ -16,7 +16,7 @@ and says whether the two differ only in what the pass is there to decide.
 
 | Pass | Rule | Its output |
 |---|---|---|
-| `tau-place` | `placeOnly` | has one instruction for each operation of the kernel, one write for each store, and no scratch space |
+| `tau-place` | `placeOnly` | has one instruction for each operation of the kernel, one write for each word of each store, and no scratch space |
 | `tau-schedule` | `scheduleOnly` | has the memory map of its input, every operation and every write to a buffer of its input, each on the same slice, and nothing else but reads of buffer words its input reads and writes and reads of scratch words |
 | `tau-route` | `routeOnly` | is its input with other numbers for the streams |
 
@@ -42,63 +42,47 @@ inductive Shape where
   | read (addr : Nat)
   /-- Memory: write the word at `addr`. -/
   | write (addr : Nat)
-  /-- A one-word operation. -/
-  | un (op : UnOp)
-  /-- A two-word operation. -/
-  | bin (op : BinOp)
-  /-- Matrix: keep a vector operand. -/
-  | load
-  /-- Matrix: multiply by a word from a stream and accumulate. -/
-  | mac (j : Nat)
-  /-- Matrix: give the accumulator. -/
-  | emit
-  /-- A constant word. -/
-  | const (xs : List Int)
-  /-- A select. -/
-  | sel
-  /-- Matrix: replace the accumulator. -/
-  | seed
-  /-- Matrix: keep stored column `j`. -/
-  | install (j : Nat)
-  /-- Matrix: multiply by stored column `j` and accumulate. -/
-  | macw (j : Nat)
+  /-- A one-value operation of type `ty`. -/
+  | un (ty : DType) (op : UnOp)
+  /-- A two-value operation of type `ty`. -/
+  | bin (ty : DType) (op : BinOp)
+  /-- A constant of type `ty`. -/
+  | const (ty : DType) (xs : List Int)
+  /-- A select of type `ty`. -/
+  | sel (ty : DType)
+  /-- Matrix: keep `g` installed words, from word `j` on. -/
+  | install (j g : Nat)
+  /-- Matrix: the product of the first `n` installed words with a word. -/
+  | product (n : Nat)
   deriving DecidableEq, Repr
 
 /-- The shape of a placed instruction. A pin is not part of it. -/
 def PInstr.shape : PInstr → Shape
   | .read _ addr => .read addr
   | .write _ addr => .write addr
-  | .un _ op _ => .un op
-  | .bin _ op _ _ => .bin op
-  | .load _ => .load
-  | .mac j _ => .mac j
-  | .emit _ => .emit
-  | .const _ xs => .const xs
-  | .sel _ _ _ _ => .sel
-  | .seed _ => .seed
-  | .install j _ => .install j
-  | .macw j => .macw j
+  | .un _ ty op _ => .un ty op
+  | .bin _ ty op _ _ => .bin ty op
+  | .const _ ty xs => .const ty xs
+  | .sel _ ty _ _ _ => .sel ty
+  | .install j srcs => .install j srcs.length
+  | .product _ n _ => .product n
   | .pin _ i => i.shape
 
 /-- The shape of an instruction of the machine. -/
 def Instr.shape : Instr → Shape
   | .read addr _ => .read addr
   | .write _ addr => .write addr
-  | .un op _ _ => .un op
-  | .bin op _ _ _ => .bin op
-  | .load _ => .load
-  | .mac j _ => .mac j
-  | .emit _ => .emit
-  | .const xs _ => .const xs
-  | .sel _ _ _ _ => .sel
-  | .seed _ => .seed
-  | .install j _ => .install j
-  | .macw j => .macw j
+  | .un ty op _ _ => .un ty op
+  | .bin ty op _ _ _ => .bin ty op
+  | .const ty xs _ => .const ty xs
+  | .sel ty _ _ _ _ => .sel ty
+  | .install j g _ => .install j g
+  | .product n _ _ => .product n
 
 /-- Whether an instruction of this shape is an operation of a kernel: it
-computes a new word. A matrix product counts once, by its `emit`. -/
+computes a new word. -/
 def Shape.isOperation : Shape → Bool
-  | .un _ | .bin _ | .const _ | .sel | .emit => true
+  | .un .. | .bin .. | .const .. | .sel _ | .product _ => true
   | _ => false
 
 /-- Whether address `a` of the slice at `p` is a word of a buffer. -/
@@ -110,22 +94,23 @@ def MemMap.holds (map : MemMap) (p a : Nat) : Bool :=
 /-- The shape of the one instruction that issues the word of a kernel's
 operation. `none` for a load and a store, which are not operations. -/
 def Stmt.operation : Stmt → Option Shape
-  | .un _ op _ => some (.un op)
-  | .bin _ op _ _ => some (.bin op)
-  | .matvec .. => some .emit
-  | .affine .. => some .emit
-  | .const _ xs => some (.const xs)
-  | .sel .. => some .sel
+  | .un _ ty op _ => some (.un ty op)
+  | .bin _ ty op _ _ => some (.bin ty op)
+  | .matvec _ _ _ _ n => some (.product n)
+  | .const _ ty xs => some (.const ty xs)
+  | .sel _ ty .. => some (.sel ty)
   | .pin _ s => s.operation
   | _ => none
 
-/-- The slice and address a kernel's store writes, by the memory map, on
-iteration `i`. `none` for any other statement, and for a buffer the map does
-not have. -/
-def Stmt.stored (map : MemMap) (i : Nat) : Stmt → Option (Nat × Nat)
-  | .store _ buf ix => map[buf]?.map fun pl => (pl.slice, pl.base + ix.eval i)
+/-- The slice and address of every word a kernel's store writes, by the memory
+map, on iteration `i`. None for any other statement, and for a buffer the map
+does not have. -/
+def Stmt.stored (map : MemMap) (i : Nat) : Stmt → List (Nat × Nat)
+  | .store _ ty buf ix =>
+    (List.range ty.bytes).filterMap fun k =>
+      map[buf]?.bind fun pl => pl.locate (ty.bytes * ix.eval i + k)
   | .pin _ s => s.stored map i
-  | _ => none
+  | _ => []
 
 /-- Every word of every memory is a word of a buffer: the placed program has
 no scratch space, so no word waits. -/
@@ -139,14 +124,14 @@ def sameOperations (k : Kernel) (pl : Placed) : Bool :=
   ((pl.instrs.map (·.2.shape)).filter Shape.isOperation).isPerm
     (k.unroll.filterMap Stmt.operation)
 
-/-- The placed program has one write for each store of the kernel, to the
-word the map gives it, and no other write. -/
+/-- The placed program has one write for each word that a store of the kernel
+stores, to the word the map gives it, and no other write. -/
 def sameStores (k : Kernel) (pl : Placed) : Bool :=
   (pl.instrs.filterMap fun (p, i) =>
       match i.shape with
       | .write a => some (p, a)
       | _ => none).isPerm
-    (k.unroll.filterMap (Stmt.stored pl.map 0))
+    (k.unroll.flatMap (Stmt.stored pl.map 0))
 
 /-- `tau-place`: whether the placed program `pl` differs from the kernel `k`
 only in what the pass decides, the memory map and the slice of each
@@ -160,9 +145,9 @@ def placeOnly (k : Kernel) (pl : Placed) : Bool :=
 `tau-schedule` writes its output for a machine with a stream for every
 word. -/
 def Config.sameSlices (a b : Config) : Bool :=
-  a.kinds == b.kinds && a.mxmWeights == b.mxmWeights && a.memDelay == b.memDelay &&
-  a.vxmDelay == b.vxmDelay && a.sxmDelay == b.sxmDelay && a.mxmDelay == b.mxmDelay &&
-  a.delays == b.delays
+  a.kinds == b.kinds && a.lanes == b.lanes && a.bankSize == b.bankSize &&
+  a.memDelay == b.memDelay && a.vxmDelay == b.vxmDelay && a.sxmDelay == b.sxmDelay &&
+  a.mxmDelay == b.mxmDelay && a.delays == b.delays
 
 /-- Every instruction an entry issues, with repeats written out. -/
 def TimedEntry.written (e : TimedEntry) : List Instr :=
@@ -209,20 +194,21 @@ def scheduleOnly (pl : Placed) (c : Compiled) : Bool :=
 
 /-! ## `tau-route` decides on which stream -/
 
-/-- The streams an instruction names, in the order it names them. -/
+/-- The `w` streams from `s` on, which carry a value of `w` words. -/
+def Stream.group (s : Stream) (w : Nat) : List Stream := (List.range w).map s.next
+
+/-- The streams an instruction names or takes with the ones it names, in
+order. -/
 def Instr.streams : Instr → List Stream
   | .read _ dst => [dst]
   | .write src _ => [src]
-  | .un _ src dst => [src, dst]
-  | .bin _ a b dst => [a, b, dst]
-  | .load src => [src]
-  | .mac _ src => [src]
-  | .emit dst => [dst]
-  | .const _ dst => [dst]
-  | .sel m a b dst => [m, a, b, dst]
-  | .seed src => [src]
-  | .install _ src => [src]
-  | .macw _ => []
+  | .un ty op src dst => src.group ty.bytes ++ dst.group (op.out ty).bytes
+  | .bin ty _ a b dst => a.group ty.bytes ++ b.group ty.bytes ++ dst.group ty.bytes
+  | .const ty _ dst => dst.group ty.bytes
+  | .sel ty m a b dst =>
+    m.group ty.bytes ++ a.group ty.bytes ++ b.group ty.bytes ++ dst.group ty.bytes
+  | .install _ g src => src.group g
+  | .product _ src dst => src :: dst.group DType.i32.bytes
 
 /-- Whether two entries are the same but for the numbers of their streams:
 the same slice, cycle and repeats, the same shape, and streams going the
