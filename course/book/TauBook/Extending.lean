@@ -51,8 +51,12 @@ Three messages do most of the guiding.
 
 In dependency order. A small feature touches only the first few.
 
-1. `spec/Tau/Isa/Word.lean`: what it does to a lane or a word.
-2. `spec/Tau/Isa/Op.lean`: its name as an operation, and its meaning in `wordSem`.
+1. `spec/Tau/Isa/Word.lean`: what it does to an element or a word.
+   `spec/Tau/Isa/Value.lean` if it handles the words of a value in a way of
+   its own.
+2. `spec/Tau/Isa/Op.lean`: its name as an operation, and its meaning: what it
+   does to one element (`UnOp.elem`, `BinOp.elem`) or, on the rearrangement
+   slice, to one word (`UnOp.move`).
    `spec/Tau/Isa/Encode.lean`: its number in the image, both ways.
 3. `spec/Tau/Isa/Instr.lean` and `spec/Tau/Machine/SliceLevel.lean`: its instruction,
    and what `exec` does with it. `spec/Tau/Machine/Issues.lean` if it issues a
@@ -82,25 +86,30 @@ The repository already contains one feature of each size. Read how each was
 done before doing your own. `git log` and `git show` on the files above show
 the changes.
 
-*An operation.* `neg` negates every lane. It is a constructor of `UnOp`, a
-line in `UnOp.kind`, a line in `wordSem`, and a number in
+*An operation.* `neg` negates every element. It is a constructor of `UnOp`,
+a line in `UnOp.kind`, a line in `UnOp.elem`, and a number in
 `spec/Tau/Isa/Encode.lean`. Nothing else in Lean changed: no instruction, no
 proof. The machine, the kernels and the checker were written for any set of
 operations, so they already handle it. That is what writing against `Sem`
-bought.
+bought. It works at every type for the same reason: `wordSem` puts the bytes
+of an element together, applies `UnOp.elem`, and takes the result apart
+again, whatever the operation. Only an operation whose result has another
+type than its operand, as `requant` and `widen` have, needs a line more, in
+`UnOp.out`.
 
-*An instruction.* `seed` replaces the matrix slice's accumulator by a word
-from a stream. It is a constructor of `Instr`, a case in `exec`, and one new
-case in each of `exec_map`, `PInstr.exec_map` and `cellExec_abs`. At the cell
-level it needed the accumulator block to accept a new command, `AccIn.load`,
-and one small lemma, `macLanes_load`.
+*An instruction.* `product` puts the product of a matrix slice's installed
+words with a word on a stream. It is a constructor of `Instr`, a case in
+`exec`, and one new case in each of `exec_map`, `PInstr.exec_map` and
+`cellExec_abs`. Its meaning is one operation of `Sem`, `matvec`, with one
+law in `Sem.Hom`. At the cell level it is a row of multiply-accumulate cells
+for each element of the product, and one small lemma, `macRow_eq`.
 
-*State.* Stored columns gave the matrix slice a memory of its own: a new
-field in `Slice`, a new field in `Cell`, two instructions (`install`,
-`macw`), and a new line in the abstraction function `Cell.abs`. The compiler
-uses it without any kernel asking: when a matrix is multiplied twice,
-`tau-place` installs it once. The checker accepted that optimization without
-being told about it, because it is the machine run on names.
+*State.* The installed words are a state of the matrix slice: a field in
+`Slice`, a field in `Cell`, an instruction that changes it (`install`), and
+a line in the abstraction function `Cell.abs`. The compiler uses the state
+without any kernel asking: when a matrix is multiplied twice, `tau-place`
+installs it once. The checker accepts that without being told about it,
+because it is the machine run on names.
 
 *A block.* Repeats needed a new block with a real invariant, the repeater,
 and changed the invariant of the refinement proof from "all clocks are
@@ -114,24 +123,24 @@ Do them in order of size. Each has a test for being done.
 
 Pick one.
 
-* `not`: the bitwise complement of every lane.
-* `sar k`: divide every lane by `2 ^ k`, rounding down, with no clamping.
-* `ge`: lane by lane, 1 where the first is at least the second.
+* `not`: the bitwise complement of every element.
+* `sar k`: divide every element by `2 ^ k`, rounding down, with no clamping.
+* `ge`: element by element, 1 where the first is at least the second.
 * `swapHalves`: on the rearrangement slice, exchange the lower and upper
-  half of the lanes.
+  half of the elements.
 
 Steps: `spec/Tau/Isa/Word.lean` if it needs a helper, then `spec/Tau/Isa/Op.lean`,
 then `spec/Tau/Isa/Encode.lean`, where it needs a number that no other operation
 has, in `encode` and in `decode`, then `spec/Tau/Tools/Json.lean`. Add `#guard` lines to `spec/tests/TauTest/Features.lean`
 with inputs for which you worked the answer out by hand, including a
-negative lane.
+negative element, and at a type of more than 8 bits.
 
 You are done when `lake build` succeeds. Notice that you did not
 touch a proof, and say why. For the proof in `spec/Tau/Proofs/Isa/Encode.lean`,
 say what would have happened had you given your operation a number that is
 already taken.
 
-Then state one fact about your operation on a single lane and prove it with
+Then state one fact about your operation on a single element and prove it with
 `bv_decide`, in the style of `spec/Tau/Proofs/Isa/Word.lean`.
 
 With the compiler: add the operation to
@@ -146,10 +155,9 @@ in Lean, say which line of the script's output tells you.
 
 Pick one.
 
-* `clear`: the matrix slice sets its accumulator to zero and outputs
-  nothing.
-* `peek dst`: the matrix slice puts its accumulator on a stream without
-  clearing it.
+* `clear j g`: the matrix slice sets `g` of its installed words to zero,
+  from word `j` on, and outputs nothing.
+* `peek j dst`: the matrix slice puts installed word `j` on a stream.
 * `forward src dst`: the vector slice passes a word from one stream to
   another unchanged. This lets a word turn round.
 
@@ -169,18 +177,22 @@ job with less work. What would be lost?
 
 ## State
 
-* A second accumulator in the matrix slice. `mac` and `emit` take a number,
-  0 or 1, saying which one. Two products can then be in progress at once.
+* An accumulator in the matrix slice. `accumulate n src` adds a product to
+  it and outputs nothing, and `emit dst` puts it on a stream and clears it.
+  A matrix that takes a word longer than the machine's can then be
+  multiplied in parts, and the parts summed.
 * A held operand in the vector slice: `hold src` keeps a word, and a new
-  two-word instruction uses the held word as its second operand. A constant
+  two-value instruction uses the held word as its second operand. A constant
   can then be used many times without being sent many times.
 
 Here the abstraction function changes, and so does `State.init_map` and
 `CellState.init_abs`. Decide first what the cell level builds the new state
-from. For the second accumulator, the answer is a second row of `mac` cells.
+from. For the accumulator, the answer is the block of the chapter "The
+accumulator", one for each lane.
 
-You are done as for an instruction, with a test that would fail if the two
-accumulators, or the held word and the stream, were confused.
+You are done as for an instruction, with a test that would fail if the
+accumulator and the product, or the held word and the stream, were
+confused.
 
 ## Timing
 

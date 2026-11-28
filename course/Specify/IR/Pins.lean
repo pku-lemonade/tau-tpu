@@ -21,10 +21,10 @@ open Tau Specify
 
 variable {V : Type}
 
-/-- The event that the statement `s`, pinned to `t`, makes on loop iteration
-`i`. `env` is the environment after `s` has run: the word of `s` is in it.
-`none` if there is no word to issue. -/
-def eventOf (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : Option (Event V) := todo
+/-- The events that the statement `s`, pinned to `t`, makes on loop iteration
+`i`: one for each word of its value. `env` is the environment after `s` has
+run: the value of `s` is in it. No events if there is no value to issue. -/
+def eventOf (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : List (Event V) := todo
 
 #eval report "pins" (Tables.pin eventOf)
 

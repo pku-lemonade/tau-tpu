@@ -74,8 +74,9 @@ by Abts and others at ISCA 2020 and ISCA 2022.
 Before learning any Lean, see the finished thing work. Do "Setup" in the
 repository's `README.md` first. The example below runs a quantized linear
 layer `relu(requant(W * x + b))` on 2-lane words: with `x = [3, -2]`,
-`b = [10, -20]`, and `W` having columns `[1, 3]` and `[2, 4]`, `W * x + b`
-is `[9, -19]`, and `relu` leaves `[9, 0]`.
+`b = [10, -20]`, and `W` having rows `[1, 2]` and `[3, 4]`, `W * x + b`
+is `[9, -19]`, and `relu` leaves `[9, 0]`. `x`, `W` and the result are
+integers of 8 bits; the product and `b` are integers of 32.
 
 In a terminal in the repository folder:
 
@@ -83,7 +84,7 @@ In a terminal in the repository folder:
 compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --print-mlir
 ```
 
-It prints the program after each of the compiler's eight passes and writes
+It prints the program after each of the compiler's nine passes and writes
 the stage files into `out/`. Compare `out/source.json` and
 `out/compiled.json`: `source.json` lists buffer sizes and operations
 (`load`, `matvec`, `add`, `requant`, `relu`, `store`) with no slices or
@@ -97,16 +98,16 @@ lake exe tau-check out/source.json out/compiled.json
 This prints `ACCEPT`. That one word is backed by a theorem: for every
 possible input, running that program on the machine gives what the program in
 `out/source.json` computes. Now open `out/compiled.json`, find an
-intermediate instruction such as `"op": "bin"` on slice 4, add one to its
-`time` (`16` to `17`), and run the check again. It prints `REJECT` and
-reports a trap: slice 4 read a stream slot that held nothing. (Change the
+intermediate instruction such as `"op": "bin"` on slice 6, add one to its
+`time` (`17` to `18`), and run the check again. It prints `REJECT` and
+reports a trap: slice 6 read a stream slot that held nothing. (Change the
 `time` back afterwards.)
 
 ```
 lake exe tau-sim out/compiled.json examples/nn/linear/buffers.json
 ```
 
-This runs the program and prints the buffers. The last buffer is `[[9, 0]]`,
+This runs the program and prints the buffers. The last buffer holds `[[9, 0]]`,
 matching `relu([9, -19])`. The simulator is not a separate piece of software.
 It is the Lean specification of the machine, compiled.
 

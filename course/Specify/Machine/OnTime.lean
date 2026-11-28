@@ -20,8 +20,9 @@ Three functions are given in `course/Specify/Support/Tables.lean`:
 
 * `Tables.issues c`: every instruction the program issues, as
   `(slice, cycle, instruction)`, with repeats written out;
-* `Tables.operands i`: the streams the instruction `i` reads;
-* `Tables.result i`: the stream `i` places its result on, if any.
+* `Tables.operands i`: the streams the instruction `i` reads, one for each
+  word of each operand;
+* `Tables.results i`: the streams `i` places the words of its result on.
 
 1. Read the sources.
 2. Write the rule in place of `todo`.

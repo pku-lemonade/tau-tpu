@@ -64,7 +64,7 @@ EXERCISES: dict[str, set[str] | None] = {
     "Blocks/Repeater.lean": {"repeater_stateAt", "repeater_outAt"},
     "Blocks/SystolicArray.lean": {"systolicArray_matvec"},
     "IR/Unroll.lean": {"Idx.eval_inst", "Stmt.exec_inst", "Kernel.run_unroll"},
-    "Check/Simplify.lean": ALL,
+    "Check/Simplify.lean": {"denote_simpUn", "denote_simpBin"},
     "Check/Checker.lean": {"check_sound", "check_pins", "check_safe"},
     "Check/Passes.lean": {"checkKernels_sound", "checkKernels_pins", "passes_sound",
                           "passes_pins"},

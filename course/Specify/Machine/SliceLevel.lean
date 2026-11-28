@@ -53,16 +53,17 @@ variable {V : Type}
 /-- Carry out one instruction at one slice of the given kind. `rd tr` is what
 the stream `tr` holds at this slice. The result is a trap, or the new state
 of the slice together with the result of the instruction, if it has one, and
-the stream the result is for.
+the stream the result is for. A result is a value: its words, the first of
+them for the stream named and the others for the streams after it.
 
 Write the cases for `read`, `write`, `un` and `bin`. Leave the others as
 they are. -/
 def exec (S : Sem V) (cfg : Config) (kind : Kind) (rd : Stream → Option V) (sl : Slice V) :
-    Instr → Except TrapKind (Slice V × Option (Stream × V))
+    Instr → Except TrapKind (Slice V × Option (Stream × List V))
   | .read addr dst => todo
   | .write src addr => todo
-  | .un op src dst => todo
-  | .bin op a b dst => todo
+  | .un ty op src dst => todo
+  | .bin ty op a b dst => todo
   | _ => .error .wrongSlice
 
 #eval report "instructions" (Tables.exec exec)

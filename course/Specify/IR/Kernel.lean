@@ -6,7 +6,7 @@ set_option linter.unusedVariables false
 # Specify: what a statement of a kernel does
 
 Source: `compiler/include/tau/Dialect/TauOps.td`, the descriptions of
-`tau.load`, `tau.store`, the one-word operations and the two-word
+`tau.load`, `tau.store`, the one-value operations and the two-value
 operations.
 
 The types are at the top of `spec/Tau/IR/Kernel.lean`: `Idx`, `Stmt`, `Env`. Read
@@ -37,10 +37,10 @@ statement cannot be run.
 Write the cases for `load`, `store`, `un` and `bin`. Leave the others as
 they are. -/
 def execStmt (S : Sem V) (i : Nat) (env : Env V) : Stmt → Option (Env V)
-  | .load dst buf ix => todo
-  | .store src buf ix => todo
-  | .un dst op a => todo
-  | .bin dst op a b => todo
+  | .load dst ty buf ix => todo
+  | .store src ty buf ix => todo
+  | .un dst ty op a => todo
+  | .bin dst ty op a b => todo
   | _ => none
 
 #eval report "statements" (Tables.stmt execStmt)

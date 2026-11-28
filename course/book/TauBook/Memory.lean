@@ -125,8 +125,9 @@ chapter: what it is, and how it stands.
 *Challenge.* A memory with two ports can take two commands per cycle. Define
 it, decide what happens when both ports write the same address on the same
 cycle, and state a read theorem. There is more than one defensible answer for
-the conflict, which makes it a question for the architect. tau-tpu avoids it
-by giving each memory slice one instruction per cycle.
+the conflict, which makes it a question for the architect. tau-tpu avoids it:
+a memory slice is two of these memories, its two banks, and it reads and
+writes on one cycle only in different banks (Machine 3.11).
 
 # Hints
 

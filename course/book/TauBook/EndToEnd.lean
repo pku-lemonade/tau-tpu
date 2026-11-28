@@ -83,7 +83,7 @@ Being exact about the limits of a theorem is part of the skill.
 * It trusts the statement. `Source.run`, `Source.timeline`, `cellExecute`,
   `extract` and `Compiled.image` are definitions somebody wrote. Read them and decide
   whether they mean what the sentence above claims.
-* It trusts the operations. `Lane.requant` is whatever
+* It trusts the operations. `Elem.requant` is whatever
   `spec/Tau/Isa/Word.lean` says it is. Nothing checks that against an intention.
 * It says nothing about how a pass did its work. A check asks whether the
   output computes what the input computes. No Lean statement says what a

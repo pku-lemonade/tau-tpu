@@ -191,18 +191,29 @@ inductive Outcome where
   /-- The slice trapped. -/
   | trap (kind : TrapKind)
   /-- The stored words afterwards, and the result. -/
-  | done (words : List Expr) (result : Option (Stream × Expr))
+  | done (words : List Expr) (result : Option (Stream × List Expr))
   deriving DecidableEq, Repr
+
+/-- The one word of a one-value operation of 8 bits applied to the word `a`,
+as a name. -/
+def un8 (op : UnOp) (a : Expr) : Expr := .word 0 (.un .i8 op (.ofWords [a]))
+
+/-- The one word of a two-value operation of 8 bits applied to the words `a`
+and `b`, as a name. -/
+def bin8 (op : BinOp) (a b : Expr) : Expr :=
+  .word 0 (.bin .i8 op (.ofWords [a]) (.ofWords [b]))
 
 /-- The type of `exec` when words are names. -/
 abbrev ExecFn :=
   Sem Expr → Config → Kind → (Stream → Option Expr) → Slice Expr → Instr →
-    Except TrapKind (Slice Expr × Option (Stream × Expr))
+    Except TrapKind (Slice Expr × Option (Stream × List Expr))
 
 /-- A machine for the rows below: memory, vector, memory; one stream each way. -/
 def tinyMachine : Config where
   kinds := [.mem, .vxm, .mem]
   streams := 1
+  lanes := 2
+  bankSize := 8
   memDelay := 1
   vxmDelay := 1
   sxmDelay := 1
@@ -217,8 +228,6 @@ def w0 : Stream := ⟨.west, 0⟩
 /-- A slice holding two words, named `a` and `b` below. -/
 def twoWords : Slice Expr where
   words := [.init 0 0, .init 0 1]
-  x := none
-  acc := .zero
   weights := []
   pipe := []
 
@@ -241,25 +250,68 @@ def exec (ex : ExecFn) : List Row :=
   let b : Expr := .init 0 1
   let u : Expr := .init 1 0
   let v : Expr := .init 1 1
-  [ row "memory: read 1 to east" (try1 ex .mem (.read 1 e0)) (.done [a, b] (some (e0, b))),
+  [ row "memory: read 1 to east" (try1 ex .mem (.read 1 e0)) (.done [a, b] (some (e0, [b]))),
     row "memory: write east at 0" (try1 ex .mem (.write e0 0)) (.done [u, b] none),
-    row "vector: relu of east to west" (try1 ex .vxm (.un .relu e0 w0))
-      (.done [a, b] (some (w0, .un .relu u))),
-    row "vector: east plus west to east" (try1 ex .vxm (.bin .add e0 w0 e0))
-      (.done [a, b] (some (e0, .bin .add u v))),
+    row "vector: relu of east to west" (try1 ex .vxm (.un .i8 .relu e0 w0))
+      (.done [a, b] (some (w0, [un8 .relu u]))),
+    row "vector: east plus west to east" (try1 ex .vxm (.bin .i8 .add e0 w0 e0))
+      (.done [a, b] (some (e0, [bin8 .add u v]))),
     row "trap: read of address 2" (try1 ex .mem (.read 2 e0)) (.trap .badAddress),
     row "trap: write at address 2" (try1 ex .mem (.write e0 2)) (.trap .badAddress),
     row "trap: read sent to a vector slice" (try1 ex .vxm (.read 0 e0)) (.trap .wrongSlice),
-    row "trap: relu sent to a memory slice" (try1 ex .mem (.un .relu e0 w0))
+    row "trap: relu sent to a memory slice" (try1 ex .mem (.un .i8 .relu e0 w0))
       (.trap .wrongSlice),
     row "trap: reverse, a rearrangement, sent to a vector slice"
-      (try1 ex .vxm (.un .reverse e0 w0)) (.trap .wrongSlice),
+      (try1 ex .vxm (.un .i8 .reverse e0 w0)) (.trap .wrongSlice),
     row "trap: result to stream 1, which the machine does not have"
       (try1 ex .mem (.read 0 ⟨.east, 1⟩)) (.trap .badStream),
     row "trap: write from an empty stream" (try1 ex .mem (.write ⟨.east, 1⟩ 0))
       (.trap .emptyRead),
     row "trap: add with one operand missing"
-      (try1 ex .vxm (.bin .add e0 ⟨.west, 3⟩ e0)) (.trap .emptyRead) ]
+      (try1 ex .vxm (.bin .i8 .add e0 ⟨.west, 3⟩ e0)) (.trap .emptyRead) ]
+
+/-- The type of `exec` on words of two lanes. -/
+abbrev ExecWordsFn :=
+  Sem (Word 2) → Config → Kind → (Stream → Option (Word 2)) → Slice (Word 2) → Instr →
+    Except TrapKind (Slice (Word 2) × Option (Stream × List (Word 2)))
+
+/-- Section 3.5, the product of a matrix slice, on a machine with four
+streams each way. Installed word 0 is (1, 2), installed word 1 is (3, 4),
+and the stream holds (10, 100). The product is a value of 32 bits. -/
+def product (ex : ExecWordsFn) : List Row :=
+  let slice : Slice (Word 2) :=
+    { words := [], weights := [Word.ofInts [1, 2], Word.ofInts [3, 4]], pipe := [] }
+  let rd (tr : Stream) : Option (Word 2) := if tr = e0 then some (Word.ofInts [10, 100]) else none
+  let run (n : Nat) : Option (List Int) :=
+    match ex (wordSem 2) { tinyMachine with streams := 4 } .mxm rd slice (.product n e0 w0) with
+    | .ok (_, some (_, v)) => some (Value.toInts v)
+    | _ => none
+  [ row "product of 2 words" (run 2) (some [210, 430]),
+    row "product of 1 word" (run 1) (some [210, 0]) ]
+
+/-- What section 3.5 leaves open about the matrix slice. -/
+def productDecisions (ex : ExecFn) : List Row :=
+  let u : Expr := .init 1 0
+  let v : Expr := .init 1 1
+  let slice : Slice Expr := { words := [], weights := [.zero, .zero], pipe := [] }
+  let two : Stream → Option Expr := fun tr =>
+    if tr = e0 then some u else if tr = ⟨.east, 1⟩ then some v else none
+  let machine : Config := { tinyMachine with streams := 4 }
+  let after (i : Instr) : Outcome :=
+    match ex exprSem machine .mxm two slice i with
+    | .ok (sl, r) => .done sl.weights r
+    | .error k => .trap k
+  [ row "install 2 words from east 0: east 0 is the first, east 1 the second"
+      (after (.install 0 2 e0)) (.done [u, v] none),
+    row "install of no words: nothing changes" (after (.install 1 0 e0)) (.done [.zero, .zero] none),
+    row "install past the last installed word: bad address"
+      (after (.install 1 2 e0)) (.trap .badAddress),
+    row "install with the second stream empty: empty read"
+      (after (.install 0 2 ⟨.east, 1⟩)) (.trap .emptyRead),
+    row "product of more words than are installed: bad address"
+      (after (.product 3 e0 w0)) (.trap .badAddress),
+    row "product of no words: the product of a matrix with no rows"
+      (after (.product 0 e0 w0)) (.done [.zero, .zero] (some (w0, (VExpr.matvec .nil u).toWords 4))) ]
 
 /-- What sections 3.5 and 3.7 leave open: which trap is reported when an
 instruction is wrong in two ways. -/
@@ -271,7 +323,52 @@ def execDecisions (ex : ExecFn) : List Row :=
     row "bad address and empty stream on a write: bad address is reported"
       (try1 ex .mem (.write ⟨.east, 1⟩ 2)) (.trap .badAddress),
     row "bad stream and empty stream on a relu: bad stream is reported"
-      (try1 ex .vxm (.un .relu ⟨.east, 3⟩ ⟨.west, 1⟩)) (.trap .badStream) ]
+      (try1 ex .vxm (.un .i8 .relu ⟨.east, 3⟩ ⟨.west, 1⟩)) (.trap .badStream) ]
+
+/-- Section 3.5, values of several words, at a vector slice of a machine
+with two streams each way. Streams 0 and 1 going east hold the words `u` and
+`v`. -/
+def groups (ex : ExecFn) : List Row :=
+  let u : Expr := .init 1 0
+  let v : Expr := .init 1 1
+  let two : Stream → Option Expr := fun tr =>
+    if tr = e0 then some u else if tr = ⟨.east, 1⟩ then some v else none
+  let after (i : Instr) : Outcome :=
+    match ex exprSem { tinyMachine with streams := 2 } .vxm two twoWords i with
+    | .ok (sl, r) => .done sl.words r
+    | .error k => .trap k
+  let relu16 : VExpr := .un .i16 .relu (.ofWords [u, v])
+  [ row "relu of type i16, of east 0 to west 0: both words are read, and the result is two words"
+      (after (.un .i16 .relu e0 w0))
+      (.done [.init 0 0, .init 0 1] (some (w0, [.word 0 relu16, .word 1 relu16]))),
+    row "trap: of type i16, from east 1, which is not a multiple of 2"
+      (after (.un .i16 .relu ⟨.east, 1⟩ w0)) (.trap .badStream),
+    row "trap: of type i32, which takes four streams"
+      (after (.un .i32 .relu e0 w0)) (.trap .badStream),
+    row "trap: of type i8, from west 0, which holds nothing"
+      (after (.un .i8 .relu w0 e0)) (.trap .emptyRead) ]
+
+/-! ## Values -/
+
+/-- Section 1: how many words a value of each type is, and the words of a
+value given its elements, each word as the signed integers of its lanes. Two
+lanes. -/
+def values (words : DType → Nat) (ofInts : DType → List Int → List (List Int)) : List Row :=
+  [ row "a value of type i8 is 1 word" (words .i8) 1,
+    row "a value of type i16 is 2 words" (words .i16) 2,
+    row "a value of type i32 is 4 words" (words .i32) 4,
+    row "of type i16, the elements 258 and -2" (ofInts .i16 [258, -2]) [[2, -2], [1, -1]] ]
+
+/-- What section 1 leaves open. `toInts` reads the elements of a value back
+from its words. -/
+def valuesDecisions (ofInts : DType → List Int → List (List Int))
+    (toInts : List (List Int) → List Int) : List Row :=
+  [ row "an element that is not given is zero" (ofInts .i16 [258]) [[2, 0], [1, 0]],
+    row "an element too large for its type keeps its low bits"
+      (ofInts .i8 [300, -129]) [[44, 127]],
+    row "read back, the last word of a value gives the signs"
+      (toInts [[2, -2], [1, -1]]) [258, -2],
+    row "one word read back is a value of type i8" (toInts [[-1, 5]]) [-1, 5] ]
 
 /-! ## Kernels -/
 
@@ -280,31 +377,34 @@ abbrev StmtFn := Sem Expr → Nat → Env Expr → Stmt → Option (Env Expr)
 
 /-- An environment as plain data: the variables, most recent first, and the
 buffers. -/
-def view (r : Option (Env Expr)) : Option (List (Var × Expr) × List (List Expr)) :=
+def view (r : Option (Env Expr)) : Option (List (Var × List Expr) × List (List Expr)) :=
   r.map fun env => (env.vars, env.bufs)
 
-/-- The descriptions of `load`, `store` and the one-word and two-word
-operations in `compiler/include/tau/Dialect/TauOps.td`. Buffer 0 holds the
-words `a` and `b`, buffer 1 holds `c`. -/
+/-- The descriptions of `load`, `store` and the one-value and two-value
+operations in `compiler/include/tau/Dialect/TauOps.td`, for values of 8
+bits, which are one word, and one load of 16 bits. Buffer 0 holds the words
+`a` and `b`, buffer 1 holds `c`. -/
 def stmt (ex : StmtFn) : List Row :=
   let a : Expr := .init 0 0
   let b : Expr := .init 0 1
   let c : Expr := .init 1 0
   let env : Env Expr := ⟨[], [[a, b], [c]], []⟩
-  let env1 : Env Expr := ⟨[(1, b), (0, a)], [[a, b], [c]], []⟩
-  [ row "load word 1 of buffer 0 into value 0"
-      (view (ex exprSem 0 env (.load 0 0 ⟨1, 0⟩))) (some ([(0, b)], [[a, b], [c]])),
+  let env1 : Env Expr := ⟨[(1, [b]), (0, [a])], [[a, b], [c]], []⟩
+  [ row "load position 1 of buffer 0 into value 0"
+      (view (ex exprSem 0 env (.load 0 .i8 0 ⟨1, 0⟩))) (some ([(0, [b])], [[a, b], [c]])),
     row "load at [0, 1] on iteration 1: position 0 + 1 * 1"
-      (view (ex exprSem 1 env (.load 0 0 ⟨0, 1⟩))) (some ([(0, b)], [[a, b], [c]])),
-    row "store value 1 to word 0 of buffer 1"
-      (view (ex exprSem 0 env1 (.store 1 1 ⟨0, 0⟩)))
-      (some ([(1, b), (0, a)], [[a, b], [b]])),
+      (view (ex exprSem 1 env (.load 0 .i8 0 ⟨0, 1⟩))) (some ([(0, [b])], [[a, b], [c]])),
+    row "store value 1 to position 0 of buffer 1"
+      (view (ex exprSem 0 env1 (.store 1 .i8 1 ⟨0, 0⟩)))
+      (some ([(1, [b]), (0, [a])], [[a, b], [b]])),
     row "relu of value 0 into value 2"
-      (view (ex exprSem 0 env1 (.un 2 .relu 0)))
-      (some ([(2, .un .relu a), (1, b), (0, a)], [[a, b], [c]])),
+      (view (ex exprSem 0 env1 (.un 2 .i8 .relu 0)))
+      (some ([(2, [un8 .relu a]), (1, [b]), (0, [a])], [[a, b], [c]])),
     row "value 0 plus value 1 into value 2"
-      (view (ex exprSem 0 env1 (.bin 2 .add 0 1)))
-      (some ([(2, .bin .add a b), (1, b), (0, a)], [[a, b], [c]])) ]
+      (view (ex exprSem 0 env1 (.bin 2 .i8 .add 0 1)))
+      (some ([(2, [bin8 .add a b]), (1, [b]), (0, [a])], [[a, b], [c]])),
+    row "load, of type i16, position 0 of buffer 0: the two words a and b"
+      (view (ex exprSem 0 env (.load 0 .i16 0 ⟨0, 0⟩))) (some ([(0, [a, b])], [[a, b], [c]])) ]
 
 /-- What the dialect's descriptions leave open. -/
 def stmtDecisions (ex : StmtFn) : List Row :=
@@ -312,53 +412,60 @@ def stmtDecisions (ex : StmtFn) : List Row :=
   let b : Expr := .init 0 1
   let c : Expr := .init 1 0
   let env : Env Expr := ⟨[], [[a, b], [c]], []⟩
-  let env1 : Env Expr := ⟨[(0, b), (0, a)], [[a, b], [c]], []⟩
+  let env1 : Env Expr := ⟨[(0, [b]), (0, [a])], [[a, b], [c]], []⟩
   [ row "a load outside its buffer fails"
-      (view (ex exprSem 0 env (.load 0 0 ⟨2, 0⟩))) none,
+      (view (ex exprSem 0 env (.load 0 .i8 0 ⟨2, 0⟩))) none,
     row "a load from a buffer that does not exist fails"
-      (view (ex exprSem 0 env (.load 0 5 ⟨0, 0⟩))) none,
+      (view (ex exprSem 0 env (.load 0 .i8 5 ⟨0, 0⟩))) none,
     row "a store outside its buffer fails; the buffer does not grow"
-      (view (ex exprSem 0 env1 (.store 0 1 ⟨1, 0⟩))) none,
+      (view (ex exprSem 0 env1 (.store 0 .i8 1 ⟨1, 0⟩))) none,
     row "a statement that uses a value with no definition fails"
-      (view (ex exprSem 0 env (.un 1 .relu 0))) none,
+      (view (ex exprSem 0 env (.un 1 .i8 .relu 0))) none,
     row "a value defined twice has its most recent definition"
-      (view (ex exprSem 0 env1 (.store 0 1 ⟨0, 0⟩)))
-      (some ([(0, b), (0, a)], [[a, b], [b]])) ]
+      (view (ex exprSem 0 env1 (.store 0 .i8 1 ⟨0, 0⟩)))
+      (some ([(0, [b]), (0, [a])], [[a, b], [b]])),
+    row "a load of 16 bits at position 1 is outside a buffer of two words"
+      (view (ex exprSem 0 env (.load 0 .i16 0 ⟨1, 0⟩))) none,
+    row "a statement of 16 bits on a value of one word fails"
+      (view (ex exprSem 0 env1 (.un 2 .i16 .relu 0))) none ]
 
 /-! ## Pins -/
 
-/-- The type of "the event of a pinned statement": the iteration, the pin,
+/-- The type of "the events of a pinned statement": the iteration, the pin,
 the statement, and the environment after the statement has run. -/
-abbrev PinFn := Nat → Idx → Stmt → Env Expr → Option (Event Expr)
+abbrev PinFn := Nat → Idx → Stmt → Env Expr → List (Event Expr)
 
 /-- Programs 5. Buffer 0 holds the words `a` and `b`; value 0 is `a` and
 value 1 is the relu of `a`. -/
 def pin (ev : PinFn) : List Row :=
   let a : Expr := .init 0 0
   let b : Expr := .init 0 1
-  let env : Env Expr := ⟨[(1, .un .relu a), (0, a)], [[a, b], [a, a, a, a]], []⟩
+  let env : Env Expr := ⟨[(1, [un8 .relu a]), (0, [a])], [[a, b], [a, a, a, a]], []⟩
   [ row "relu of a, at 3"
-      (ev 0 ⟨3, 0⟩ (.un 1 .relu 0) env) (some ⟨3, none, .un .relu a⟩),
-    row "store a to word 0 of buffer 1, at 6"
-      (ev 0 ⟨6, 0⟩ (.store 0 1 ⟨0, 0⟩) env) (some ⟨6, some (1, 0), a⟩),
-    row "load word 1 of buffer 0 into value 2, at 2"
-      (ev 0 ⟨2, 0⟩ (.load 2 0 ⟨1, 0⟩) ⟨[(2, b), (0, a)], env.bufs, []⟩)
-      (some ⟨2, none, b⟩),
+      (ev 0 ⟨3, 0⟩ (.un 1 .i8 .relu 0) env) [⟨3, none, un8 .relu a⟩],
+    row "store a to position 0 of buffer 1, at 6"
+      (ev 0 ⟨6, 0⟩ (.store 0 .i8 1 ⟨0, 0⟩) env) [⟨6, some (1, 0), a⟩],
+    row "load position 1 of buffer 0 into value 2, at 2"
+      (ev 0 ⟨2, 0⟩ (.load 2 .i8 0 ⟨1, 0⟩) ⟨[(2, [b]), (0, [a])], env.bufs, []⟩)
+      [⟨2, none, b⟩],
     row "relu of a, at 5 every 4, iteration 2"
-      (ev 2 ⟨5, 4⟩ (.un 1 .relu 0) env) (some ⟨13, none, .un .relu a⟩),
-    row "store a to word i of buffer 1, at 9 every 4, iteration 3"
-      (ev 3 ⟨9, 4⟩ (.store 0 1 ⟨0, 1⟩) env) (some ⟨21, some (1, 3), a⟩) ]
+      (ev 2 ⟨5, 4⟩ (.un 1 .i8 .relu 0) env) [⟨13, none, un8 .relu a⟩],
+    row "store a to position i of buffer 1, at 9 every 4, iteration 3"
+      (ev 3 ⟨9, 4⟩ (.store 0 .i8 1 ⟨0, 1⟩) env) [⟨21, some (1, 3), a⟩],
+    row "store a value of two words to position 1 of buffer 1, at 6: one event for each word"
+      (ev 0 ⟨6, 0⟩ (.store 2 .i16 1 ⟨1, 0⟩) ⟨[(2, [a, b])], env.bufs, []⟩)
+      [⟨6, some (1, 2), a⟩, ⟨6, some (1, 3), b⟩] ]
 
 /-- What Programs 5 leaves open. -/
 def pinDecisions (ev : PinFn) : List Row :=
   let a : Expr := .init 0 0
-  let env : Env Expr := ⟨[(1, .un .relu a), (0, a)], [[a], [a]], []⟩
-  [ row "a matrix product: the word is its result"
-      (ev 0 ⟨7, 0⟩ (.matvec 1 0 0 ⟨0, 0⟩ 1) env) (some ⟨7, none, .un .relu a⟩),
-    row "a statement that is pinned twice: the inner statement's word"
-      (ev 0 ⟨7, 0⟩ (.pin ⟨2, 0⟩ (.un 1 .relu 0)) env) (some ⟨7, none, .un .relu a⟩),
-    row "a statement whose word has no value: no event"
-      (ev 0 ⟨7, 0⟩ (.un 5 .relu 0) env) none ]
+  let env : Env Expr := ⟨[(1, [un8 .relu a]), (0, [a])], [[a], [a]], []⟩
+  [ row "a matrix product: the words are its result"
+      (ev 0 ⟨7, 0⟩ (.matvec 1 0 0 ⟨0, 0⟩ 1) env) [⟨7, none, un8 .relu a⟩],
+    row "a statement that is pinned twice: the inner statement's words"
+      (ev 0 ⟨7, 0⟩ (.pin ⟨2, 0⟩ (.un 1 .i8 .relu 0)) env) [⟨7, none, un8 .relu a⟩],
+    row "a statement whose result has no value: no event"
+      (ev 0 ⟨7, 0⟩ (.un 5 .i8 .relu 0) env) [] ]
 
 /-- The type of "run a source program on names": the final buffers and the
 pinned words, or `none` if it cannot be run. -/
@@ -370,10 +477,10 @@ def calls (run : SourceFn) : List Row :=
   let b : Expr := .init 1 0
   let c : Expr := .init 2 0
   let k : Source := .ofKernel
-    [ .stmt (.load 0 0 ⟨0, 0⟩), .stmt (.pin ⟨3, 0⟩ (.un 1 .relu 0)),
-      .stmt (.store 1 1 ⟨0, 0⟩) ]
-  let r : Expr := .un .relu a
-  let rr : Expr := .un .relu r
+    [ .stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.pin ⟨3, 0⟩ (.un 1 .i8 .relu 0)),
+      .stmt (.store 1 .i8 1 ⟨0, 0⟩) ]
+  let r : Expr := un8 .relu a
+  let rr : Expr := un8 .relu r
   [ row "call K on buffers 0 and 2"
       (run (.call k [0, 2] 0 .done) [[a], [b], [c]])
       (some ([[a], [b], [r]], [⟨3, none, r⟩])),
@@ -391,10 +498,59 @@ abbrev IssuesFn := Config → Program → Nat → List (List Expr) → List (Iss
 def issued (f : IssuesFn) : List Row :=
   let a : Expr := .init 0 0
   let prog : Program :=
-    [ .once 0 0 (.read 0 e0), .once 1 3 (.un .relu e0 e0), .once 2 6 (.write e0 0) ]
+    [ .once 0 0 (.read 0 e0), .once 1 3 (.un .i8 .relu e0 e0), .once 2 6 (.write e0 0) ]
   [ row "cycles 0, 3 and 6"
       (f tinyMachine prog 7 [[a], [], [.fill]])
-      [ ⟨0, 0, none, a⟩, ⟨3, 1, none, .un .relu a⟩, ⟨6, 2, some 0, .un .relu a⟩ ] ]
+      [ ⟨0, 0, none, a⟩, ⟨3, 1, none, un8 .relu a⟩, ⟨6, 2, some 0, un8 .relu a⟩ ] ]
+
+/-- The type of "run a program": the machine, the program, the number of
+cycles and the starting memories; a trap, or the memories at the end. -/
+abbrev ExecuteFn :=
+  Config → Program → Nat → List (List Expr) → Except Trap (List (List Expr))
+
+/-- How a run ended, as something two rows can be compared by. -/
+def ended (r : Except Trap (List (List Expr))) : Sum Trap (List (List Expr)) :=
+  match r with
+  | .error t => .inl t
+  | .ok mem => .inr mem
+
+/-- Machine 3.11: the memory at position 2 reads and writes on cycle 4. -/
+def banks (f : ExecuteFn) : List Row :=
+  let a : Expr := .init 0 0
+  let p : Expr := .init 1 0
+  let q : Expr := .init 1 1
+  let r : Expr := .init 1 2
+  let machine : Config := { tinyMachine with bankSize := 2 }
+  let run (told : List Instr) :=
+    ended (f machine (.once 0 0 (.read 0 e0) :: told.map (.once 2 4)) 5 [[a], [], [p, q, r]])
+  [ row "write at address 2, and read address 0"
+      (run [.write e0 2, .read 0 w0]) (.inr [[a], [], [p, q, a]]),
+    row "write at address 1, and read address 0"
+      (run [.write e0 1, .read 0 w0]) (.inl ⟨.sameBank, 2, 4⟩),
+    row "read address 0, and read address 2"
+      (run [.read 0 w0, .read 2 w0]) (.inl ⟨.twoInstructions, 2, 4⟩) ]
+
+/-- What section 3.11 leaves open. -/
+def banksDecisions (f : ExecuteFn) : List Row :=
+  let a : Expr := .init 0 0
+  let p : Expr := .init 1 0
+  let q : Expr := .init 1 1
+  let r : Expr := .init 1 2
+  let machine : Config := { tinyMachine with bankSize := 2 }
+  let run (m : Config) (told : List Instr) :=
+    ended (f m (.once 0 0 (.read 0 e0) :: told.map (.once 2 4)) 5 [[a], [], [p, q, r]])
+  [ row "the read may be listed first"
+      (run machine [.read 0 w0, .write e0 2]) (.inr [[a], [], [p, q, a]]),
+    row "a write and a read with a third instruction: two instructions is reported"
+      (run machine [.write e0 2, .read 0 w0, .read 1 w0]) (.inl ⟨.twoInstructions, 2, 4⟩),
+    row "same bank and a bad address: same bank is reported"
+      (run machine [.write e0 9, .read 2 w0]) (.inl ⟨.sameBank, 2, 4⟩),
+    row "a lower bank of no words: every address is in the upper bank"
+      (run { tinyMachine with bankSize := 0 } [.write e0 2, .read 0 w0])
+      (.inl ⟨.sameBank, 2, 4⟩),
+    row "a read and a write at a vector slice: wrong slice is reported"
+      (ended (f machine [.once 1 0 (.read 0 e0), .once 1 0 (.write e0 2)] 1 [[a], [], []]))
+      (.inl ⟨.wrongSlice, 1, 0⟩) ]
 
 /-! ## The image -/
 
@@ -409,6 +565,22 @@ def numbers (stream : Stream → Nat) (int : Int → Nat) : List Row :=
     row "the integer -1" (int (-1)) 1,
     row "the integer 5" (int 5) 10,
     row "the integer -5" (int (-5)) 9 ]
+
+/-- Machine 3.10: the one-value operations as numbers. -/
+def operations (enc : UnOp → List Nat) : List Row :=
+  [ row "relu" (enc .relu) [0],
+    row "requantize by 3" (enc (.requant 3)) [1, 3],
+    row "negate" (enc .neg) [2],
+    row "absolute value" (enc .abs) [3],
+    row "shift bits left by 2" (enc (.shl 2)) [4, 2],
+    row "add the constant 5" (enc (.addi 5)) [5, 10],
+    row "multiply by the constant -5" (enc (.muli (-5))) [6, 9],
+    row "shift elements by 1" (enc (.shift 1)) [7, 1],
+    row "rotate elements by 1" (enc (.rotate 1)) [8, 1],
+    row "reverse" (enc .reverse) [9],
+    row "broadcast element 2" (enc (.broadcast 2)) [10, 2],
+    row "permute by the table 1, 0" (enc (.permute [1, 0])) [11, 2, 1, 0],
+    row "widen to i32" (enc (.widen .i32)) [12, 2] ]
 
 /-- The same table read the other way. -/
 def numbersBack (stream : Nat → Stream) (int : Nat → Int) : List Row :=
@@ -434,13 +606,21 @@ def entries (enc : TimedEntry → List Nat) : List Row :=
     row "write west 0 at address 4 on cycle 9"
       (enc (.once 0 9 (.write w1 4))) [9, 0, 0, 0, 1, 1, 4],
     row "relu of east 0 to west 0 on cycle 6"
-      (enc (.once 0 6 (.un .relu e0 w1))) [6, 0, 0, 0, 2, 0, 1, 0],
+      (enc (.once 0 6 (.un .i8 .relu e0 w1))) [6, 0, 0, 0, 2, 0, 0, 1, 0],
     row "add 5 to east 1, to east 1, on cycle 7"
-      (enc (.once 0 7 (.un (.addi 5) ⟨.east, 1⟩ ⟨.east, 1⟩))) [7, 0, 0, 0, 2, 2, 2, 5, 10],
+      (enc (.once 0 7 (.un .i8 (.addi 5) ⟨.east, 1⟩ ⟨.east, 1⟩))) [7, 0, 0, 0, 2, 0, 2, 2, 5, 10],
     row "east 1 minus west 2 to east 0 on cycle 8"
-      (enc (.once 0 8 (.bin .sub ⟨.east, 1⟩ ⟨.west, 2⟩ e0))) [8, 0, 0, 0, 3, 1, 2, 5, 0],
+      (enc (.once 0 8 (.bin .i8 .sub ⟨.east, 1⟩ ⟨.west, 2⟩ e0))) [8, 0, 0, 0, 3, 0, 1, 2, 5, 0],
+    row "of 32 bits: east 0 to 3 plus west 0 to 3, to east 4 to 7, on cycle 8"
+      (enc (.once 0 8 (.bin .i32 .add e0 w1 ⟨.east, 4⟩))) [8, 0, 0, 0, 3, 2, 0, 0, 1, 8],
+    row "east 0, of 8 bits, widened to 32 bits on west 4 to 7, on cycle 3"
+      (enc (.once 0 3 (.un .i8 (.widen .i32) e0 ⟨.west, 4⟩))) [3, 0, 0, 0, 2, 0, 0, 9, 12, 2],
     row "the constant 3, -4 to west 2 on cycle 4"
-      (enc (.once 0 4 (.const [3, -4] ⟨.west, 2⟩))) [4, 0, 0, 0, 7, 5, 2, 6, 7] ]
+      (enc (.once 0 4 (.const .i8 [3, -4] ⟨.west, 2⟩))) [4, 0, 0, 0, 6, 0, 5, 2, 6, 7],
+    row "install 2 words from west 1 on, at word 4, on cycle 5"
+      (enc (.once 0 5 (.install 4 2 ⟨.west, 1⟩))) [5, 0, 0, 0, 5, 4, 2, 3],
+    row "the product of 3 installed words with west 0, to east 4 to 7, on cycle 9"
+      (enc (.once 0 9 (.product 3 w1 ⟨.east, 4⟩))) [9, 0, 0, 0, 4, 3, 1, 8] ]
 
 /-! ## Passes -/
 
@@ -452,26 +632,26 @@ def sameUpToNumbering (a b : List Stmt) : Bool :=
 
 /-- A loop that copies buffer 0 to buffer 1 through a relu, two words. -/
 def reluLoop : Kernel :=
-  [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .store 1 1 ⟨0, 1⟩]]
+  [.loop 2 [.load 0 .i8 0 ⟨0, 1⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 1⟩]]
 
 /-- `compiler/lib/Passes/Unroll.cpp`. -/
 def unroll (un : Kernel → List Stmt) : List Row :=
   [ row "a loop of two iterations becomes two copies, with positions filled in"
       (un reluLoop)
-      [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩,
-       .load 0 0 ⟨1, 0⟩, .un 1 .relu 0, .store 1 1 ⟨1, 0⟩],
+      [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩,
+       .load 0 .i8 0 ⟨1, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨1, 0⟩],
     row "the check accepts the unrolled kernel for the original"
       (checkKernels reluLoop ((un reluLoop).map Item.stmt) [2, 2]) true,
     row "statements before and after a loop stay in place"
-      ((un [.stmt (.load 5 0 ⟨0, 0⟩), .loop 1 [.un 6 .relu 5], .stmt (.store 6 1 ⟨0, 0⟩)]).length)
+      ((un [.stmt (.load 5 .i8 0 ⟨0, 0⟩), .loop 1 [.un 6 .i8 .relu 5], .stmt (.store 6 .i8 1 ⟨0, 0⟩)]).length)
       3 ]
 
 /-- What `Unroll.cpp` leaves open, or does differently from its Lean copy. -/
 def unrollDecisions (un : Kernel → List Stmt) : List Row :=
   [ row "a loop of no iterations disappears"
-      (un [.loop 0 [.load 0 0 ⟨0, 1⟩]]) [],
+      (un [.loop 0 [.load 0 .i8 0 ⟨0, 1⟩]]) [],
     row "outside a loop the iteration is 0, and the stride is written out as 0"
-      (un [.stmt (.load 0 0 ⟨2, 5⟩)]) [.load 0 0 ⟨2, 0⟩] ]
+      (un [.stmt (.load 0 .i8 0 ⟨2, 5⟩)]) [.load 0 .i8 0 ⟨2, 0⟩] ]
 
 /-- `compiler/lib/Passes/Simplify.cpp`. Each row gives a kernel and the
 kernel the pass should make of it, up to the numbering of values. -/
@@ -479,42 +659,42 @@ def simplify (sp : Kernel → Kernel) : List Row :=
   let same (k : Kernel) (want : List Stmt) : Bool :=
     sameUpToNumbering (Kernel.unroll (sp k)) want
   let reluRelu : Kernel :=
-    [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.un 2 .relu 1),
-     .stmt (.store 2 1 ⟨0, 0⟩)]
+    [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.un 1 .i8 .relu 0), .stmt (.un 2 .i8 .relu 1),
+     .stmt (.store 2 .i8 1 ⟨0, 0⟩)]
   [ row "relu of relu: the second relu goes, and the store uses the first"
-      (same reluRelu [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩]) true,
+      (same reluRelu [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩]) true,
     row "the check accepts the simplified kernel for the original"
       (checkKernels reluRelu (sp reluRelu) [1, 1]) true,
     row "max of a value with itself: the max goes"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.bin 1 .max 0 0), .stmt (.store 1 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .store 0 1 ⟨0, 0⟩]) true,
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.bin 1 .i8 .max 0 0), .stmt (.store 1 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .store 0 .i8 1 ⟨0, 0⟩]) true,
     row "min of a value with itself: the min goes"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.bin 1 .min 0 0), .stmt (.store 1 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .store 0 1 ⟨0, 0⟩]) true,
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.bin 1 .i8 .min 0 0), .stmt (.store 1 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .store 0 .i8 1 ⟨0, 0⟩]) true,
     row "nothing to simplify: the kernel is unchanged"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.store 1 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩]) true,
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.un 1 .i8 .relu 0), .stmt (.store 1 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩]) true,
     row "inside a loop"
-      (same [.loop 2 [.load 0 0 ⟨0, 1⟩, .un 1 .relu 0, .un 2 .relu 1, .store 2 1 ⟨0, 1⟩]]
-        [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩,
-         .load 2 0 ⟨1, 0⟩, .un 3 .relu 2, .store 3 1 ⟨1, 0⟩]) true ]
+      (same [.loop 2 [.load 0 .i8 0 ⟨0, 1⟩, .un 1 .i8 .relu 0, .un 2 .i8 .relu 1, .store 2 .i8 1 ⟨0, 1⟩]]
+        [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩,
+         .load 2 .i8 0 ⟨1, 0⟩, .un 3 .i8 .relu 2, .store 3 .i8 1 ⟨1, 0⟩]) true ]
 
 /-- What `Simplify.cpp` leaves open. -/
 def simplifyDecisions (sp : Kernel → Kernel) : List Row :=
   let same (k : Kernel) (want : List Stmt) : Bool :=
     sameUpToNumbering (Kernel.unroll (sp k)) want
   [ row "three relus in a row become one"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.un 2 .relu 1),
-             .stmt (.un 3 .relu 2), .stmt (.store 3 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩]) true,
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.un 1 .i8 .relu 0), .stmt (.un 2 .i8 .relu 1),
+             .stmt (.un 3 .i8 .relu 2), .stmt (.store 3 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩]) true,
     row "max of two loads of the same word stays: they are different values"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.load 1 0 ⟨0, 0⟩), .stmt (.bin 2 .max 0 1),
-             .stmt (.store 2 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .load 1 0 ⟨0, 0⟩, .bin 2 .max 0 1, .store 2 1 ⟨0, 0⟩]) true,
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.load 1 .i8 0 ⟨0, 0⟩), .stmt (.bin 2 .i8 .max 0 1),
+             .stmt (.store 2 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .load 1 .i8 0 ⟨0, 0⟩, .bin 2 .i8 .max 0 1, .store 2 .i8 1 ⟨0, 0⟩]) true,
     row "max of a relu of relu with the first relu: both rewrites apply"
-      (same [.stmt (.load 0 0 ⟨0, 0⟩), .stmt (.un 1 .relu 0), .stmt (.un 2 .relu 1),
-             .stmt (.bin 3 .max 1 2), .stmt (.store 3 1 ⟨0, 0⟩)]
-        [.load 0 0 ⟨0, 0⟩, .un 1 .relu 0, .store 1 1 ⟨0, 0⟩]) true ]
+      (same [.stmt (.load 0 .i8 0 ⟨0, 0⟩), .stmt (.un 1 .i8 .relu 0), .stmt (.un 2 .i8 .relu 1),
+             .stmt (.bin 3 .i8 .max 1 2), .stmt (.store 3 .i8 1 ⟨0, 0⟩)]
+        [.load 0 .i8 0 ⟨0, 0⟩, .un 1 .i8 .relu 0, .store 1 .i8 1 ⟨0, 0⟩]) true ]
 
 /-! ## A rule for schedules -/
 
@@ -524,30 +704,27 @@ def issues (c : Compiled) : List (Nat × Nat × Instr) :=
     (List.range c.cycles).flatMap fun t =>
       (c.prog.dueAt p t).map fun i => (p, t, i)
 
-/-- The streams an instruction reads. -/
+/-- The streams an instruction reads: for a value of several words, each of
+its streams. -/
 def operands : Instr → List Stream
   | .read _ _ => []
   | .write src _ => [src]
-  | .un _ src _ => [src]
-  | .bin _ a b _ => [a, b]
-  | .load src => [src]
-  | .mac _ src => [src]
-  | .emit _ => []
-  | .const _ _ => []
-  | .sel m a b _ => [m, a, b]
-  | .seed src => [src]
-  | .install _ src => [src]
-  | .macw _ => []
+  | .un ty _ src _ => src.group ty.bytes
+  | .bin ty _ a b _ => a.group ty.bytes ++ b.group ty.bytes
+  | .const _ _ _ => []
+  | .sel ty m a b _ => m.group ty.bytes ++ a.group ty.bytes ++ b.group ty.bytes
+  | .install _ g src => src.group g
+  | .product _ src _ => [src]
 
-/-- The stream an instruction places its result on, if it has a result. -/
-def result : Instr → Option Stream
-  | .read _ dst => some dst
-  | .un _ _ dst => some dst
-  | .bin _ _ _ dst => some dst
-  | .emit dst => some dst
-  | .const _ dst => some dst
-  | .sel _ _ _ dst => some dst
-  | _ => none
+/-- The streams an instruction places the words of its result on. -/
+def results : Instr → List Stream
+  | .read _ dst => [dst]
+  | .un ty op _ dst => dst.group (op.out ty).bytes
+  | .bin ty _ _ _ dst => dst.group ty.bytes
+  | .product _ _ dst => dst.group DType.i32.bytes
+  | .const ty _ dst => dst.group ty.bytes
+  | .sel ty _ _ _ dst => dst.group ty.bytes
+  | _ => []
 
 /-- What the machine, run on names, says about timing: `some true` if it
 reads an empty stream slot, `some false` if it runs to the end, and `none` if
@@ -564,7 +741,7 @@ def machineReadsEmpty (c : Compiled) : Bool := machineSays c == some true
 def onTiny (prog : Program) (cycles : Nat) : Compiled where
   cfg := tinyMachine
   memSizes := [1, 0, 1]
-  map := [⟨0, 0, 1⟩, ⟨2, 0, 1⟩]
+  map := [.one 0 0 1, .one 2 0 1]
   prog := prog
   cycles := cycles
 
@@ -577,7 +754,7 @@ def onTime (rule : Compiled → Bool) : List Row :=
     row "the write one cycle early"
       (rule (onTiny [.once 0 0 (.read 0 e0), .once 2 3 (.write e0 0)] 5)) false,
     row "a relu on the way: read at 0, relu at slice 1 on cycle 3, write at 2 on cycle 6"
-      (rule (onTiny [.once 0 0 (.read 0 e0), .once 1 3 (.un .relu e0 e0),
+      (rule (onTiny [.once 0 0 (.read 0 e0), .once 1 3 (.un .i8 .relu e0 e0),
                      .once 2 6 (.write e0 0)] 7)) true,
     row "going west: read at slice 2, write at slice 0 on cycle 4"
       (rule (onTiny [.once 2 0 (.read 0 w0), .once 0 4 (.write w0 0)] 5)) true,
@@ -677,16 +854,16 @@ def readRow (lines : String) (got want : Answer) : Row :=
   else ⟨s!"lines {lines}", true⟩
 
 /-- `compiler/lib/Passes/Unroll.cpp`, group by group. -/
-def readUnroll (a16 a29 a35 a54 a67 a72 a73 a82 a89 : Answer) : List Row :=
+def readUnroll (a16 a29 a35 a52 a65 a70 a71 a80 a87 : Answer) : List Row :=
   [ readRow "16 to 24" a16 ⟨.mlir, ""⟩,
     readRow "29 to 33" a29 ⟨.kernel, "Idx.inst"⟩,
-    readRow "35 to 52" a35 ⟨.kernel, "Stmt.inst"⟩,
-    readRow "54 to 60" a54 ⟨.mlir, ""⟩,
-    readRow "67 to 70" a67 ⟨.limit, "Item"⟩,
-    readRow "72, 74 and 79" a72 ⟨.kernel, "unrollLoop"⟩,
-    readRow "73" a73 ⟨.mlir, ""⟩,
-    readRow "82" a82 ⟨.kernel, "Item.unroll"⟩,
-    readRow "89 to 91" a89 ⟨.mlir, ""⟩ ]
+    readRow "35 to 50" a35 ⟨.kernel, "Stmt.inst"⟩,
+    readRow "52 to 58" a52 ⟨.mlir, ""⟩,
+    readRow "65 to 68" a65 ⟨.limit, "Item"⟩,
+    readRow "70, 72 and 77" a70 ⟨.kernel, "unrollLoop"⟩,
+    readRow "71" a71 ⟨.mlir, ""⟩,
+    readRow "80" a80 ⟨.kernel, "Item.unroll"⟩,
+    readRow "87 to 89" a87 ⟨.mlir, ""⟩ ]
 
 /-- Where the C++ pass and its Lean copy differ, and one line of the
 scheduler. -/
@@ -694,7 +871,7 @@ def readDifferences (newNames nested outside : Option Bool) (timingLine : Nat) :
   [ ⟨"new value names", newNames == some true⟩,
     ⟨"a loop inside a loop", nested == some false⟩,
     ⟨"a statement outside every loop", outside == some true⟩,
-    ⟨"the line of Schedule.cpp that is the timing rule", timingLine == 301⟩ ]
+    ⟨"the line of Schedule.cpp that is the timing rule", timingLine == 354⟩ ]
 
 /-- The lines of the C++ that the reading exercise quotes. If the C++ moves,
 `course/tests/CourseTest/SpecSolutions.lean` fails here and the exercise has to be
@@ -703,15 +880,15 @@ def quotedLines : List (String × Nat × String) :=
   [ ("compiler/lib/Passes/Unroll.cpp", 16, "#include"),
     ("compiler/lib/Passes/Unroll.cpp", 31, "op.setBase(op.getBase() + op.getStride() * k)"),
     ("compiler/lib/Passes/Unroll.cpp", 36, "getAttrOfType<IntegerAttr>(\"at\")"),
-    ("compiler/lib/Passes/Unroll.cpp", 50, "tau::AffineOp"),
-    ("compiler/lib/Passes/Unroll.cpp", 54, "struct UnrollPass"),
-    ("compiler/lib/Passes/Unroll.cpp", 67, "getParentOp"),
-    ("compiler/lib/Passes/Unroll.cpp", 72, "k < n"),
-    ("compiler/lib/Passes/Unroll.cpp", 73, "IRMapping mapping"),
-    ("compiler/lib/Passes/Unroll.cpp", 79, "builder.clone(op, mapping)"),
-    ("compiler/lib/Passes/Unroll.cpp", 82, "loop.erase()"),
-    ("compiler/lib/Passes/Unroll.cpp", 89, "createUnrollPass"),
-    ("compiler/lib/Passes/Schedule.cpp", 301, "return delay + 1 + std::abs(q - p);") ]
+    ("compiler/lib/Passes/Unroll.cpp", 48, "tau::MatVecOp"),
+    ("compiler/lib/Passes/Unroll.cpp", 52, "struct UnrollPass"),
+    ("compiler/lib/Passes/Unroll.cpp", 65, "getParentOp"),
+    ("compiler/lib/Passes/Unroll.cpp", 70, "k < n"),
+    ("compiler/lib/Passes/Unroll.cpp", 71, "IRMapping mapping"),
+    ("compiler/lib/Passes/Unroll.cpp", 77, "builder.clone(op, mapping)"),
+    ("compiler/lib/Passes/Unroll.cpp", 80, "loop.erase()"),
+    ("compiler/lib/Passes/Unroll.cpp", 87, "createUnrollPass"),
+    ("compiler/lib/Passes/Schedule.cpp", 354, "return delay + 1 + std::abs(q - p);") ]
 
 /-- Whether every quoted line is still where the exercise says it is. -/
 def quotedLinesHold : IO (List Row) := do
@@ -724,13 +901,14 @@ def quotedLinesHold : IO (List Row) := do
 
 /-! ## What makes a specification provable -/
 
-/-- A step that computes `relu`, for any meaning of the operations. -/
-def plain {V : Type} (S : Sem V) (x : V) : V := S.un .relu x
+/-- A step that computes `relu` of the word `x`, a value of 8 bits, for any
+meaning of the operations. -/
+def plain {V : Type} (S : Sem V) (x : V) : List V := S.un .i8 .relu [x]
 
 /-- The same, except that it first looks at the word: a zero word becomes the
-constant 7. It needs to compare values, which `plain` does not. -/
-def peeking {V : Type} [DecidableEq V] (S : Sem V) (x : V) : V :=
-  if x = S.zero then S.const [7] else S.un .relu x
+constant 7. It needs to compare words, which `plain` does not. -/
+def peeking {V : Type} [DecidableEq V] (S : Sem V) (x : V) : List V :=
+  if x = S.zero then S.const .i8 [7] else S.un .i8 .relu [x]
 
 /-- A memory that answers 0 where `Tau.memory` answers "nothing". -/
 def memory0 (words : List Int) : Block (List Int) (MemIn Int) Int where

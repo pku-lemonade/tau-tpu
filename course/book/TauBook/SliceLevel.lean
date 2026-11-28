@@ -16,7 +16,7 @@ set_option verso.code.warnLineLength 100
 
 *Specify:* `course/Specify/Machine/SliceLevel.lean`.
 
-*Read:* `spec/Tau/Isa/Op.lean` and `spec/Tau/Isa/Instr.lean` now.
+*Read:* `spec/Tau/Isa/Value.lean`, `spec/Tau/Isa/Op.lean` and `spec/Tau/Isa/Instr.lean` now.
 `spec/Tau/Machine/SliceLevel.lean` and `spec/tests/TauTest/Linear.lean` after you have
 specified.
 
@@ -31,8 +31,8 @@ then program the machine by hand.
 
 # Specify two parts of it first
 
-Read section 3 of `Machine.md`, all of it. Then read `spec/Tau/Isa/Op.lean`,
-`spec/Tau/Isa/Instr.lean`, and the first eighty lines of
+Read sections 1 and 3 of `Machine.md`, all of it. Then read `spec/Tau/Isa/Value.lean`, `spec/Tau/Isa/Op.lean`,
+`spec/Tau/Isa/Instr.lean`, and the first ninety lines of
 `spec/Tau/Machine/SliceLevel.lean`, down to the definition of `State`. Those are
 the types: operations, instructions, traps, the state of a slice. Stop
 there.
@@ -99,6 +99,8 @@ has a delay of one cycle and there is one stream in each direction.
 def tinyMachine : Tau.Config where
   kinds := [.mem, .vxm, .mem]
   streams := 1
+  lanes := 2
+  bankSize := 8
   memDelay := 1
   vxmDelay := 1
   sxmDelay := 1
@@ -141,8 +143,10 @@ in `spec/Tau/Proofs/Machine/Timing.lean`:
 
 Three definitions appear in its statement. `IsRun` says that `st` lists the
 states of a run that does not trap, `st u` being the state at the start of
-cycle `u`. `State.result` is what a slice computes in a cycle, and
-`State.out` is what comes out of its pipe and is placed on a stream. The
+cycle `u`. `State.result` is what a slice computes in a cycle: a value, as a
+list of words, and the first of its streams. The theorem follows one of the
+words, word `j`, on stream `id + j`. `State.placed` is the word a slice
+places on a given stream when a value comes out of its pipe. The
 hypothesis `hfree` is the condition "if nothing else is put on that stream in
 its path": no slice on the way places a word of its own in the slot just as
 the travelling word arrives there. `arrives_west` is the mirror image.
@@ -209,7 +213,7 @@ supplied from outside:
 {docstring Tau.Sem}
 
 `exprSem` above is one `Sem`. `wordSem lanes` is another: real words of
-32-bit lanes. The machine moves values and hands them to these operations. It
+byte lanes. The machine moves words and hands them to these operations. It
 never inspects one to decide what to do. Which slots are read, and whether a
 trap happens, depend only on the program. Look through `exec` and confirm
 this for yourself: no `if` or `match` in it tests a value of type `V`.
@@ -223,7 +227,10 @@ course.
 hand on a nine-slice machine, with a comment on each instruction. Follow one
 value through it: the word `x` leaves slice 2 on cycle 0 and is used by slice
 0 on cycle 4. Check that against the rule: 0 + 1 + 1 + 2 = 4. Then check the
-arrival of `W * x` and of `b` at slice 4 on cycle 14.
+arrival of `W * x` at slice 4 on cycle 14, and follow `b`. In memory `b` is a
+value of 8 bits, one word. The product is a value of 32 bits, four words on
+four streams. So the vector slice first widens `b` to 32 bits, and reads its
+own result two cycles later.
 
 The file also runs the checker on the same schedule. Ignore that part for
 now.
@@ -265,7 +272,7 @@ open Tau TauTest.Linear
 def addProgram : Program :=
   [ .once 2 sorry (.read 0 (e 0)),
     .once 3 sorry (.read 0 (e 1)),
-    .once 4 sorry (.bin .add (e 0) (e 1) (e 0)),
+    .once 4 sorry (.bin .i8 .add (e 0) (e 1) (e 0)),
     .once 5 sorry (.write (e 0) 0) ]
 
 def addImage : List (List (Word 2)) :=

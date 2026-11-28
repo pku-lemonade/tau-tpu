@@ -46,18 +46,32 @@ def systolicOf (x : List Int) : Block (Vector Int x.length) (List Int) Int :=
 place are given by position. -/
 def streamOf (d : Dir) (placed : Nat → Option Int) (row : List (Option Int)) :
     List (Option Int) :=
-  advanceRow ((List.range row.length).map fun p => (placed p).map fun v => (⟨d, 0⟩, v)) d 0 row
+  advanceRow ((List.range row.length).map fun p => (placed p).map fun v => (⟨d, 0⟩, [v])) d 0 row
 
 #guard passes (Tables.streamEast (streamOf .east))
 #guard passes (Tables.streamEastDecisions (streamOf .east))
 #guard passes (Tables.streamWest (streamOf .west))
 #guard passes (Tables.exec exec)
 #guard passes (Tables.execDecisions exec)
+#guard passes (Tables.product exec)
+#guard passes (Tables.productDecisions exec)
+#guard passes (Tables.groups exec)
 
-/-- The event of a pinned statement, as Programs 5 has it: the statement has
-run and `env` is what it left. -/
-def eventOf (i : Nat) (t : Idx) (s : Stmt) (env : Env Expr) : Option (Event Expr) :=
-  (env.issue (t.eval i) (s.target i)).events.head?
+/-- The words of a value of two lanes, each as the integers of its lanes. -/
+def wordsOf (ty : DType) (xs : List Int) : List (List Int) :=
+  (Value.ofInts ty xs : Value 2).map Word.toInts
+
+/-- The elements of the value whose words have these lanes. -/
+def elementsOf (ws : List (List Int)) : List Int :=
+  Value.toInts (ws.map Word.ofInts : Value 2)
+
+#guard passes (Tables.values DType.bytes wordsOf)
+#guard passes (Tables.valuesDecisions wordsOf elementsOf)
+
+/-- The events of a pinned statement, as Programs 5 has it: the statement has
+run and `env` is what it left, with no events yet. -/
+def eventOf (i : Nat) (t : Idx) (s : Stmt) (env : Env Expr) : List (Event Expr) :=
+  (env.issue (t.eval i) (s.target i)).events
 
 #guard passes (Tables.pin eventOf)
 #guard passes (Tables.pinDecisions eventOf)
@@ -69,7 +83,10 @@ def runSource (s : Source) (bufs : List (List Expr)) :
 
 #guard passes (Tables.calls runSource)
 #guard passes (Tables.issued (issues exprSem))
+#guard passes (Tables.banks (execute exprSem))
+#guard passes (Tables.banksDecisions (execute exprSem))
 #guard passes (Tables.numbers Stream.encode encodeInt)
+#guard passes (Tables.operations UnOp.encode)
 #guard passes (Tables.numbersBack Stream.decode decodeInt)
 #guard passes (Tables.entries TimedEntry.encode)
 

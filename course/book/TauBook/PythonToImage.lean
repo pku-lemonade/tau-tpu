@@ -129,9 +129,9 @@ A kernel that applies relu, pinned to its cycle 3, called twice:
 ```lean
 def reluCallee : Source :=
   Source.ofKernel
-    [ .stmt (.load 0 0 ⟨0, 0⟩),
-      .stmt (.pin ⟨3, 0⟩ (.un 1 .relu 0)),
-      .stmt (.store 1 1 ⟨0, 0⟩) ]
+    [ .stmt (.load 0 .i8 0 ⟨0, 0⟩),
+      .stmt (.pin ⟨3, 0⟩ (.un 1 .i8 .relu 0)),
+      .stmt (.store 1 .i8 1 ⟨0, 0⟩) ]
 
 def reluTwice : Source :=
   .call reluCallee [0, 2] 0 (.call reluCallee [2, 1] 10 .done)
@@ -179,7 +179,7 @@ compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --print-mlir
 ```
 
 and compare what is printed after `tau-route` with what is printed after
-`tau-slice`. Before, `%8 = tau.i.bin %6, %7` says that the add takes the
+`tau-slice`. Before, `%7 = tau.i.bin %5, %6` says that the add takes the
 results of two other instructions. After, an entry says
 `a = "e0", b = "e1"`: it reads two streams. The first is how a compiler
 thinks. The second is all the machine has: a slice is told which streams to
@@ -194,8 +194,8 @@ out of the one list, and `step` asks each slice for what is due.
 A slice's repeater can issue one entry many times. `tau-fold` finds entries
 of a slice that are the same but for their cycle and their address, and
 whose cycles and addresses go up in equal steps, and merges them into one
-repeating entry. After `tau-fold` in the output above, the two `mac` entries
-of slice 0 are one.
+repeating entry. After `tau-fold` in the output above, the two `install`
+entries of slice 0 are one.
 
 A fold is a rewrite, and a rewrite can be wrong. tau-tpu once did this
 merging inside the function that writes the JSON file. Every check still

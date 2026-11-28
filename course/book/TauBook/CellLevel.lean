@@ -47,10 +47,12 @@ have the same shape. The differences are these.
 
 * Instructions are issued by a `repeater`, which counts down to each one in
   its own registers. No cycle count is shared by the whole machine.
-* Memory is a `memory` block holding a vector, not a list.
+* Memory is two `memory` blocks, one for each bank, each holding a vector,
+  not a list.
 * Results wait in a `shiftRegister`.
-* The matrix slice has one `mac` cell per lane, and a second small `memory`
-  for the columns it stores.
+* The matrix slice has a row of `mac` cells for each element of a product
+  (`macRow`). Each cell of a row holds one lane of an installed word, and
+  the row adds up its products from cell to cell.
 
 # Try it
 

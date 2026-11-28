@@ -19,18 +19,30 @@ optimization.
 
 *Read:* `spec/Tau/Check/Expr.lean`, `spec/Tau/Check/Simplify.lean`.
 
-*Proofs:* `spec/Tau/Proofs/Check/Simplify.lean`. All of them are exercises, and
-short.
+*Proofs:* `spec/Tau/Proofs/Check/Simplify.lean`. The two about `simpUn` and
+`simpBin` are exercises, and short. The rest are for reading.
 
 *Time:* one day.
 
 # The idea
 
-An expression describes a value by how it was computed.
+An expression describes a word by how it was computed.
 
 {docstring Tau.Expr}
 
 You have already used two of these as names: `.init 0 0` and `.fill`.
+
+A word is computed as part of a value: an operation takes values and gives a
+value, and a value is one, two or four words. So there is a second kind of
+expression, for a value, and the two are defined together. A word is "word
+`k` of this value", and a value is an operation applied to values, or some
+words side by side.
+
+{docstring Tau.VExpr}
+
+`VExpr.ofWords` makes a value of a list of words. If they are all the words
+of one value, in order, it gives that value back, so an expression stays as
+small as the computation it describes.
 
 Expressions are themselves a `Sem`: applying an operation to expressions
 builds a bigger expression.
@@ -48,16 +60,22 @@ by the word from the buffer and applies the real operations.
 
 # A simplifier
 
-{docstring Tau.Expr.simp}
+{docstring Tau.VExpr.simp}
+
+Here `a` is the value whose one word started at position 0 of buffer 0.
 
 ```lean
-example :
-    (Expr.un .relu (.un .relu (.init 0 0))).simp = .un .relu (.init 0 0) := by
-  rfl
+def a : VExpr := .words (.cons (.init 0 0) .nil)
 
-example : (Expr.bin .max (.init 0 0) (.init 0 0)).simp = .init 0 0 := by
-  rfl
+example : (VExpr.un .i8 .relu (.un .i8 .relu a)).simp = .un .i8 .relu a := by
+  decide
+
+example : (VExpr.bin .i8 .max a a).simp = a := by
+  decide
 ```
+
+A word is simplified by simplifying the value it is a word of
+(`Expr.simp`).
 
 The compiler's `tau-simplify` pass does the same rewrites on MLIR. See it
 work on `examples/nn/linear/kernel.mlir`, which has a `relu` of a `relu`:
@@ -82,13 +100,13 @@ The first half is about expressions and works for any operations that obey
 the laws:
 
 ```lean
-example (S : Sem Nat) (hS : S.Lawful) (bufs : List (List Nat)) (fill : Nat) (e : Expr) :
-    e.simp.denote S bufs fill = e.denote S bufs fill :=
-  Expr.denote_simp S hS bufs fill e
+example (S : Sem Nat) (hS : S.Lawful) (bufs : List (List Nat)) (fill : Nat) (v : VExpr) :
+    v.simp.denote S bufs fill = v.denote S bufs fill :=
+  VExpr.denote_simp S hS bufs fill v
 ```
 
 The second half shows that real words obey the laws, using the facts about
-lanes from the chapter on the MAC:
+elements from the chapter on the MAC:
 
 ```lean
 example : (wordSem 4).Lawful := wordSem_lawful 4
@@ -102,8 +120,9 @@ number format untouched.
 1. Read `spec/Tau/Check/Expr.lean` and `spec/Tau/Check/Simplify.lean`.
 2. In your scratch file, build an expression that `simp` reduces in two
    places, and check the result with `rfl`.
-3. Do `Prove/Check/Simplify.lean`: first `denote_simpUn` and
-   `denote_simpBin`, then `Expr.denote_simp` by induction on the expression.
+3. Do `Prove/Check/Simplify.lean`: `denote_simpUn` and `denote_simpBin`.
+   Then read `Expr.denote_simp`, `VExpr.denote_simp` and `Exprs.denote_simp`
+   below them, which use your two.
 4. Read `compiler/lib/Passes/Simplify.cpp`. It makes the same three
    rewrites, on a kernel.
 5. Specify that pass in Lean, in `course/Specify/IR/Simplify.lean`. It is the
@@ -113,8 +132,12 @@ number format untouched.
 
 # Lean you will need
 
-* Induction on an inductive type you defined: `induction e with`, one case
-  per constructor, with an induction hypothesis for each sub-expression.
+* Recursion over types that are defined together. `Expr`, `VExpr` and
+  `Exprs` each mention the others, so a fact about one needs the same fact
+  about the others, and `induction` does not apply. The three theorems are
+  written as functions by pattern matching, one case per constructor, and
+  call each other on the parts of the expression. Lean checks that every
+  such call is on a smaller expression.
 * `unfold simpUn` followed by `split`, to follow the cases of a function
   defined by pattern matching.
 * `obtain ⟨h1, rfl⟩ := h`, to take a conjunction apart and substitute an
@@ -146,8 +169,8 @@ changes and run `git switch main`.
 
 *Specify.* Add a rewrite of your own. A candidate: `max a (max a b)` becomes
 `max a b`. Add the law it needs to `Sem.Lawful` and the case to `simpBin`.
-Before asking anyone to prove your law for words, state it for a single lane
-and try `bv_decide`. If the law is false you will get a counterexample in
+Before asking anyone to prove your law for words, state it for a single
+element and try `bv_decide`. If the law is false you will get a counterexample in
 seconds. Then have an agent repair `denote_simpBin` and `wordSem_lawful`, in
 `spec/Tau/Proofs/Check/Simplify.lean`, and review the change. It should touch
 those two proofs and nothing else.
@@ -163,17 +186,16 @@ state that yours keeps values.
 
 # Hints
 
-For `denote_simpUn`: `unfold simpUn`, `split`. In the first case the goal
-becomes the law `relu_relu` after `simp only [Expr.denote]`. The second case
-is `rfl`.
+For `denote_simpUn`: `unfold simpUn`, `split`. The first case has an `if` on
+the two types, so `split` again. Where they are equal, `subst` the equation
+and the goal becomes the law `relu_relu` after `simp only [VExpr.denote]`.
+The other cases are `rfl`.
 
 For `denote_simpBin`: `unfold simpBin`, `split`. In the first case take the
-hypothesis apart; the operation is `max` or `min` and the two operands are
-equal.
-
-For `Expr.denote_simp`: in the `un` and `bin` cases use the two lemmas and
-the induction hypotheses. The other cases are `rfl` or `simp only` with the
-definitions.
+hypothesis apart; the operation is `max` or `min`, the two operands are
+equal, and the operand has as many words as the type. The laws ask for the
+last as a fact about the value, not about its expression:
+`VExpr.length_denote` turns one into the other.
 
 For `course/Specify/IR/Simplify.lean`: walk the statements in order and carry two
 things along, the values that were replaced and by what, and the values that

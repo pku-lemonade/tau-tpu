@@ -84,9 +84,9 @@ applies `relu`, and stores the result to word 0 of buffer 1:
 
 ```lean
 def reluKernel : Kernel :=
-  [ .stmt (.load 0 0 ⟨0, 0⟩),
-    .stmt (.un 1 .relu 0),
-    .stmt (.store 1 1 ⟨0, 0⟩) ]
+  [ .stmt (.load 0 .i8 0 ⟨0, 0⟩),
+    .stmt (.un 1 .i8 .relu 0),
+    .stmt (.store 1 .i8 1 ⟨0, 0⟩) ]
 ```
 
 # What a kernel means
@@ -97,13 +97,15 @@ value or a position outside a buffer. Read it in `spec/Tau/IR/Kernel.lean`, from
 `Stmt.exec` up to `Kernel.run`.
 
 Like the machine, it works for any `Sem`. Run on names, the kernel above ends
-with buffer 1 holding "`relu` of the word that started in buffer 0":
+with buffer 1 holding "word 0 of `relu` of the value whose one word started
+in buffer 0". An operation takes and gives values, and a value of type `i8`
+is one word; the chapter on expressions has the details.
 
 ```lean
 example :
     reluKernel.run exprSem [[.init 0 0], [.init 1 0]]
-      = some [[.init 0 0], [.un .relu (.init 0 0)]] := by
-  rfl
+      = some [[.init 0 0], [.word 0 (.un .i8 .relu (.ofWords [.init 0 0]))]] := by
+  decide
 ```
 
 `Kernel.run` is the definition of correctness for the whole compiler: a
@@ -120,9 +122,9 @@ A loop of two iterations that copies buffer 0 to buffer 1, unrolled:
 
 ```lean
 example :
-    Kernel.unroll [.loop 2 [.load 0 0 ⟨0, 1⟩, .store 0 1 ⟨0, 1⟩]]
-      = [ .load 0 0 ⟨0, 0⟩, .store 0 1 ⟨0, 0⟩,
-          .load 0 0 ⟨1, 0⟩, .store 0 1 ⟨1, 0⟩ ] := by
+    Kernel.unroll [.loop 2 [.load 0 .i8 0 ⟨0, 1⟩, .store 0 .i8 1 ⟨0, 1⟩]]
+      = [ .load 0 .i8 0 ⟨0, 0⟩, .store 0 .i8 1 ⟨0, 0⟩,
+          .load 0 .i8 0 ⟨1, 0⟩, .store 0 .i8 1 ⟨1, 0⟩ ] := by
   rfl
 ```
 

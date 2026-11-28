@@ -81,8 +81,8 @@ stores it to word 0 of buffer 1.
 
 ```lean
 def copyKernel : Kernel :=
-  [ .stmt (.load 0 0 ⟨0, 0⟩),
-    .stmt (.store 0 1 ⟨0, 0⟩) ]
+  [ .stmt (.load 0 .i8 0 ⟨0, 0⟩),
+    .stmt (.store 0 .i8 1 ⟨0, 0⟩) ]
 ```
 
 A compiled program also says where the buffers live. Buffer 0 is at slice 0
@@ -92,7 +92,7 @@ and buffer 1 at slice 2, each one word long.
 def tinyCompiled (prog : Program) (cycles : Nat) : Compiled where
   cfg := tinyMachine
   memSizes := [1, 0, 1]
-  map := [⟨0, 0, 1⟩, ⟨2, 0, 1⟩]
+  map := [.one 0 0 1, .one 2 0 1]
   prog := prog
   cycles := cycles
 ```
@@ -173,7 +173,9 @@ applying `f` first and running the machine. That is `execute_map`, and
 `Kernel.run_map` and `Source.run_map` say the same of kernels and of source
 programs.
 
-Evaluating an expression, `Expr.denote`, is such a function. So the run on
+Evaluating an expression, `Expr.denote`, is such a function, for any
+operations that give values of the right number of words (`Sem.Sized`); that
+is what lets the words of a value be named one by one. So the run on
 real words is the run on names, evaluated. Two runs that end with the same
 expressions therefore end with the same words, for every input.
 
@@ -421,9 +423,9 @@ and undo the change afterwards.
 
 1. In `compiler/lib/Passes/Schedule.cpp`, in the function `lag`, remove the
    `+ 1` from the timing rule.
-2. In `compiler/lib/Passes/Route.cpp`, delete the loop
-   `while (numbers.count(stream)) ++stream;`, so that every word gets
-   stream 0.
+2. In `compiler/lib/Passes/Route.cpp`, delete the loop that begins
+   `while (base + width <= machine->streams && !free())`, so that every
+   word gets stream 0.
 3. In `compiler/lib/Passes/Schedule.cpp`, in `Scheduler::write`, delete the
    statement that begins `writeWord(instrs[unit.result].op->getLoc(),`, so
    that a word that should wait in memory is never written there.

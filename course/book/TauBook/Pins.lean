@@ -62,9 +62,9 @@ is the kernel of the chapter on kernels again, with its relu pinned to cycle
 
 ```lean
 def reluAt (t : Nat) : Kernel :=
-  [ .stmt (.load 0 0 ⟨0, 0⟩),
-    .stmt (.pin ⟨t, 0⟩ (.un 1 .relu 0)),
-    .stmt (.store 1 1 ⟨0, 0⟩) ]
+  [ .stmt (.load 0 .i8 0 ⟨0, 0⟩),
+    .stmt (.pin ⟨t, 0⟩ (.un 1 .i8 .relu 0)),
+    .stmt (.store 1 .i8 1 ⟨0, 0⟩) ]
 ```
 
 Running a kernel gives its buffers, as before, and its _timeline_: the events
@@ -73,10 +73,10 @@ event. It says: the relu of the word that started at position 0 of buffer 0,
 on cycle 3.
 
 ```lean
-example :
-    kernelEvents (reluAt 3) [1, 1]
-      = [⟨3, none, .un .relu (.init 0 0)⟩] := by
-  rfl
+def reluOfInput : Expr := .word 0 (.un .i8 .relu (.ofWords [.init 0 0]))
+
+example : kernelEvents (reluAt 3) [1, 1] = [⟨3, none, reluOfInput⟩] := by
+  decide
 ```
 
 A pin does not change what a kernel computes. `Stmt.exec` runs the statement
@@ -98,6 +98,8 @@ timing rule, with a delay of 1 and a distance of 1.
 def pinMachine : Tau.Config where
   kinds := [.mem, .vxm, .mem]
   streams := 1
+  lanes := 2
+  bankSize := 8
   memDelay := 1
   vxmDelay := 1
   sxmDelay := 1
@@ -106,10 +108,10 @@ def pinMachine : Tau.Config where
 def reluProgram (t : Nat) : Compiled where
   cfg := pinMachine
   memSizes := [1, 0, 1]
-  map := [⟨0, 0, 1⟩, ⟨2, 0, 1⟩]
+  map := [.one 0 0 1, .one 2 0 1]
   prog :=
     [ .once 0 t (.read 0 ⟨.east, 0⟩),
-      .once 1 (t + 3) (.un .relu ⟨.east, 0⟩ ⟨.east, 0⟩),
+      .once 1 (t + 3) (.un .i8 .relu ⟨.east, 0⟩ ⟨.east, 0⟩),
       .once 2 (t + 6) (.write ⟨.east, 0⟩ 0) ]
   cycles := t + 7
 ```
@@ -120,9 +122,9 @@ Its timeline has three events: what it read, the relu, and the store.
 example :
     machineEvents (reluProgram 0)
       = [ ⟨0, none, .init 0 0⟩,
-          ⟨3, none, .un .relu (.init 0 0)⟩,
-          ⟨6, some (1, 0), .un .relu (.init 0 0)⟩ ] := by
-  rfl
+          ⟨3, none, reluOfInput⟩,
+          ⟨6, some (1, 0), reluOfInput⟩ ] := by
+  decide
 ```
 
 The second is the kernel's event. The program that starts on cycle 0 keeps
@@ -247,7 +249,7 @@ the shortest schedule the compiler finds, where there is one: the program
 runs as fast as without them, and its timing is now part of what is checked.
 
 `examples/paced/kernel.py` pins a loop to one iteration every cycle, the
-fastest pace there is, since a slice issues one instruction in a cycle:
+fastest pace there is, since a memory slice issues one read in a cycle:
 
 ```
 PYTHONPATH=compiler/python python3 -m tau examples/paced/kernel.py -o out
@@ -256,18 +258,18 @@ lake exe tau-sim --timeline out/source.json examples/paced/buffers.json
 lake exe tau-check out/source.json out/compiled.json
 ```
 
-One iteration takes seven cycles from its read to its write, so with one
+One iteration takes eleven cycles from its read to its write, so with one
 cycle between iterations all four are in flight at once. Open
 `out/compiled.json`: the whole loop is three entries, each issued four times,
 on consecutive cycles. A loop at a fixed spacing is what a repeating entry is.
 
 ```
-cycle:   0  1  2  3  4  5  6  7  8  9  10
-iter 0:  R───────────V────────W
-iter 1:     R───────────V────────W
-iter 2:        R───────────V────────W
-iter 3:           R───────────V────────W
-         (R = read at slice 2, V = relu at slice 4, W = write at slice 3)
+cycle:   0  1  2  3  4  5  6  7  8  9  10 11 12 13 14
+iter 0:  R─────────────────V──────────────W
+iter 1:     R─────────────────V──────────────W
+iter 2:        R─────────────────V──────────────W
+iter 3:           R─────────────────V──────────────W
+         (R = read at slice 2, V = relu at slice 6, W = write at slice 3)
 ```
 
 A pace is also what makes a long loop a short program.

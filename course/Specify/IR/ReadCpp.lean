@@ -38,42 +38,42 @@ def lines16to24 : Answer := todo
 `base + stride * k` and the stride to 0. -/
 def lines29to33 : Answer := todo
 
-/-- Lines 35 to 52: `instantiate(Operation *op, uint64_t k)`, which fills the
-iteration into a pin and picks out the four operations that have a
+/-- Lines 35 to 50: `instantiate(Operation *op, uint64_t k)`, which fills the
+iteration into a pin and picks out the three operations that have a
 position. -/
-def lines35to52 : Answer := todo
+def lines35to50 : Answer := todo
 
-/-- Lines 54 to 60: `struct UnrollPass`, its name and its description. -/
-def lines54to60 : Answer := todo
+/-- Lines 52 to 58: `struct UnrollPass`, its name and its description. -/
+def lines52to58 : Answer := todo
 
-/-- Lines 67 to 70: a `tau.for` inside a `tau.for` is an error. Lines 75 to
-78 say the same for the body. -/
-def lines67to70 : Answer := todo
+/-- Lines 65 to 68: a `tau.for` inside a `tau.for` is an error. Lines 73 to
+76 say the same for the body. -/
+def lines65to68 : Answer := todo
 
-/-- Lines 72, 74 and 79: for every `k` below `n`, for every operation of the
+/-- Lines 70, 72 and 77: for every `k` below `n`, for every operation of the
 body, make a copy and fill in `k`. -/
-def lines72and74and79 : Answer := todo
+def lines70and72and77 : Answer := todo
 
-/-- Line 73, and the argument `mapping` on line 79: an `IRMapping`, new for
+/-- Line 71, and the argument `mapping` on line 77: an `IRMapping`, new for
 every copy. -/
-def line73 : Answer := todo
+def line71 : Answer := todo
 
-/-- Line 82: `loop.erase()`. -/
-def line82 : Answer := todo
+/-- Line 80: `loop.erase()`. -/
+def line80 : Answer := todo
 
-/-- Lines 89 to 91: `tau::createUnrollPass`. -/
-def lines89to91 : Answer := todo
+/-- Lines 87 to 89: `tau::createUnrollPass`. -/
+def lines87to89 : Answer := todo
 
 #eval report "Unroll.cpp, group by group"
-  (readUnroll lines16to24 lines29to33 lines35to52 lines54to60 lines67to70
-    lines72and74and79 line73 line82 lines89to91)
+  (readUnroll lines16to24 lines29to33 lines35to50 lines52to58 lines65to68
+    lines70and72and77 line71 line80 lines87to89)
 
 /-! ## Where the two differ
 
 Answer `some true` or `some false`. -/
 
 /-- The C++ gives the statements of each copy of the body new value names,
-and the Lean copy keeps the names. (What is line 73 for?) -/
+and the Lean copy keeps the names. (What is line 71 for?) -/
 def newNames : Option Bool := todo
 
 /-- Both the C++ and the Lean copy can be given a loop inside a loop. (Look
@@ -93,13 +93,14 @@ def timingRuleLine : Nat := todo
 
 /-! ## After the reports agree
 
-The third group of lines, 35 to 52, names four operations. Until this
-exercise was written it named three, and the Lean copy named four. The one
-missing was `tau.affine`: inside a loop it kept the same position in every
-copy. The checker rejected every such program, so no wrong answer ever came
-out of the compiler, and no example had such a kernel. Reading the two files
-side by side found it. `examples/nn/affine-batch` is the kernel that now tests
-it.
+The third group of lines, 35 to 50, names every operation that has a
+position. When this exercise was first written it named one fewer than the
+Lean copy did. The one missing was an operation the language had then, a
+matrix product with a bias added: inside a loop it kept the same position in
+every copy. The checker rejected every such program, so no wrong answer ever
+came out of the compiler, and no example had such a kernel. Reading the two
+files side by side found it. `examples/nn/affine-batch` is the kernel that
+was added to test it.
 
 A copy in Lean does not prove the C++ right. It does give you something
 precise to hold the C++ against.

@@ -30,9 +30,13 @@ open Tau Specify
 /-! ## Pins and the image -/
 
 /-- A solution to `Specify.IR.Pins`. -/
-def eventOf {V : Type} (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : Option (Event V) :=
+def eventOf {V : Type} (i : Nat) (t : Idx) (s : Stmt) (env : Env V) : List (Event V) :=
   let target := s.target i
-  (env.vars.lookup target.1).map fun w => ⟨t.eval i, target.2, w⟩
+  match env.vars.lookup target.1 with
+  | some x =>
+    (List.range x.length).zipWith
+      (fun k w => ⟨t.eval i, target.2.map fun bk => (bk.1, bk.2 + k), w⟩) x
+  | none => []
 
 #guard passes (Tables.pin eventOf)
 #guard passes (Tables.pinDecisions eventOf)
@@ -70,38 +74,36 @@ def Known.use (k : Known) (v : Var) : Var := (k.alias.lookup v).getD v
 /-- A statement with every value it uses replaced by the value to use in its
 place. -/
 def Known.rename (k : Known) : Stmt → Stmt
-  | .load dst buf ix => .load dst buf ix
-  | .store src buf ix => .store (k.use src) buf ix
-  | .un dst op a => .un dst op (k.use a)
-  | .bin dst op a b => .bin dst op (k.use a) (k.use b)
+  | .load dst ty buf ix => .load dst ty buf ix
+  | .store src ty buf ix => .store (k.use src) ty buf ix
+  | .un dst ty op a => .un dst ty op (k.use a)
+  | .bin dst ty op a b => .bin dst ty op (k.use a) (k.use b)
   | .matvec dst x buf ix n => .matvec dst (k.use x) buf ix n
-  | .affine dst x bias buf ix n => .affine dst (k.use x) (k.use bias) buf ix n
-  | .const dst xs => .const dst xs
-  | .sel dst m a b => .sel dst (k.use m) (k.use a) (k.use b)
+  | .const dst ty xs => .const dst ty xs
+  | .sel dst ty m a b => .sel dst ty (k.use m) (k.use a) (k.use b)
   | .pin t s => .pin t (k.rename s)
 
 /-- Simplify one statement. Returns what is known afterwards and the
 statement to keep, if any. A pinned statement is always kept. -/
 def simplifyStmt (k : Known) : Stmt → Known × Option Stmt
-  | .load dst buf ix => (k, some (.load dst buf ix))
-  | .store src buf ix => (k, some (.store (k.use src) buf ix))
-  | .un dst .relu a =>
+  | .load dst ty buf ix => (k, some (.load dst ty buf ix))
+  | .store src ty buf ix => (k, some (.store (k.use src) ty buf ix))
+  | .un dst ty .relu a =>
     let a := k.use a
     if k.relus.contains a then ({ k with alias := (dst, a) :: k.alias }, none)
-    else ({ k with relus := dst :: k.relus }, some (.un dst .relu a))
-  | .un dst op a => (k, some (.un dst op (k.use a)))
-  | .bin dst op a b =>
+    else ({ k with relus := dst :: k.relus }, some (.un dst ty .relu a))
+  | .un dst ty op a => (k, some (.un dst ty op (k.use a)))
+  | .bin dst ty op a b =>
     let a := k.use a
     let b := k.use b
     if (op == .max || op == .min) && a == b then ({ k with alias := (dst, a) :: k.alias }, none)
-    else (k, some (.bin dst op a b))
+    else (k, some (.bin dst ty op a b))
   | .matvec dst x buf ix n => (k, some (.matvec dst (k.use x) buf ix n))
-  | .affine dst x bias buf ix n => (k, some (.affine dst (k.use x) (k.use bias) buf ix n))
-  | .const dst xs => (k, some (.const dst xs))
-  | .sel dst m a b => (k, some (.sel dst (k.use m) (k.use a) (k.use b)))
+  | .const dst ty xs => (k, some (.const dst ty xs))
+  | .sel dst ty m a b => (k, some (.sel dst ty (k.use m) (k.use a) (k.use b)))
   | .pin t s =>
     let k' := match s with
-      | .un dst .relu _ => { k with relus := dst :: k.relus }
+      | .un dst _ .relu _ => { k with relus := dst :: k.relus }
       | _ => k
     (k', some (.pin t (k.rename s)))
 
@@ -137,7 +139,7 @@ def simplify (k : Kernel) : Kernel := simplifyFrom ⟨[], []⟩ k
 `u`, on the stream `tr`: Machine 3.4. -/
 def arrives (cfg : Config) (tr : Stream) (q u : Nat) : Nat × Nat × Instr → Bool
   | (p, t, i) =>
-    Tables.result i == some tr &&
+    (Tables.results i).contains tr &&
     match cfg.kindAt p with
     | none => false
     | some kind =>
@@ -292,7 +294,7 @@ open Specify.Tables
 
 #guard passes (readUnroll ⟨.mlir, ""⟩ ⟨.kernel, "Idx.inst"⟩ ⟨.kernel, "Stmt.inst"⟩ ⟨.mlir, ""⟩
   ⟨.limit, "Item"⟩ ⟨.kernel, "unrollLoop"⟩ ⟨.mlir, ""⟩ ⟨.kernel, "Item.unroll"⟩ ⟨.mlir, ""⟩)
-#guard passes (readDifferences (some true) (some false) (some true) 301)
+#guard passes (readDifferences (some true) (some false) (some true) 354)
 
 -- The names the answers give exist.
 #check @Idx.inst

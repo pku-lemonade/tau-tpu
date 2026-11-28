@@ -63,24 +63,27 @@ once in the proof.
 
 # Fixed-width numbers
 
-So far the examples used `Nat`. Real hardware uses a fixed number of bits. A
-_lane_ in tau-tpu is a 32-bit value, the Lean type `BitVec 32`, and arithmetic
-wraps around on overflow. Read `spec/Tau/Isa/Word.lean` now. A _word_ is a fixed
-number of lanes.
+So far the examples used `Nat`. Real hardware uses a fixed number of bits.
+Read `spec/Tau/Isa/Word.lean` now. A _lane_ in tau-tpu is a byte, and a
+_word_ is a fixed number of lanes. A slice computes with _elements_ of 32
+bits, the Lean type `BitVec 32`, and arithmetic wraps around on overflow. An
+element is held as one, two or four bytes; `spec/Tau/Isa/Value.lean` says how,
+and you can leave it for the chapter on the slice-level machine.
 
-The MAC theorem holds for lanes too, because it assumes nothing about
+The MAC theorem holds for elements too, because it assumes nothing about
 addition. What changes is the meaning of the sum: it is the true dot product
 only if nothing overflowed.
 
-`spec/Tau/Proofs/Isa/Word.lean` proves facts about single lanes in two ways.
+`spec/Tau/Proofs/Isa/Word.lean` proves facts about single elements in two
+ways.
 
-The first way is by cases. `Lane.relu a` is `if a.slt 0 then 0 else a`, where
+The first way is by cases. `Elem.relu a` is `if a.slt 0 then 0 else a`, where
 `slt` is signed less-than. To prove something about it, split on the
 comparison:
 
 ```lean
-example (a : Lane) : Lane.relu (Lane.relu a) = Lane.relu a := by
-  unfold Lane.relu
+example (a : Elem) : Elem.relu (Elem.relu a) = Elem.relu a := by
+  unfold Elem.relu
   by_cases h : a.slt 0 = true <;> simp_all
 ```
 
@@ -88,18 +91,18 @@ The second way is `bv_decide`. It turns the statement into a question about
 individual bits, hands it to a SAT solver, and checks the solver's answer:
 
 ```lean
-example (a b : Lane) : Lane.max a b = Lane.max b a := by
-  unfold Lane.max
+example (a b : Elem) : Elem.max a b = Elem.max b a := by
+  unfold Elem.max
   bv_decide
 ```
 
 `bv_decide` needs no insight. When the statement is false it gives a
-counterexample: try it on `Lane.max a b = a` and read the message. Its cost is
+counterexample: try it on `Elem.max a b = a` and read the message. Its cost is
 trust. In your scratch file run these two commands and compare:
 
 ```
-#print axioms Tau.Lane.max_comm
-#print axioms Tau.Lane.max_self
+#print axioms Tau.Elem.max_comm
+#print axioms Tau.Elem.max_self
 ```
 
 The first lists an extra axiom. A `bv_decide` proof relies on Lean's compiler
@@ -126,14 +129,14 @@ being correct. The main theorems of this course avoid it for that reason.
 
 *Prove.* `Prove/Blocks/Mac.lean`, then `Prove/Isa/Word.lean`.
 
-*State.* State and prove a fact about `Lane.requant` that a user of it would
+*State.* State and prove a fact about `Elem.requant` that a user of it would
 want to know, other than its range. For example: with `k = 0`, an input that
 is already between -128 and 127 comes out unchanged. Write the bounds with
-`slt`, as `Lane.requant_range` does. Try `bv_decide` first. If it fails, read
+`slt`, as `Elem.requant_range` does. Try `bv_decide` first. If it fails, read
 the counterexample before deciding the tactic is at fault: your statement may
 be false at one of the bounds.
 
-*Challenge.* Give a condition on two signals of lanes under which the MAC's
+*Challenge.* Give a condition on two signals of elements under which the MAC's
 total, read as a signed integer with `BitVec.toInt`, equals the dot product
 computed over the integers. Prove it. You will need facts about
 `BitVec.toInt` from Lean's library. Finding them, with `exact?` and by
@@ -146,7 +149,7 @@ For `mac_stateAt_add`: `unfold mac`, then `rw [Block.stateAt_mapIn]`, then
 works because applying `AccIn.map` to `.add (a k, b k)` computes to
 `.add (a k * b k)`.
 
-For the lane facts proved by cases: `unfold` the operation, then
+For the element facts proved by cases: `unfold` the operation, then
 `split <;> rfl` or `by_cases h : ... <;> simp_all`.
 
 # Checkpoint

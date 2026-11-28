@@ -47,7 +47,7 @@ variable {V W : Type}
 /-- If a placed program run on expressions ends with the table `m`, then run
 on real buffers it can be carried out, and the buffers it ends with are `m`
 evaluated. -/
-theorem Placed.execute_of_exprs (S : Sem V) (pl : Placed) (bufs : List (List V)) (fill : V)
+theorem Placed.execute_of_exprs (S : Sem V) (hZ : S.Sized) (pl : Placed) (bufs : List (List V)) (fill : V)
     (m : List (List Expr)) (h : placedExprs pl = some m) :
     ∃ mem,
       pl.execute S (pl.image bufs fill) = some mem ∧
@@ -55,7 +55,7 @@ theorem Placed.execute_of_exprs (S : Sem V) (pl : Placed) (bufs : List (List V))
   -- The proof of `execute_of_exprs` again, with `Placed.execute_map` in place
   -- of `execute_map`.
   let f := Expr.denote S bufs fill
-  have hf : exprSem.Hom S f := denote_hom S bufs fill
+  have hf : exprSem.Hom S f := denote_hom S hZ bufs fill
   unfold placedExprs at h
   cases hx : pl.execute exprSem (Tau.image pl.map pl.memSizes Expr.init .fill) with
   | none => simp [hx] at h
@@ -74,11 +74,11 @@ theorem Placed.execute_of_exprs (S : Sem V) (pl : Placed) (bufs : List (List V))
 
 /-- The timeline of a placed program on real buffers is its timeline on
 expressions, evaluated. -/
-theorem Placed.timeline_of_events (S : Sem V) (pl : Placed) (bufs : List (List V)) (fill : V) :
+theorem Placed.timeline_of_events (S : Sem V) (hZ : S.Sized) (pl : Placed) (bufs : List (List V)) (fill : V) :
     pl.timeline S bufs fill =
       (placedEvents pl).map (Event.map (Expr.denote S bufs fill)) := by
   unfold Placed.timeline placedEvents Placed.image
-  rw [image_denote S, Placed.timelineFrom_map exprSem S _ (denote_hom S bufs fill)]
+  rw [image_denote S, Placed.timelineFrom_map exprSem S _ (denote_hom S hZ bufs fill)]
 
 /-! ## `tau-inline`: source program to kernel -/
 
@@ -93,8 +93,8 @@ theorem checkInlined_sound (S : Sem V) (hS : S.Lawful) (s : Source) (k : Kernel)
   -- run evaluated, and the two evaluated results agree
   -- (`denote_of_sameExprs`).
   obtain ⟨a, b, ha, hb, hab⟩ := agree_exprs h
-  refine ⟨_, Source.run_of_exprs S s bufs fill a ha, ?_⟩
-  rw [Kernel.run_of_exprs S k bufs fill b hb, denote_of_sameExprs S hS bufs fill a b hab]
+  refine ⟨_, Source.run_of_exprs S hS.sized s bufs fill a ha, ?_⟩
+  rw [Kernel.run_of_exprs S hS.sized k bufs fill b hb, denote_of_sameExprs S hS bufs fill a b hab]
 
 /-- **`checkInlined` and time.** Every word the source program pins to a
 cycle, the kernel pins to the same cycle. -/
@@ -102,7 +102,7 @@ theorem checkInlined_pins (S : Sem V) (hS : S.Lawful) (s : Source) (k : Kernel)
     (bufs : List (List V)) (fill : V)
     (h : checkInlined s k (bufs.map List.length) = true) :
     s.timeline S bufs ⊆ k.timeline S bufs := by
-  rw [Source.timeline_of_events S s bufs fill, Kernel.timeline_of_events S k bufs fill]
+  rw [Source.timeline_of_events S hS.sized s bufs fill, Kernel.timeline_of_events S hS.sized k bufs fill]
   exact covers_denote S hS bufs fill _ _ (agree_events h)
 
 /-! ## `tau-simplify` and `tau-unroll`: kernel to kernel -/
@@ -143,8 +143,8 @@ theorem checkPlaced_sound (S : Sem V) (hS : S.Lawful) (k : Kernel) (pl : Placed)
   unfold checkPlaced at h
   simp only [Bool.and_eq_true] at h
   obtain ⟨a, b, hk, hp, hab⟩ := agree_exprs h.2
-  obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S pl bufs fill b hp
-  refine ⟨mem, _, hrun, Kernel.run_of_exprs S k bufs fill a hk, ?_⟩
+  obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S hS.sized pl bufs fill b hp
+  refine ⟨mem, _, hrun, Kernel.run_of_exprs S hS.sized k bufs fill a hk, ?_⟩
   rw [hx]
   exact (denote_of_sameExprs S hS bufs fill a b hab).symm
 
@@ -156,7 +156,7 @@ theorem checkPlaced_pins (S : Sem V) (hS : S.Lawful) (k : Kernel) (pl : Placed)
     k.timeline S bufs ⊆ pl.timeline S bufs fill := by
   unfold checkPlaced at h
   simp only [Bool.and_eq_true] at h
-  rw [Kernel.timeline_of_events S k bufs fill, Placed.timeline_of_events S pl bufs fill]
+  rw [Kernel.timeline_of_events S hS.sized k bufs fill, Placed.timeline_of_events S hS.sized pl bufs fill]
   exact covers_denote S hS bufs fill _ _ (agree_events h.2)
 
 /-! ## `tau-schedule`: placed program to compiled program -/
@@ -177,8 +177,8 @@ theorem checkScheduled_sound (S : Sem V) (hS : S.Lawful) (pl : Placed) (c : Comp
   -- run evaluated (`Placed.execute_of_exprs`, `execute_of_exprs`), and the
   -- two evaluated tables agree (`denote_of_sameExprs`).
   obtain ⟨a, b, hp, hm, hab⟩ := agree_exprs h
-  obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S pl bufs fill a hp
-  obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S c bufs fill b hm
+  obtain ⟨mem, hrun, hx⟩ := Placed.execute_of_exprs S hS.sized pl bufs fill a hp
+  obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S hS.sized c bufs fill b hm
   refine ⟨mem, mem', hrun, hrun', ?_⟩
   rw [hx, hx']
   exact (denote_of_sameExprs S hS bufs fill a b hab).symm
@@ -189,7 +189,7 @@ theorem checkScheduled_pins (S : Sem V) (hS : S.Lawful) (pl : Placed) (c : Compi
     (bufs : List (List V)) (fill : V)
     (h : checkScheduled pl c = true) :
     pl.timeline S bufs fill ⊆ c.timeline S bufs fill := by
-  rw [Placed.timeline_of_events S pl bufs fill, timeline_of_events S c bufs fill]
+  rw [Placed.timeline_of_events S hS.sized pl bufs fill, timeline_of_events S hS.sized c bufs fill]
   exact covers_denote S hS bufs fill _ _ (agree_events h)
 
 /-! ## `tau-route`, `tau-slice`, `tau-fold`: compiled program to compiled program -/
@@ -207,8 +207,8 @@ theorem checkRouted_sound (S : Sem V) (hS : S.Lawful) (c c' : Compiled)
   -- The proof of `checkScheduled_sound` again, with `execute_of_exprs` on
   -- both sides.
   obtain ⟨a, b, ha, hb, hab⟩ := agree_exprs h
-  obtain ⟨mem, hrun, hx⟩ := execute_of_exprs S c bufs fill a ha
-  obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S c' bufs fill b hb
+  obtain ⟨mem, hrun, hx⟩ := execute_of_exprs S hS.sized c bufs fill a ha
+  obtain ⟨mem', hrun', hx'⟩ := execute_of_exprs S hS.sized c' bufs fill b hb
   refine ⟨mem, mem', hrun, hrun', ?_⟩
   rw [hx, hx']
   exact (denote_of_sameExprs S hS bufs fill a b hab).symm
@@ -219,7 +219,7 @@ theorem checkRouted_pins (S : Sem V) (hS : S.Lawful) (c c' : Compiled)
     (bufs : List (List V)) (fill : V)
     (h : checkRouted c c' = true) :
     c.timeline S bufs fill ⊆ c'.timeline S bufs fill := by
-  rw [timeline_of_events S c bufs fill, timeline_of_events S c' bufs fill]
+  rw [timeline_of_events S hS.sized c bufs fill, timeline_of_events S hS.sized c' bufs fill]
   exact covers_denote S hS bufs fill _ _ (agree_events h)
 
 /-! ## All the passes -/
