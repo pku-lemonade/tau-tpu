@@ -7,42 +7,48 @@
           "buf": 0,
           "dst": 0,
           "op": "load",
-          "stride": 1
+          "stride": 1,
+          "ty": "i16"
         },
         {
           "base": 0,
           "buf": 1,
           "dst": 1,
           "op": "load",
-          "stride": 1
+          "stride": 1,
+          "ty": "i16"
         },
         {
           "a": 0,
           "b": 1,
           "dst": 2,
           "fn": "add",
-          "op": "bin"
+          "op": "bin",
+          "ty": "i16"
         },
         {
           "a": 0,
           "b": 1,
           "dst": 3,
           "fn": "sub",
-          "op": "bin"
+          "op": "bin",
+          "ty": "i16"
         },
         {
           "a": 2,
           "b": 3,
           "dst": 4,
           "fn": "max",
-          "op": "bin"
+          "op": "bin",
+          "ty": "i16"
         },
         {
           "base": 0,
           "buf": 2,
           "op": "store",
           "src": 4,
-          "stride": 1
+          "stride": 1,
+          "ty": "i16"
         }
       ],
       "n": 4,
@@ -50,8 +56,8 @@
     }
   ],
   "buffers": [
-    4,
-    4,
-    4
+    8,
+    8,
+    8
   ]
 }

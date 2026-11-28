@@ -1,76 +1,141 @@
 {
   "config": {
+    "bankSize": 64,
     "kinds": [
       "mxm",
       "sxm",
       "mem",
       "mem",
+      "mem",
+      "mem",
       "vxm",
+      "mem",
+      "mem",
       "mem",
       "mem",
       "sxm",
       "mxm"
     ],
+    "lanes": 8,
     "memDelay": 1,
     "mxmDelay": 2,
-    "mxmWeights": 8,
-    "streams": 8,
+    "streams": 16,
     "sxmDelay": 1,
     "vxmDelay": 1
   },
-  "cycles": 47,
+  "cycles": 51,
   "map": [
     {
-      "base": 0,
-      "size": 1,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 2
+        }
+      ],
+      "size": 1
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 3
+      "parts": [
+        {
+          "base": 0,
+          "slice": 3
+        },
+        {
+          "base": 0,
+          "slice": 4
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 0,
-      "size": 1,
-      "slice": 5
+      "parts": [
+        {
+          "base": 1,
+          "slice": 2
+        },
+        {
+          "base": 2,
+          "slice": 3
+        },
+        {
+          "base": 2,
+          "slice": 4
+        },
+        {
+          "base": 0,
+          "slice": 5
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 6
+      "parts": [
+        {
+          "base": 1,
+          "slice": 5
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 1,
-      "size": 1,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 7
+        }
+      ],
+      "size": 1
     }
   ],
   "memSizes": [
     0,
     0,
     2,
-    4,
+    3,
+    3,
+    65,
     0,
     1,
-    4,
+    0,
+    0,
+    0,
     0,
     0
   ],
   "program": [
     {
-      "op": "load",
+      "g": 2,
+      "gap": 0,
+      "j": 0,
+      "op": "install",
+      "repeats": 1,
       "slice": 0,
       "src": {
         "dir": "west",
         "id": 0
       },
-      "time": 4
+      "stride": 2,
+      "time": 6
     },
     {
+      "dst": {
+        "dir": "east",
+        "id": 4
+      },
+      "n": 4,
+      "op": "product",
+      "slice": 0,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 8
+    },
+    {
+      "g": 1,
       "gap": 0,
       "j": 0,
-      "op": "mac",
+      "op": "install",
       "repeats": 3,
       "slice": 0,
       "src": {
@@ -78,47 +143,21 @@
         "id": 0
       },
       "stride": 1,
-      "time": 5
-    },
-    {
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "op": "emit",
-      "slice": 0,
       "time": 9
     },
     {
-      "op": "load",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 26
-    },
-    {
-      "gap": 0,
-      "j": 0,
-      "op": "mac",
-      "repeats": 3,
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "stride": 1,
-      "time": 27
-    },
-    {
       "dst": {
         "dir": "east",
         "id": 0
       },
-      "op": "emit",
+      "n": 4,
+      "op": "product",
       "slice": 0,
-      "time": 31
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 29
     },
     {
       "addr": 0,
@@ -128,27 +167,27 @@
       },
       "op": "read",
       "slice": 2,
-      "time": 0
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 2,
-      "time": 36
+      "time": 4
     },
     {
       "addr": 1,
-      "op": "write",
-      "slice": 2,
-      "src": {
-        "dir": "west",
+      "dst": {
+        "dir": "east",
         "id": 0
       },
-      "time": 46
+      "op": "read",
+      "slice": 2,
+      "time": 11
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 34
     },
     {
       "addr": 0,
@@ -158,127 +197,196 @@
       },
       "gap": 0,
       "op": "read",
-      "repeats": 3,
+      "repeats": 1,
       "slice": 3,
       "stride": 1,
-      "time": 0
+      "time": 1
     },
     {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "west",
-        "id": 0
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 16
-    },
-    {
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "requant",
-      "k": 2,
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 18
-    },
-    {
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "fn": "relu",
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 20
-    },
-    {
+      "addr": 2,
       "dst": {
         "dir": "east",
         "id": 1
       },
-      "fn": "requant",
-      "k": 2,
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 38
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 40
-    },
-    {
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "fn": "relu",
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 42
+      "op": "read",
+      "slice": 3,
+      "time": 12
     },
     {
       "addr": 0,
       "dst": {
         "dir": "west",
+        "id": 1
+      },
+      "gap": 0,
+      "op": "read",
+      "repeats": 1,
+      "slice": 4,
+      "stride": 1,
+      "time": 0
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 2
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 13
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "gap": 0,
+      "op": "read",
+      "repeats": 3,
+      "slice": 5,
+      "stride": 1,
+      "time": 2
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 3
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 14
+    },
+    {
+      "addr": 64,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 45
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "east",
         "id": 0
       },
       "op": "read",
       "slice": 5,
-      "time": 13
+      "time": 46
     },
     {
-      "addr": 0,
+      "a": {
+        "dir": "east",
+        "id": 4
+      },
+      "b": {
+        "dir": "east",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "time": 17,
+      "ty": "i32"
+    },
+    {
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "requant",
+      "k": 2,
+      "op": "un",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 19,
+      "ty": "i32"
+    },
+    {
       "dst": {
         "dir": "west",
         "id": 0
       },
-      "gap": 0,
-      "op": "read",
-      "repeats": 3,
+      "fn": "relu",
+      "op": "un",
       "slice": 6,
-      "stride": 1,
-      "time": 19
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 21,
+      "ty": "i8"
+    },
+    {
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "fn": "requant",
+      "k": 2,
+      "op": "un",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 38,
+      "ty": "i32"
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "east",
+        "id": 1
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "time": 40,
+      "ty": "i8"
+    },
+    {
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "relu",
+      "op": "un",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 42,
+      "ty": "i8"
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 7,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 50
     }
   ]
 }

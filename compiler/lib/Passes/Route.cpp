@@ -18,6 +18,15 @@
 // pass gives two words the same stream number only if their moving slots
 // differ.
 //
+// The words of a value are on streams that follow one another, from a number
+// that is a multiple of how many they are (Machine 3.5). The words of an
+// `install` follow one another too, from any number. Words that an
+// instruction takes side by side but
+// that different instructions make, such as the reads that bring a value out
+// of memory, are in the same moving slot, since they are at one slice on one
+// cycle. The pass gives each such run its numbers first, the lowest free run
+// that starts where it may, then each result its lowest free run.
+//
 // The pass fails if a word needs a stream number the machine does not have.
 //
 // Nothing here is proved. `tau-check scheduled.json routed.json` decides
@@ -33,6 +42,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/ADT/DenseSet.h"
 
 #include <map>
 #include <set>
@@ -67,43 +77,87 @@ struct RoutePass : PassWrapper<RoutePass, OperationPass<func::FuncOp>> {
 
     // For each direction and moving slot, the stream numbers already taken.
     std::map<std::pair<bool, int64_t>, std::set<int64_t>> taken;
+    bool failed = false;
 
-    for (Operation &op : func.getBody().front()) {
-      if (!tau::isInstr(op))
-        continue;
-      Value result = tau::streamResult(op);
-      if (!result)
-        continue;
+    // The direction and the moving slot of the word of `op`.
+    auto slotOf = [&](Operation &op) -> std::optional<std::pair<bool, int64_t>> {
       std::optional<int64_t> time = tau::optIntAttr(op, "time");
       if (!time) {
         op.emitError("run tau-schedule before tau-route");
-        return signalPassFailure();
+        failed = true;
+        return std::nullopt;
       }
       int64_t from = tau::intAttr(op, "slice");
       std::optional<bool> direction = tau::goesEast(op);
       if (!direction) {
         op.emitError("the instructions that use this word lie on both sides "
                      "of the slice that issues it");
-        return signalPassFailure();
+        failed = true;
+        return std::nullopt;
       }
       bool east = *direction;
       int delay = machine->delayOf(static_cast<int>(from), tau::delayName(op));
       int64_t land = *time + delay + 1;
-      int64_t slot = east ? from - land : from + land;
+      return std::make_pair(east, east ? from - land : from + land);
+    };
+    // Give a run of words the lowest free run of stream numbers that starts
+    // at a multiple of `align`. Word `k` of the run is the result of
+    // `ops[k]`, or result `k` of the one instruction in `ops`, which is given
+    // the stream of its first result.
+    llvm::DenseSet<Operation *> routed;
+    auto give = [&](ArrayRef<Operation *> ops, int64_t width, int64_t align) {
+      std::vector<std::pair<bool, int64_t>> slots;
+      for (int64_t k = 0; k < width; ++k) {
+        auto slot = slotOf(*ops[ops.size() == 1 ? 0 : k]);
+        if (!slot)
+          return;
+        slots.push_back(*slot);
+      }
+      int64_t base = 0;
+      auto free = [&] {
+        for (int64_t k = 0; k < width; ++k)
+          if (taken[slots[k]].count(base + k))
+            return false;
+        return true;
+      };
+      while (base + width <= machine->streams && !free())
+        base += align;
+      if (base + width > machine->streams) {
+        ops.front()->emitError(
+            "the machine has too few streams for this program");
+        failed = true;
+        return;
+      }
+      for (int64_t k = 0; k < width; ++k)
+        taken[slots[k]].insert(base + k);
+      for (size_t k = 0; k < ops.size(); ++k) {
+        ops[k]->setAttr("east", builder.getBoolAttr(slots[k].first));
+        tau::setIntAttr(*ops[k], "stream", base + static_cast<int64_t>(k));
+        routed.insert(ops[k]);
+      }
+    };
 
-      std::set<int64_t> &numbers = taken[{east, slot}];
-      int64_t stream = 0;
-      while (numbers.count(stream))
-        ++stream;
-      if (stream >= machine->streams) {
-        op.emitError("the machine has too few streams for this program");
+    Block &block = func.getBody().front();
+    for (Operation &op : block) {
+      if (!tau::isInstr(op) || failed)
+        continue;
+      Expected<std::vector<tau::SideBySide>> runs = tau::sideBySide(op);
+      if (!runs) {
+        op.emitError(toString(runs.takeError()));
         return signalPassFailure();
       }
-      numbers.insert(stream);
-
-      op.setAttr("east", builder.getBoolAttr(east));
-      tau::setIntAttr(op, "stream", stream);
+      for (const tau::SideBySide &run : *runs)
+        if (!failed)
+          give(run.makers, static_cast<int64_t>(run.makers.size()), run.align);
     }
+    for (Operation &op : block)
+      if (tau::isInstr(op) && tau::streamResult(op) && !routed.count(&op) &&
+          !failed) {
+        int64_t width = op.getNumResults();
+        give({&op}, width, width);
+      }
+    if (failed)
+      return signalPassFailure();
 
     tau::setMachine(func, *machine);
     func->removeAttr("tau.streams");

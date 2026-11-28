@@ -12,7 +12,8 @@ import tau
 
 
 @tau.kernel
-def taps(x: tau.Buf["LEN"], y: tau.Buf["N"], *, N=4, LEN=6, TAPS=(1, 2, 1)):
+def taps(x: tau.Buf["LEN", tau.i16], y: tau.Buf["N"], *, N=4, LEN=6,
+         TAPS=(1, 2, 1)):
     for i in tau.loop(N):
         total = None
         for k, tap in enumerate(TAPS):

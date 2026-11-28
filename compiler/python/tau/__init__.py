@@ -22,9 +22,14 @@ the program is written with, and the trace is the program.
 
 What follows from that:
 
-  * A word is a handle with no operators. Python cannot add two words or
+  * A value is a handle with no operators. Python cannot add two values or
     test one, so what a program does cannot depend on its data. That is the
     property the machine has, and the one every check rests on.
+  * A value has a type, `tau.i8`, `tau.i16` or `tau.i32`: its elements are
+    signed integers of that many bits. A buffer holds values of one type,
+    `tau.Buf[4]` of 8 bits and `tau.Buf[4, tau.i32]` of 32. An operation
+    takes values of one type; `requant` gives 8 bits, `widen` gives more
+    bits, and a matrix product takes 8 bits and gives 32.
   * A Python `for` over a `range`, an `if` on an integer, a helper function,
     a list of words: all of it runs while tracing and leaves only the
     operations it called. `dense` below is such a helper.
@@ -55,7 +60,8 @@ import re
 
 __all__ = [
     "Buf", "T", "kernel", "loop", "alloc", "trace", "run", "dense",
-    "load", "store", "const", "select", "matvec", "affine",
+    "i8", "i16", "i32",
+    "load", "store", "const", "select", "matvec", "widen",
     "relu", "neg", "abs", "reverse", "requant", "shl", "addi", "muli",
     "shift", "rotate", "broadcast", "permute",
     "add", "sub", "mul", "max", "min", "and_", "or_", "xor", "lt",
@@ -152,23 +158,39 @@ def _pin(at):
 
 
 # ---------------------------------------------------------------------------
-# Words and buffers
+# Types, values and buffers
 # ---------------------------------------------------------------------------
 
-class Word:
-    """One word. While tracing it is a name; in a run it holds lanes.
-    Either way Python cannot look inside it."""
+# A type is the number of bits of an element.
+i8, i16, i32 = 8, 16, 32
 
-    __slots__ = ("frame", "id", "lanes", "scope")
 
-    def __init__(self, frame=None, id=None, lanes=None, scope=None):
+def _type(bits):
+    if bits not in (i8, i16, i32):
+        raise TauError("a type is tau.i8, tau.i16 or tau.i32")
+    return bits
+
+
+def _name(bits):
+    """The name of a type in a source file: "i8", "i16" or "i32"."""
+    return f"i{bits}"
+
+
+class Value:
+    """One value of `bits` bits. While tracing it is a name; in a run it
+    holds its elements. Either way Python cannot look inside it."""
+
+    __slots__ = ("frame", "id", "bits", "lanes", "scope")
+
+    def __init__(self, bits, frame=None, id=None, lanes=None, scope=None):
+        self.bits = bits
         self.frame = frame
         self.id = id
         self.lanes = lanes
         self.scope = scope
 
     def __bool__(self):
-        raise TauError("a word cannot be tested: a program cannot decide "
+        raise TauError("a value cannot be tested: a program cannot decide "
                        "anything from its data")
 
     __eq__ = object.__eq__
@@ -176,26 +198,30 @@ class Word:
 
 
 class Buffer:
-    """A buffer of a kernel. `words` is its contents in a run."""
+    """A buffer of a kernel: `size` values of `bits` bits. `words` is its
+    contents in a run, the elements of each value."""
 
-    __slots__ = ("frame", "index", "size", "words")
+    __slots__ = ("frame", "index", "size", "bits", "words")
 
-    def __init__(self, frame, index, size, words=None):
+    def __init__(self, frame, index, size, bits, words=None):
         self.frame = frame
         self.index = index
         self.size = size
+        self.bits = bits
         self.words = words
 
 
 class Buf:
-    """The type of a kernel's buffer argument: `tau.Buf[4]` is four words.
-    `tau.Buf["N"]` takes its size from the kernel's constant `N`."""
+    """The type of a kernel's buffer argument: `tau.Buf[4]` is four values of
+    8 bits, and `tau.Buf[4, tau.i32]` four of 32. `tau.Buf["N"]` takes its
+    size from the kernel's constant `N`."""
 
-    def __init__(self, size):
+    def __init__(self, size, bits=i8):
         self.size = size
+        self.bits = _type(bits)
 
-    def __class_getitem__(cls, size):
-        return cls(size)
+    def __class_getitem__(cls, item):
+        return cls(*item) if isinstance(item, tuple) else cls(item)
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +245,7 @@ class Kernel:
                 if p.default is not p.empty:
                     defaults[p.name] = p.default
             elif isinstance(p.annotation, Buf):
-                self.params.append(p.annotation.size)
+                self.params.append((p.annotation.size, p.annotation.bits))
             else:
                 raise TauError(f"{fn.__name__}: parameter '{p.name}' needs "
                                "the type tau.Buf[size]")
@@ -237,8 +263,9 @@ class Kernel:
 
     @property
     def sizes(self):
-        return [self.consts[s] if isinstance(s, str) else s
-                for s in self.params]
+        """For each buffer, its size and the bits of its values."""
+        return [(self.consts[s] if isinstance(s, str) else s, bits)
+                for s, bits in self.params]
 
     def key(self):
         return (self.fn, tuple(sorted(self.consts.items())))
@@ -261,8 +288,8 @@ def kernel(fn):
 # ---------------------------------------------------------------------------
 
 class _Def:
-    """One traced kernel: the sizes of its buffers and its items. An item
-    is a statement, a loop or a call, as in a source file."""
+    """One traced kernel: the sizes and types of its buffers and its items.
+    An item is a statement, a loop or a call, as in a source file."""
 
     def __init__(self, name, sizes):
         self.name = name
@@ -289,7 +316,8 @@ class _Tracer:
         saved = self.loop, self.scope
         self.loop = None
         self.frames.append(frame)
-        buffers = [Buffer(frame, i, n) for i, n in enumerate(frame.sizes)]
+        buffers = [Buffer(frame, i, n, bits)
+                   for i, (n, bits) in enumerate(frame.sizes)]
         target.fn(*buffers, **target.consts)
         if self.loop is not None:
             raise TauError("a tau.loop was not finished")
@@ -309,35 +337,41 @@ class _Tracer:
             raise TauError("not a buffer of this kernel")
         return buf.index
 
-    def use(self, word):
-        if not isinstance(word, Word) or word.frame is not self.frames[-1]:
-            raise TauError("not a word of this kernel")
-        if word.scope is not None and word.scope != (self.scope if self.in_loop() else None):
-            raise TauError("a word made inside a tau.loop cannot be used "
+    def use(self, value, bits=None):
+        if not isinstance(value, Value) or value.frame is not self.frames[-1]:
+            raise TauError("not a value of this kernel")
+        if value.scope is not None and value.scope != (self.scope if self.in_loop() else None):
+            raise TauError("a value made inside a tau.loop cannot be used "
                            "outside it")
-        return word.id
+        if bits is not None and value.bits != bits:
+            raise TauError(f"a value of {value.bits} bits where one of "
+                           f"{bits} bits is needed")
+        return value.id
 
-    def define(self):
+    def define(self, bits):
         frame = self.frames[-1]
-        word = Word(frame, frame.values, scope=self.scope if self.in_loop() else None)
+        value = Value(bits, frame, frame.values,
+                      scope=self.scope if self.in_loop() else None)
         frame.values += 1
-        return word
+        return value
 
-    def stmt(self, op, fields, operands, pin, result=True):
+    def stmt(self, op, fields, operands, pin, result=None, bits=None):
+        """Trace one statement. `bits` is the type its operands have to have,
+        and `result` the type of the value it gives, if it gives one."""
         item = {"op": op}
-        for key, word in operands:
-            item[key] = self.use(word)
+        for key, value in operands:
+            item[key] = self.use(value, bits)
         item.update(fields)
-        word = None
-        if result:
-            word = self.define()
-            item["dst"] = word.id
+        value = None
+        if result is not None:
+            value = self.define(result)
+            item["dst"] = value.id
         if pin is not None:
             item["at"] = pin[0]
             if pin[1]:
                 item["every"] = pin[1]
         self.emit(item)
-        return word
+        return value
 
     def begin_loop(self, n):
         if self.loop is not None:
@@ -349,12 +383,12 @@ class _Tracer:
         body, self.loop = self.loop, None
         self.emit({"op": "loop", "n": n, "body": body})
 
-    def alloc(self, size):
+    def alloc(self, size, bits):
         if len(self.frames) != 1:
             raise TauError("tau.alloc belongs in the outermost kernel")
         frame = self.frames[0]
-        frame.sizes.append(size)
-        return Buffer(frame, len(frame.sizes) - 1, size)
+        frame.sizes.append((size, bits))
+        return Buffer(frame, len(frame.sizes) - 1, size, bits)
 
     def call(self, target, buffers, at):
         if self.loop is not None:
@@ -363,9 +397,9 @@ class _Tracer:
         args = [self.buffer(b) for b in buffers]
         if len(set(args)) != len(args):
             raise TauError(f"{target.name}: a buffer is passed twice")
-        if [b.size for b in buffers] != target.sizes:
-            raise TauError(f"{target.name}: expected buffers of sizes "
-                           f"{target.sizes}")
+        if [(b.size, b.bits) for b in buffers] != target.sizes:
+            raise TauError(f"{target.name}: expected buffers of sizes and "
+                           f"bits {target.sizes}")
         if target.key() not in self.defs:
             self.defs[target.key()] = self.trace(target)
         self.emit({"op": "call", "args": args, "at": pin[0] if pin else 0,
@@ -393,7 +427,10 @@ class Program:
                 else:
                     out.append(dict(item))
             return out
-        return {"buffers": self.entry.sizes, "body": body(self.entry.items)}
+        # A buffer is a row of words: a value of `bits` bits is `bits / 8` of
+        # them (Programs 1).
+        words = [size * bits // 8 for size, bits in self.entry.sizes]
+        return {"buffers": words, "body": body(self.entry.items)}
 
     def mlir(self):
         """The program in the `tau` dialect, the input of `tauc`."""
@@ -405,7 +442,10 @@ def _mlir_function(d):
         return f"%b{i}"
 
     def ty(i):
-        return f"!tau.buf<{d.sizes[i]}>"
+        return f"!tau.buf<{d.sizes[i][0]} x {d.sizes[i][1]}>"
+
+    def val(name):
+        return f"!tau.int<{name[1:]}>"
 
     def stmt(item):
         op = item["op"]
@@ -427,22 +467,21 @@ def _mlir_function(d):
                 extra = f", {item['k']}"
             if "table" in item:
                 extra = f", {item['table']}"
-            return f"%v{item['dst']} = tau.{item['fn']} %v{item['a']}{extra}{pin}"
+            to = f" to {val(item['to'])}" if "to" in item else ""
+            return (f"%v{item['dst']} = tau.{item['fn']} %v{item['a']}{extra}"
+                    f"{pin} : {val(item['ty'])}{to}")
         if op == "bin":
             return (f"%v{item['dst']} = tau.{item['fn']} %v{item['a']}, "
-                    f"%v{item['b']}{pin}")
+                    f"%v{item['b']}{pin} : {val(item['ty'])}")
         if op == "const":
-            return f"%v{item['dst']} = tau.const {item['values']}{pin}"
+            return (f"%v{item['dst']} = tau.const {item['values']}{pin}"
+                    f" : {val(item['ty'])}")
         if op == "sel":
             return (f"%v{item['dst']} = tau.select %v{item['m']}, "
-                    f"%v{item['a']}, %v{item['b']}{pin}")
+                    f"%v{item['a']}, %v{item['b']}{pin} : {val(item['ty'])}")
         if op == "matvec":
             return (f"%v{item['dst']} = tau.matvec %v{item['x']}, "
                     f"{buf(item['buf'])}{at}, {item['n']}{pin} : {ty(item['buf'])}")
-        if op == "affine":
-            return (f"%v{item['dst']} = tau.affine %v{item['x']}, "
-                    f"{buf(item['buf'])}{at}, {item['n']}, %v{item['bias']}{pin}"
-                    f" : {ty(item['buf'])}")
         raise TauError(f"cannot write '{op}'")
 
     lines = []
@@ -469,10 +508,13 @@ def _mlir_function(d):
 # Running on real numbers
 # ---------------------------------------------------------------------------
 
-def _wrap(v):
-    """A 32-bit signed lane: arithmetic wraps around, as in spec/Tau/Isa/Word.lean."""
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
+def _wrap(v, bits=32):
+    """A signed integer of `bits` bits: arithmetic wraps around. A slice
+    computes with elements of 32 bits and keeps the low bytes of a result,
+    as in spec/Tau/Isa/Word.lean; for the operations below that comes to
+    computing with whole numbers and wrapping the result to its type."""
+    v &= (1 << bits) - 1
+    return v - (1 << bits) if v >> (bits - 1) else v
 
 
 def _requant(k, x):
@@ -480,15 +522,18 @@ def _requant(k, x):
     return -128 if s < -128 else 127 if s > 127 else s
 
 
+# What each one-value operation does to the elements of a value. The result
+# is wrapped to its type afterwards.
 _UN = {
     "relu": lambda k, w: [x if x >= 0 else 0 for x in w],
-    "neg": lambda k, w: [_wrap(-x) for x in w],
-    "abs": lambda k, w: [_wrap(-x) if x < 0 else x for x in w],
+    "neg": lambda k, w: [-x for x in w],
+    "abs": lambda k, w: [-x if x < 0 else x for x in w],
     "reverse": lambda k, w: w[::-1],
     "requant": lambda k, w: [_requant(k, x) for x in w],
     "shl": lambda k, w: [_wrap(x << k) for x in w],
-    "addi": lambda k, w: [_wrap(x + k) for x in w],
-    "muli": lambda k, w: [_wrap(x * k) for x in w],
+    "addi": lambda k, w: [_wrap(x + _wrap(k)) for x in w],
+    "muli": lambda k, w: [_wrap(x * _wrap(k)) for x in w],
+    "widen": lambda k, w: list(w),
     "shift": lambda k, w: [w[i - k] if k <= i else 0 for i in range(len(w))],
     "rotate": lambda k, w: [w[(i + k) % len(w)] for i in range(len(w))],
     "broadcast": lambda k, w: [w[k] if k < len(w) else 0 for _ in w],
@@ -497,14 +542,14 @@ _UN = {
 }
 
 _BIN = {
-    "add": lambda a, b: _wrap(a + b),
-    "sub": lambda a, b: _wrap(a - b),
-    "mul": lambda a, b: _wrap(a * b),
+    "add": lambda a, b: a + b,
+    "sub": lambda a, b: a - b,
+    "mul": lambda a, b: a * b,
     "max": lambda a, b: b if a < b else a,
     "min": lambda a, b: a if a < b else b,
-    "and": lambda a, b: _wrap(a & b),
-    "or": lambda a, b: _wrap(a | b),
-    "xor": lambda a, b: _wrap(a ^ b),
+    "and": lambda a, b: a & b,
+    "or": lambda a, b: a | b,
+    "xor": lambda a, b: a ^ b,
     "lt": lambda a, b: 1 if a < b else 0,
 }
 
@@ -519,15 +564,29 @@ class _Runner:
         self.iteration = None
         self.events = []
         self.buffers = []
+        self.types = []
 
     def in_loop(self):
         return self.iteration is not None
 
-    def issue(self, pin, lanes, store=None):
-        if pin is not None:
-            time = self.origin + pin[0] + pin[1] * (self.iteration or 0)
-            self.events.append({"time": time, "word": list(lanes),
-                                **({"buf": store[0], "pos": store[1]} if store else {})})
+    def issue(self, pin, value, store=None):
+        """The events of a pinned value: one for each of its words, the low
+        byte of every element first. The words of a store go to the words
+        of the buffer from the value's first word on."""
+        if pin is None:
+            return
+        time = self.origin + pin[0] + pin[1] * (self.iteration or 0)
+        count = value.bits // 8
+        for k in range(count):
+            word = [_wrap(x >> (8 * k), 8) for x in value.lanes]
+            where = {"buf": store[0], "pos": count * store[1] + k} if store else {}
+            self.events.append({"time": time, "word": word, **where})
+
+    def value(self, bits, lanes, pin, store=None):
+        """A value of a run, with its elements wrapped to its type."""
+        value = Value(bits, lanes=[_wrap(x, bits) for x in lanes])
+        self.issue(pin, value, store)
+        return value
 
     def word(self, buf, pos):
         base, stride = pos
@@ -536,12 +595,13 @@ class _Runner:
             raise TauError("a position outside its buffer")
         return k
 
-    def alloc(self, size):
+    def alloc(self, size, bits):
         if self.depth != 1:
             raise TauError("tau.alloc belongs in the outermost kernel")
         words = [[0] * self.lanes for _ in range(size)]
         self.buffers.append(words)
-        return Buffer(None, len(self.buffers) - 1, size, words)
+        self.types.append(bits)
+        return Buffer(None, len(self.buffers) - 1, size, bits, words)
 
     def call(self, target, buffers, at):
         pin = _pin(at)
@@ -549,14 +609,15 @@ class _Runner:
             raise TauError("a kernel cannot be called inside a tau.loop")
         if len({id(b) for b in buffers}) != len(buffers):
             raise TauError(f"{target.name}: a buffer is passed twice")
-        if [b.size for b in buffers] != target.sizes:
-            raise TauError(f"{target.name}: expected buffers of sizes "
-                           f"{target.sizes}")
+        if [(b.size, b.bits) for b in buffers] != target.sizes:
+            raise TauError(f"{target.name}: expected buffers of sizes and "
+                           f"bits {target.sizes}")
         saved = self.origin
         self.origin += pin[0] if pin else 0
         self.depth += 1
         # The called kernel numbers its buffers from zero.
-        inner = [Buffer(None, (i, b), b.size, b.words) for i, b in enumerate(buffers)]
+        inner = [Buffer(None, (i, b), b.size, b.bits, b.words)
+                 for i, b in enumerate(buffers)]
         target.fn(*inner, **target.consts)
         self.depth -= 1
         self.origin = saved
@@ -589,23 +650,31 @@ def trace(target):
 
 def run(target, buffers, lanes):
     """Run a kernel on real numbers. `buffers` holds, for each buffer, its
-    words as lists of integers. Returns the final buffers, scratch buffers
-    after the kernel's own, and the events of the pinned operations."""
+    type and its values as lists of integers (docs/Formats.md, section 6).
+    Returns the final buffers in the same way, scratch buffers after the
+    kernel's own, and the events of the pinned operations."""
     global _ctx
     if _ctx is not None:
         raise TauError("tau.run cannot be used inside a kernel")
-    if [len(b) for b in buffers] != target.sizes:
-        raise TauError(f"{target.name}: expected buffers of sizes {target.sizes}")
+    given = [(len(b["values"]), int(b["type"][1:])) for b in buffers]
+    if given != target.sizes:
+        raise TauError(f"{target.name}: expected buffers of sizes and bits "
+                       f"{target.sizes}")
     _ctx = runner = _Runner(lanes)
     try:
-        runner.buffers = [[[_wrap(x) for x in (w + [0] * lanes)[:lanes]] for w in b]
-                          for b in buffers]
+        runner.types = [bits for _, bits in given]
+        runner.buffers = [[[_wrap(x, bits) for x in (w + [0] * lanes)[:lanes]]
+                           for w in b["values"]]
+                          for b, bits in zip(buffers, runner.types)]
         runner.depth = 1
-        handles = [Buffer(None, i, len(b), b) for i, b in enumerate(runner.buffers)]
+        handles = [Buffer(None, i, len(b), bits, b)
+                   for i, (b, bits) in enumerate(zip(runner.buffers, runner.types))]
         target.fn(*handles, **target.consts)
     finally:
         _ctx = None
-    return runner.buffers, runner.events
+    out = [{"type": _name(bits), "values": b}
+           for b, bits in zip(runner.buffers, runner.types)]
+    return out, runner.events
 
 
 # ---------------------------------------------------------------------------
@@ -638,107 +707,110 @@ def loop(n):
         ctx.iteration = None
 
 
-def alloc(size):
-    """A scratch buffer of `size` words, for one kernel to leave a result in
-    and another to pick it up. It becomes a buffer of the program, after the
-    outermost kernel's own, and starts as zeros."""
-    return _need().alloc(size)
+def alloc(size, bits=i8):
+    """A scratch buffer of `size` values of `bits` bits, for one kernel to
+    leave a result in and another to pick it up. It becomes a buffer of the
+    program, after the outermost kernel's own, and starts as zeros."""
+    return _need().alloc(size, _type(bits))
 
 
 def load(buf, pos, at=None):
-    """The word at position `pos` of `buf`."""
+    """The value at position `pos` of `buf`."""
     ctx, at, pos = _need(), _pin(at), _position(pos)
     if isinstance(ctx, _Tracer):
-        return ctx.stmt("load", {"buf": ctx.buffer(buf), "base": pos[0],
-                                 "stride": pos[1]}, [], at)
-    lanes = list(buf.words[ctx.word(buf, pos)])
-    ctx.issue(at, lanes)
-    return Word(lanes=lanes)
+        return ctx.stmt("load", {"ty": _name(buf.bits), "buf": ctx.buffer(buf),
+                                 "base": pos[0], "stride": pos[1]}, [], at,
+                        result=buf.bits)
+    return ctx.value(buf.bits, buf.words[ctx.word(buf, pos)], at)
 
 
-def store(buf, pos, word, at=None):
-    """Store `word` at position `pos` of `buf`."""
+def store(buf, pos, value, at=None):
+    """Store `value` at position `pos` of `buf`."""
     ctx, at, pos = _need(), _pin(at), _position(pos)
     if isinstance(ctx, _Tracer):
-        ctx.stmt("store", {"buf": ctx.buffer(buf), "base": pos[0],
-                           "stride": pos[1]}, [("src", word)], at, result=False)
+        ctx.stmt("store", {"ty": _name(buf.bits), "buf": ctx.buffer(buf),
+                           "base": pos[0], "stride": pos[1]},
+                 [("src", value)], at, bits=buf.bits)
         return
+    if value.bits != buf.bits:
+        raise TauError(f"a value of {value.bits} bits stored to a buffer of "
+                       f"values of {buf.bits} bits")
     k = ctx.word(buf, pos)
-    buf.words[k] = list(word.lanes)
-    ctx.issue(at, word.lanes, store=(_outer(buf), k))
+    buf.words[k] = list(value.lanes)
+    ctx.issue(at, value, store=(_outer(buf), k))
 
 
-def const(values, at=None):
-    """The word with the given lanes. Missing lanes are zero."""
+def const(values, bits=i8, at=None):
+    """The value of `bits` bits with the given elements. Missing elements are
+    zero."""
     ctx, at = _need(), _pin(at)
     values = [int(v) for v in values]
     if isinstance(ctx, _Tracer):
-        return ctx.stmt("const", {"values": values}, [], at)
-    lanes = [_wrap(v) for v in (values + [0] * ctx.lanes)[:ctx.lanes]]
-    ctx.issue(at, lanes)
-    return Word(lanes=lanes)
+        return ctx.stmt("const", {"ty": _name(_type(bits)), "values": values},
+                        [], at, result=bits)
+    return ctx.value(_type(bits), (values + [0] * ctx.lanes)[:ctx.lanes], at)
 
 
 def select(m, a, b, at=None):
-    """Lane by lane: `a` where `m` is not zero, `b` elsewhere."""
+    """Element by element: `a` where `m` is not zero, `b` elsewhere."""
     ctx, at = _need(), _pin(at)
     if isinstance(ctx, _Tracer):
-        return ctx.stmt("sel", {}, [("m", m), ("a", a), ("b", b)], at)
+        return ctx.stmt("sel", {"ty": _name(a.bits)},
+                        [("m", m), ("a", a), ("b", b)], at,
+                        result=a.bits, bits=a.bits)
+    if not m.bits == a.bits == b.bits:
+        raise TauError("tau.select takes three values of one type")
     lanes = [x if c != 0 else y for c, x, y in zip(m.lanes, a.lanes, b.lanes)]
-    ctx.issue(at, lanes)
-    return Word(lanes=lanes)
-
-
-def _product(ctx, x, buf, pos, n, start):
-    acc = list(start)
-    first = ctx.word(buf, pos)
-    for j in range(n):
-        if first + j >= buf.size:
-            raise TauError("a matrix column outside its buffer")
-        scale = x.lanes[j] if j < ctx.lanes else 0
-        acc = [_wrap(a + scale * c) for a, c in zip(acc, buf.words[first + j])]
-    return acc
+    return ctx.value(a.bits, lanes, at)
 
 
 def matvec(x, buf, pos, n, at=None):
-    """The matrix whose `n` columns are the words of `buf` from `pos` on,
-    times the word `x`."""
+    """The matrix whose `n` rows are the values of `buf` from `pos` on, times
+    the value `x`: element `i` of the result is the dot product of row `i`
+    with `x`, and the elements from `n` on are zero. The rows and `x` have 8
+    bits and the result has 32."""
     ctx, at, pos = _need(), _pin(at), _position(pos)
+    if buf.bits != i8:
+        raise TauError("a matrix is in a buffer of values of 8 bits")
     if isinstance(ctx, _Tracer):
         return ctx.stmt("matvec", {"buf": ctx.buffer(buf), "base": pos[0],
-                                   "stride": pos[1], "n": n}, [("x", x)], at)
-    lanes = _product(ctx, x, buf, pos, n, [0] * ctx.lanes)
-    ctx.issue(at, lanes)
-    return Word(lanes=lanes)
-
-
-def affine(x, buf, pos, n, bias, at=None):
-    """As `matvec`, with the word `bias` added."""
-    ctx, at, pos = _need(), _pin(at), _position(pos)
-    if isinstance(ctx, _Tracer):
-        return ctx.stmt("affine", {"buf": ctx.buffer(buf), "base": pos[0],
-                                   "stride": pos[1], "n": n},
-                        [("x", x), ("bias", bias)], at)
-    lanes = _product(ctx, x, buf, pos, n, bias.lanes)
-    ctx.issue(at, lanes)
-    return Word(lanes=lanes)
+                                   "stride": pos[1], "n": n}, [("x", x)], at,
+                        result=i32, bits=i8)
+    if x.bits != i8:
+        raise TauError("a matrix is multiplied by a value of 8 bits")
+    first = ctx.word(buf, pos)
+    if first + n > buf.size:
+        raise TauError("a matrix row outside its buffer")
+    lanes = [0] * ctx.lanes
+    for i in range(n):
+        if i == ctx.lanes:
+            break
+        lanes[i] = sum(w * v for w, v in zip(buf.words[first + i], x.lanes))
+    return ctx.value(i32, lanes, at)
 
 
 def _unary(fn, takes):
     def op(a, *params, at=None):
         ctx, pin = _need(), _pin(at)
         if len(params) != (1 if takes else 0):
-            raise TauError(f"tau.{fn} takes a word" +
+            raise TauError(f"tau.{fn} takes a value" +
                            (f" and `{takes}`" if takes else ""))
         param = params[0] if takes else None
         if takes == "table":
             param = [int(k) for k in param]
+        # `requant` gives 8 bits and `widen` the bits it is told; any other
+        # operation gives the type it takes.
+        bits = i8 if fn == "requant" else _type(param) if fn == "widen" else a.bits
+        if fn == "widen" and bits < a.bits:
+            raise TauError(f"tau.widen of {a.bits} bits to {bits}")
         if isinstance(ctx, _Tracer):
-            return ctx.stmt("un", {"fn": fn, **({takes: param} if takes else {})},
-                            [("a", a)], pin)
-        lanes = _UN[fn](param, a.lanes)
-        ctx.issue(pin, lanes)
-        return Word(lanes=lanes)
+            fields = {"fn": fn, "ty": _name(a.bits)}
+            if fn == "widen":
+                fields["to"] = _name(bits)
+            elif takes:
+                fields[takes] = param
+            return ctx.stmt("un", fields, [("a", a)], pin, result=bits)
+        return ctx.value(bits, _UN[fn](param, a.lanes), pin)
     op.__name__ = fn
     return op
 
@@ -747,17 +819,21 @@ def _binary(fn):
     def op(a, b, at=None):
         ctx, pin = _need(), _pin(at)
         if isinstance(ctx, _Tracer):
-            return ctx.stmt("bin", {"fn": fn}, [("a", a), ("b", b)], pin)
+            return ctx.stmt("bin", {"fn": fn, "ty": _name(a.bits)},
+                            [("a", a), ("b", b)], pin,
+                            result=a.bits, bits=a.bits)
+        if a.bits != b.bits:
+            raise TauError(f"tau.{fn} takes two values of one type")
         lanes = [_BIN[fn](x, y) for x, y in zip(a.lanes, b.lanes)]
-        ctx.issue(pin, lanes)
-        return Word(lanes=lanes)
+        return ctx.value(a.bits, lanes, pin)
     op.__name__ = fn
     return op
 
 
-# One-word operations. The first group runs on a vector slice, the second on
+# One-value operations. The first group runs on a vector slice, the second on
 # a rearrangement slice.
 relu = _unary("relu", None)
+widen = _unary("widen", "to")
 neg = _unary("neg", None)
 requant = _unary("requant", "k")
 shl = _unary("shl", "k")
@@ -770,7 +846,7 @@ rotate = _unary("rotate", "k")
 broadcast = _unary("broadcast", "k")
 permute = _unary("permute", "table")
 
-# Two-word operations.
+# Two-value operations.
 add = _binary("add")
 sub = _binary("sub")
 mul = _binary("mul")
@@ -783,13 +859,13 @@ lt = _binary("lt")
 def dense(x, weights, pos, n, bias=None, shift=0, activate=True, at=None):
     """A quantized linear layer: `relu(requant(W * x + bias, shift))`.
 
-    This is not an operation of the machine. It is a Python function that
+    `x` and the rows of `weights` have 8 bits, `bias` has 32 and the result
+    8. This is not an operation of the machine. It is a Python function that
     calls three or four of them, and those are what gets traced. A pin
     given here goes on the matrix product."""
-    if bias is None:
-        y = matvec(x, weights, pos, n, at=at)
-    else:
-        y = affine(x, weights, pos, n, bias, at=at)
+    y = matvec(x, weights, pos, n, at=at)
+    if bias is not None:
+        y = add(y, bias)
     y = requant(y, shift)
     return relu(y) if activate else y
 

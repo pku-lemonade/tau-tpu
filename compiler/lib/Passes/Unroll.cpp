@@ -47,8 +47,6 @@ static void instantiate(Operation *op, uint64_t k) {
     instantiate(store, k);
   else if (auto matvec = dyn_cast<tau::MatVecOp>(op))
     instantiate(matvec, k);
-  else if (auto affine = dyn_cast<tau::AffineOp>(op))
-    instantiate(affine, k);
 }
 
 struct UnrollPass : PassWrapper<UnrollPass, OperationPass<func::FuncOp>> {

@@ -70,15 +70,16 @@ Error encodeEntry(tau::EntryOp entry, SmallVectorImpl<int64_t> &out) {
     out.push_back(num("addr"));
   } else if (instr == "un") {
     out.push_back(2);
+    out.push_back(tau::typeCode(num("bits")));
     out.push_back(stream("src"));
     out.push_back(stream("dst"));
     static const char *const plain[] = {"relu",  "requant", "neg",    "abs",
                                         "shl",   "addi",    "muli",   "shift",
                                         "rotate", "reverse", "broadcast",
-                                        "permute"};
+                                        "permute", "widen"};
     StringRef fn = entry.getFn().value_or("");
     int64_t code = -1;
-    for (int64_t c = 0; c < 12; ++c)
+    for (int64_t c = 0; c < 13; ++c)
       if (fn == plain[c])
         code = c;
     if (code < 0)
@@ -86,6 +87,8 @@ Error encodeEntry(tau::EntryOp entry, SmallVectorImpl<int64_t> &out) {
     out.push_back(code);
     if (fn == "addi" || fn == "muli") {
       out.push_back(intNumber(num("k")));
+    } else if (fn == "widen") {
+      out.push_back(tau::typeCode(num("to")));
     } else if (fn == "permute") {
       ArrayRef<int64_t> table = *entry.getTable();
       out.push_back(static_cast<int64_t>(table.size()));
@@ -105,43 +108,36 @@ Error encodeEntry(tau::EntryOp entry, SmallVectorImpl<int64_t> &out) {
     if (code < 0)
       return createStringError("cannot encode the operation '" + fn + "'");
     out.push_back(3);
+    out.push_back(tau::typeCode(num("bits")));
     out.push_back(code);
     out.push_back(stream("a"));
     out.push_back(stream("b"));
     out.push_back(stream("dst"));
-  } else if (instr == "load") {
+  } else if (instr == "product") {
     out.push_back(4);
+    out.push_back(num("n"));
     out.push_back(stream("src"));
-  } else if (instr == "mac") {
+    out.push_back(stream("dst"));
+  } else if (instr == "install") {
     out.push_back(5);
     out.push_back(num("j"));
+    out.push_back(num("g"));
     out.push_back(stream("src"));
-  } else if (instr == "emit") {
-    out.push_back(6);
-    out.push_back(stream("dst"));
   } else if (instr == "const") {
-    out.push_back(7);
+    out.push_back(6);
+    out.push_back(tau::typeCode(num("bits")));
     out.push_back(stream("dst"));
     ArrayRef<int64_t> values = *entry.getValues();
     out.push_back(static_cast<int64_t>(values.size()));
     for (int64_t value : values)
       out.push_back(intNumber(value));
   } else if (instr == "sel") {
-    out.push_back(8);
+    out.push_back(7);
+    out.push_back(tau::typeCode(num("bits")));
     out.push_back(stream("m"));
     out.push_back(stream("a"));
     out.push_back(stream("b"));
     out.push_back(stream("dst"));
-  } else if (instr == "seed") {
-    out.push_back(9);
-    out.push_back(stream("src"));
-  } else if (instr == "install") {
-    out.push_back(10);
-    out.push_back(num("j"));
-    out.push_back(stream("src"));
-  } else if (instr == "macw") {
-    out.push_back(11);
-    out.push_back(num("j"));
   } else {
     return createStringError("cannot encode the instruction '" + instr + "'");
   }

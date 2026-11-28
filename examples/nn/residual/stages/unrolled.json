@@ -5,7 +5,8 @@
       "buf": 0,
       "dst": 0,
       "op": "load",
-      "stride": 0
+      "stride": 0,
+      "ty": "i8"
     },
     {
       "base": 0,
@@ -21,27 +22,31 @@
       "buf": 2,
       "dst": 2,
       "op": "load",
-      "stride": 0
+      "stride": 0,
+      "ty": "i32"
     },
     {
       "a": 1,
       "b": 2,
       "dst": 3,
       "fn": "add",
-      "op": "bin"
+      "op": "bin",
+      "ty": "i32"
     },
     {
       "a": 3,
       "dst": 4,
       "fn": "requant",
       "k": 2,
-      "op": "un"
+      "op": "un",
+      "ty": "i32"
     },
     {
       "a": 4,
       "dst": 5,
       "fn": "relu",
-      "op": "un"
+      "op": "un",
+      "ty": "i8"
     },
     {
       "base": 0,
@@ -57,33 +62,37 @@
       "dst": 7,
       "fn": "requant",
       "k": 2,
-      "op": "un"
+      "op": "un",
+      "ty": "i32"
     },
     {
       "a": 0,
       "b": 7,
       "dst": 8,
       "fn": "add",
-      "op": "bin"
+      "op": "bin",
+      "ty": "i8"
     },
     {
       "a": 8,
       "dst": 9,
       "fn": "relu",
-      "op": "un"
+      "op": "un",
+      "ty": "i8"
     },
     {
       "base": 0,
       "buf": 4,
       "op": "store",
       "src": 9,
-      "stride": 0
+      "stride": 0,
+      "ty": "i8"
     }
   ],
   "buffers": [
     1,
     4,
-    1,
+    4,
     4,
     1
   ]

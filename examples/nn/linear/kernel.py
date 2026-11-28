@@ -1,6 +1,6 @@
 """A quantized linear layer: y = relu(requant(W * x + b)).
 
-`w` holds the two columns of W. The second `relu` is redundant on purpose, to
+`w` holds the two rows of W. The second `relu` is redundant on purpose, to
 give `tau-simplify` something to remove.
 """
 
@@ -8,7 +8,8 @@ import tau
 
 
 @tau.kernel
-def linear(x: tau.Buf[1], b: tau.Buf[1], w: tau.Buf[2], y: tau.Buf[1]):
+def linear(x: tau.Buf[1], b: tau.Buf[1, tau.i32], w: tau.Buf[2],
+           y: tau.Buf[1]):
     v = tau.load(x, 0)
     prod = tau.matvec(v, w, 0, 2)
     bias = tau.load(b, 0)

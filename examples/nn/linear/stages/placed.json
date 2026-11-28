@@ -1,20 +1,25 @@
 {
   "config": {
+    "bankSize": 64,
     "kinds": [
       "mxm",
       "sxm",
       "mem",
       "mem",
+      "mem",
+      "mem",
       "vxm",
+      "mem",
+      "mem",
       "mem",
       "mem",
       "sxm",
       "mxm"
     ],
+    "lanes": 8,
     "memDelay": 1,
     "mxmDelay": 2,
-    "mxmWeights": 8,
-    "streams": 8,
+    "streams": 16,
     "sxmDelay": 1,
     "vxmDelay": 1
   },
@@ -26,104 +31,189 @@
       "slice": 2
     },
     {
-      "op": "load",
-      "slice": 0,
-      "src": 0
-    },
-    {
       "addr": 0,
       "dst": 1,
       "op": "read",
-      "slice": 5
+      "slice": 4
     },
     {
       "j": 0,
-      "op": "mac",
+      "op": "install",
       "slice": 0,
-      "src": 1
+      "srcs": [
+        1
+      ]
     },
     {
       "addr": 1,
       "dst": 2,
       "op": "read",
-      "slice": 5
-    },
-    {
-      "j": 1,
-      "op": "mac",
-      "slice": 0,
-      "src": 2
-    },
-    {
-      "dst": 3,
-      "op": "emit",
-      "slice": 0
-    },
-    {
-      "addr": 0,
-      "dst": 4,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 3,
-      "b": 4,
-      "dst": 5,
-      "fn": "add",
-      "op": "bin",
       "slice": 4
     },
     {
-      "dst": 6,
+      "j": 1,
+      "op": "install",
+      "slice": 0,
+      "srcs": [
+        2
+      ]
+    },
+    {
+      "dst": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "n": 2,
+      "op": "product",
+      "slice": 0,
+      "src": 0
+    },
+    {
+      "addr": 0,
+      "dst": 7,
+      "op": "read",
+      "slice": 7
+    },
+    {
+      "addr": 0,
+      "dst": 8,
+      "op": "read",
+      "slice": 8
+    },
+    {
+      "addr": 0,
+      "dst": 9,
+      "op": "read",
+      "slice": 9
+    },
+    {
+      "addr": 0,
+      "dst": 10,
+      "op": "read",
+      "slice": 10
+    },
+    {
+      "a": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "b": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "dst": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "ty": "i32"
+    },
+    {
+      "dst": [
+        15
+      ],
       "fn": "requant",
       "k": 0,
       "op": "un",
-      "slice": 4,
-      "src": 5
+      "slice": 6,
+      "src": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "ty": "i32"
     },
     {
-      "dst": 7,
+      "dst": [
+        16
+      ],
       "fn": "relu",
       "op": "un",
-      "slice": 4,
-      "src": 6
+      "slice": 6,
+      "src": [
+        15
+      ],
+      "ty": "i8"
     },
     {
       "addr": 0,
       "op": "write",
-      "slice": 6,
-      "src": 7
+      "slice": 5,
+      "src": 16
     }
   ],
   "map": [
     {
-      "base": 0,
-      "size": 1,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 2
+        }
+      ],
+      "size": 1
     },
     {
-      "base": 0,
-      "size": 1,
-      "slice": 3
+      "parts": [
+        {
+          "base": 0,
+          "slice": 7
+        },
+        {
+          "base": 0,
+          "slice": 8
+        },
+        {
+          "base": 0,
+          "slice": 9
+        },
+        {
+          "base": 0,
+          "slice": 10
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 0,
-      "size": 2,
-      "slice": 5
+      "parts": [
+        {
+          "base": 0,
+          "slice": 4
+        }
+      ],
+      "size": 2
     },
     {
-      "base": 0,
-      "size": 1,
-      "slice": 6
+      "parts": [
+        {
+          "base": 0,
+          "slice": 5
+        }
+      ],
+      "size": 1
     }
   ],
   "memSizes": [
     0,
     0,
     1,
-    1,
     0,
     2,
+    1,
+    0,
+    1,
+    1,
+    1,
     1,
     0,
     0

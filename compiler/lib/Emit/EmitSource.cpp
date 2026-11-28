@@ -50,16 +50,23 @@ Expected<json::Value> emitStmt(Operation &op, Numbering &num) {
   return stmt;
 }
 
+/// The name of the type of the value `value`.
+std::string typeOf(Value value) {
+  return tau::typeName(cast<tau::IntType>(value.getType()).getBits());
+}
+
 Expected<json::Value> emitBare(Operation &op, Numbering &num) {
   if (auto load = dyn_cast<tau::LoadOp>(op))
     return json::Object{{"op", "load"},
                         {"dst", num.define(load.getResult())},
+                        {"ty", typeOf(load.getResult())},
                         {"buf", num.buffers.lookup(load.getBuf())},
                         {"base", static_cast<int64_t>(load.getBase())},
                         {"stride", static_cast<int64_t>(load.getStride())}};
   if (auto store = dyn_cast<tau::StoreOp>(op))
     return json::Object{{"op", "store"},
                         {"src", num.values.lookup(store.getValue())},
+                        {"ty", typeOf(store.getValue())},
                         {"buf", num.buffers.lookup(store.getBuf())},
                         {"base", static_cast<int64_t>(store.getBase())},
                         {"stride", static_cast<int64_t>(store.getStride())}};
@@ -73,21 +80,10 @@ Expected<json::Value> emitBare(Operation &op, Numbering &num) {
                         {"stride", static_cast<int64_t>(matvec.getStride())},
                         {"n", static_cast<int64_t>(matvec.getN())}};
   }
-  if (auto affine = dyn_cast<tau::AffineOp>(op)) {
-    int64_t x = num.values.lookup(affine.getX());
-    int64_t bias = num.values.lookup(affine.getBias());
-    return json::Object{{"op", "affine"},
-                        {"dst", num.define(affine.getResult())},
-                        {"x", x},
-                        {"bias", bias},
-                        {"buf", num.buffers.lookup(affine.getBuf())},
-                        {"base", static_cast<int64_t>(affine.getBase())},
-                        {"stride", static_cast<int64_t>(affine.getStride())},
-                        {"n", static_cast<int64_t>(affine.getN())}};
-  }
   if (auto constant = dyn_cast<tau::ConstOp>(op))
     return json::Object{{"op", "const"},
                         {"dst", num.define(constant.getResult())},
+                        {"ty", typeOf(constant.getResult())},
                         {"values", json::Array(constant.getValues())}};
   if (auto select = dyn_cast<tau::SelectOp>(op)) {
     int64_t m = num.values.lookup(select.getM());
@@ -95,6 +91,7 @@ Expected<json::Value> emitBare(Operation &op, Numbering &num) {
     int64_t b = num.values.lookup(select.getB());
     return json::Object{{"op", "sel"},
                         {"dst", num.define(select.getResult())},
+                        {"ty", typeOf(select.getResult())},
                         {"m", m},
                         {"a", a},
                         {"b", b}};
@@ -104,6 +101,7 @@ Expected<json::Value> emitBare(Operation &op, Numbering &num) {
     int64_t b = num.values.lookup(op.getOperand(1));
     return json::Object{{"op", "bin"},
                         {"fn", tau::kernelName(op)},
+                        {"ty", typeOf(op.getOperand(0))},
                         {"dst", num.define(op.getResult(0))},
                         {"a", a},
                         {"b", b}};
@@ -112,8 +110,11 @@ Expected<json::Value> emitBare(Operation &op, Numbering &num) {
     int64_t a = num.values.lookup(op.getOperand(0));
     json::Object object{{"op", "un"},
                         {"fn", tau::kernelName(op)},
+                        {"ty", typeOf(op.getOperand(0))},
                         {"dst", num.define(op.getResult(0))},
                         {"a", a}};
+    if (isa<tau::WidenOp>(op))
+      object["to"] = typeOf(op.getResult(0));
     if (auto k = op.getAttrOfType<IntegerAttr>("k"))
       object["k"] = k.getInt();
     if (auto table = op.getAttrOfType<DenseI64ArrayAttr>("table"))
@@ -124,7 +125,7 @@ Expected<json::Value> emitBare(Operation &op, Numbering &num) {
                            op.getName().getStringRef() + "'");
 }
 
-/// The buffers of `func`, numbered, with their sizes.
+/// The buffers of `func`, numbered, with the number of words in each.
 Expected<json::Array> readBuffers(func::FuncOp func, Numbering &num) {
   json::Array sizes;
   for (BlockArgument arg : func.getArguments()) {
@@ -132,7 +133,8 @@ Expected<json::Array> readBuffers(func::FuncOp func, Numbering &num) {
     if (!buf)
       return createStringError("every argument must be a !tau.buf");
     num.buffers[arg] = static_cast<int64_t>(sizes.size());
-    sizes.push_back(static_cast<int64_t>(buf.getSize()));
+    sizes.push_back(static_cast<int64_t>(buf.getSize()) *
+                    tau::wordsOf(buf.getBits()));
   }
   return std::move(sizes);
 }

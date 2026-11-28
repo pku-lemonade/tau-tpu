@@ -71,7 +71,7 @@ struct SlicePass : PassWrapper<SlicePass, OperationPass<func::FuncOp>> {
     auto streamOf = [&](Value value) -> std::string {
       Operation *def = value.getDefiningOp();
       auto east = def->getAttrOfType<BoolAttr>("east");
-      std::optional<int64_t> stream = tau::optIntAttr(*def, "stream");
+      std::optional<int64_t> stream = tau::streamNumber(value);
       if (!east || !stream) {
         def->emitError("run tau-route before tau-slice");
         failed = true;
@@ -92,25 +92,42 @@ struct SlicePass : PassWrapper<SlicePass, OperationPass<func::FuncOp>> {
       NamedAttrList attrs;
       attrs.set("instr", builder.getStringAttr(name));
       attrs.set("time", builder.getI64IntegerAttr(*time));
-      for (StringRef key : {"fn", "k", "table", "values", "addr", "j"})
+      for (StringRef key :
+           {"fn", "k", "table", "values", "addr", "j", "n", "bits", "to"})
         if (Attribute attr = op->getAttr(key))
           attrs.set(key, attr);
       auto connect = [&](StringRef key, Value value) {
         attrs.set(key, builder.getStringAttr(streamOf(value)));
       };
-      if (name == "write" || name == "un" || name == "load" ||
+      // A value is named by the stream of its first word. Its words have to
+      // be on streams that follow one another (`tau-route`).
+      std::vector<std::vector<Value>> values = tau::operandValues(*op);
+      for (const std::vector<Value> &words : values) {
+        std::string first = streamOf(words.front());
+        for (size_t k = 1; k < words.size() && !failed; ++k) {
+          std::string expected =
+              first.substr(0, 1) +
+              std::to_string(std::stoll(first.substr(1)) + k);
+          if (streamOf(words[k]) != expected) {
+            op->emitError("the words this instruction takes side by side are "
+                          "not on streams that follow one another");
+            failed = true;
+          }
+        }
+      }
+      if (name == "write" || name == "un" || name == "product" ||
           name == "install")
-        connect("src", op->getOperand(0));
-      if (name == "mac" || name == "seed")
-        connect("src", op->getOperand(1));
+        connect("src", values[0].front());
+      if (name == "install")
+        attrs.set("g", builder.getI64IntegerAttr(values[0].size()));
       if (name == "bin") {
-        connect("a", op->getOperand(0));
-        connect("b", op->getOperand(1));
+        connect("a", values[0].front());
+        connect("b", values[1].front());
       }
       if (name == "sel") {
-        connect("m", op->getOperand(0));
-        connect("a", op->getOperand(1));
-        connect("b", op->getOperand(2));
+        connect("m", values[0].front());
+        connect("a", values[1].front());
+        connect("b", values[2].front());
       }
       if (Value result = tau::streamResult(*op))
         connect("dst", result);

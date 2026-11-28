@@ -1,48 +1,81 @@
 {
   "config": {
+    "bankSize": 64,
     "kinds": [
       "mxm",
       "sxm",
       "mem",
       "mem",
+      "mem",
+      "mem",
       "vxm",
+      "mem",
+      "mem",
       "mem",
       "mem",
       "sxm",
       "mxm"
     ],
+    "lanes": 8,
     "memDelay": 1,
     "mxmDelay": 2,
-    "mxmWeights": 8,
-    "streams": 8,
+    "streams": 16,
     "sxmDelay": 1,
     "vxmDelay": 1
   },
-  "cycles": 20,
+  "cycles": 32,
   "map": [
     {
-      "base": 0,
-      "size": 4,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 2
+        },
+        {
+          "base": 0,
+          "slice": 3
+        }
+      ],
+      "size": 8
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 3
+      "parts": [
+        {
+          "base": 0,
+          "slice": 7
+        },
+        {
+          "base": 0,
+          "slice": 8
+        }
+      ],
+      "size": 8
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 5
+      "parts": [
+        {
+          "base": 0,
+          "slice": 4
+        },
+        {
+          "base": 0,
+          "slice": 5
+        }
+      ],
+      "size": 8
     }
   ],
   "memSizes": [
     0,
     0,
     4,
-    5,
+    65,
+    67,
+    67,
     0,
-    7,
+    67,
+    68,
+    65,
     0,
     0,
     0
@@ -79,6 +112,16 @@
       "time": 1
     },
     {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 2
+    },
+    {
       "addr": 2,
       "dst": {
         "dir": "east",
@@ -89,85 +132,69 @@
       "time": 2
     },
     {
+      "addr": 3,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 2
+    },
+    {
       "addr": 1,
       "dst": {
         "dir": "east",
-        "id": 0
+        "id": 1
       },
       "op": "read",
-      "slice": 2,
+      "slice": 3,
       "time": 3
     },
     {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
+      "addr": 2,
       "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4,
-      "time": 4
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 2,
-      "time": 4
-    },
-    {
-      "addr": 1,
-      "dst": {
-        "dir": "east",
+        "dir": "west",
         "id": 1
       },
       "op": "read",
-      "slice": 3,
-      "time": 4
+      "slice": 8,
+      "time": 3
     },
     {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
+      "addr": 3,
       "dst": {
         "dir": "west",
         "id": 0
       },
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4,
-      "time": 5
+      "op": "read",
+      "slice": 7,
+      "time": 3
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 4
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 4
     },
     {
       "addr": 0,
       "dst": {
         "dir": "east",
-        "id": 1
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 5
-    },
-    {
-      "addr": 3,
-      "dst": {
-        "dir": "east",
         "id": 0
       },
       "op": "read",
@@ -175,17 +202,36 @@
       "time": 5
     },
     {
-      "addr": 2,
+      "addr": 1,
       "dst": {
-        "dir": "east",
+        "dir": "west",
         "id": 0
       },
       "op": "read",
-      "slice": 2,
-      "time": 6
+      "slice": 7,
+      "time": 5
     },
     {
-      "addr": 3,
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 2
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 6,
+      "time": 6,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
       "dst": {
         "dir": "east",
         "id": 1
@@ -200,27 +246,156 @@
         "id": 0
       },
       "b": {
-        "dir": "east",
-        "id": 1
+        "dir": "west",
+        "id": 0
       },
       "dst": {
         "dir": "east",
-        "id": 2
+        "id": 0
       },
       "fn": "sub",
       "op": "bin",
-      "slice": 4,
+      "slice": 6,
+      "time": 7,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
       "time": 7
     },
     {
-      "addr": 4,
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 6,
+      "time": 8,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 8
+    },
+    {
+      "addr": 64,
       "op": "write",
-      "slice": 5,
+      "slice": 7,
+      "src": {
+        "dir": "east",
+        "id": 2
+      },
+      "time": 9
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 9
+    },
+    {
+      "addr": 65,
+      "op": "write",
+      "slice": 7,
       "src": {
         "dir": "east",
         "id": 0
       },
-      "time": 7
+      "time": 10
+    },
+    {
+      "addr": 64,
+      "op": "write",
+      "slice": 8,
+      "src": {
+        "dir": "east",
+        "id": 3
+      },
+      "time": 10
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 10
+    },
+    {
+      "addr": 3,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 10
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "sub",
+      "op": "bin",
+      "slice": 6,
+      "time": 11,
+      "ty": "i16"
+    },
+    {
+      "addr": 66,
+      "op": "write",
+      "slice": 7,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 11
+    },
+    {
+      "addr": 65,
+      "op": "write",
+      "slice": 8,
+      "src": {
+        "dir": "east",
+        "id": 1
+      },
+      "time": 11
     },
     {
       "addr": 2,
@@ -230,63 +405,47 @@
       },
       "op": "read",
       "slice": 3,
-      "time": 7
+      "time": 11
     },
     {
-      "a": {
-        "dir": "east",
-        "id": 0
+      "addr": 3,
+      "dst": {
+        "dir": "west",
+        "id": 1
       },
-      "b": {
+      "op": "read",
+      "slice": 8,
+      "time": 11
+    },
+    {
+      "addr": 66,
+      "op": "write",
+      "slice": 8,
+      "src": {
         "dir": "east",
         "id": 1
       },
+      "time": 12
+    },
+    {
+      "addr": 2,
       "dst": {
-        "dir": "east",
-        "id": 2
-      },
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4,
-      "time": 8
-    },
-    {
-      "addr": 4,
-      "op": "write",
-      "slice": 3,
-      "src": {
         "dir": "west",
-        "id": 0
+        "id": 1
       },
-      "time": 8
+      "op": "read",
+      "slice": 8,
+      "time": 12
     },
     {
-      "addr": 4,
+      "addr": 3,
       "dst": {
         "dir": "west",
         "id": 0
       },
       "op": "read",
-      "slice": 5,
-      "time": 8
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 9
+      "slice": 7,
+      "time": 12
     },
     {
       "addr": 1,
@@ -296,45 +455,27 @@
       },
       "op": "read",
       "slice": 2,
-      "time": 9
+      "time": 13
     },
     {
-      "addr": 4,
+      "addr": 2,
       "dst": {
-        "dir": "east",
+        "dir": "west",
         "id": 0
       },
       "op": "read",
-      "slice": 3,
-      "time": 9
+      "slice": 7,
+      "time": 13
     },
     {
-      "addr": 5,
-      "op": "write",
-      "slice": 5,
-      "src": {
-        "dir": "east",
-        "id": 2
-      },
-      "time": 10
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
+      "addr": 64,
       "dst": {
-        "dir": "east",
+        "dir": "west",
         "id": 1
       },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 10
+      "op": "read",
+      "slice": 8,
+      "time": 13
     },
     {
       "addr": 0,
@@ -344,138 +485,36 @@
       },
       "op": "read",
       "slice": 2,
-      "time": 10
-    },
-    {
-      "addr": 1,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 10
-    },
-    {
-      "addr": 6,
-      "op": "write",
-      "slice": 5,
-      "src": {
-        "dir": "east",
-        "id": 2
-      },
-      "time": 11
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "west",
-        "id": 0
-      },
-      "dst": {
-        "dir": "east",
-        "id": 2
-      },
-      "fn": "max",
-      "op": "bin",
-      "slice": 4,
-      "time": 11
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "east",
-        "id": 1
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 11
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 1
-      },
-      "b": {
-        "dir": "east",
-        "id": 0
-      },
-      "dst": {
-        "dir": "east",
-        "id": 2
-      },
-      "fn": "max",
-      "op": "bin",
-      "slice": 4,
-      "time": 12
-    },
-    {
-      "addr": 5,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 5,
-      "time": 12
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 13
-    },
-    {
-      "addr": 6,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 5,
-      "time": 13
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "east",
-        "id": 1
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
       "time": 14
     },
     {
-      "addr": 3,
-      "op": "write",
-      "slice": 5,
-      "src": {
+      "addr": 1,
+      "dst": {
         "dir": "east",
-        "id": 2
+        "id": 1
       },
+      "op": "read",
+      "slice": 3,
+      "time": 14
+    },
+    {
+      "addr": 65,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 14
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
       "time": 14
     },
     {
@@ -491,20 +530,61 @@
         "dir": "east",
         "id": 0
       },
-      "fn": "max",
+      "fn": "add",
       "op": "bin",
-      "slice": 4,
+      "slice": 6,
+      "time": 15,
+      "ty": "i16"
+    },
+    {
+      "addr": 67,
+      "op": "write",
+      "slice": 8,
+      "src": {
+        "dir": "east",
+        "id": 1
+      },
       "time": 15
     },
     {
-      "addr": 2,
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 15
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 15
+    },
+    {
+      "addr": 65,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 15
+    },
+    {
+      "addr": 64,
       "op": "write",
-      "slice": 5,
+      "slice": 9,
       "src": {
         "dir": "east",
-        "id": 2
+        "id": 0
       },
-      "time": 15
+      "time": 16
     },
     {
       "a": {
@@ -519,20 +599,385 @@
         "dir": "east",
         "id": 0
       },
-      "fn": "max",
+      "fn": "add",
       "op": "bin",
-      "slice": 4,
+      "slice": 6,
+      "time": 16,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
       "time": 16
     },
     {
       "addr": 1,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 16
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "west",
+        "id": 2
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 6,
+      "time": 17,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 17
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 9,
+      "time": 17
+    },
+    {
+      "addr": 66,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 17
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "west",
+        "id": 2
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 6,
+      "time": 18,
+      "ty": "i16"
+    },
+    {
+      "addr": 67,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 8,
+      "time": 18
+    },
+    {
+      "addr": 66,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 7,
+      "time": 18
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "time": 19,
+      "ty": "i16"
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "time": 20,
+      "ty": "i16"
+    },
+    {
+      "addr": 64,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "west",
+        "id": 2
+      },
+      "time": 20
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 6,
+      "time": 21,
+      "ty": "i16"
+    },
+    {
+      "addr": 2,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "west",
+        "id": 3
+      },
+      "time": 21
+    },
+    {
+      "addr": 64,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 3
+      },
+      "time": 21
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "west",
+        "id": 2
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 21
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 0
+      },
+      "b": {
+        "dir": "west",
+        "id": 0
+      },
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "max",
+      "op": "bin",
+      "slice": 6,
+      "time": 22,
+      "ty": "i16"
+    },
+    {
+      "addr": 64,
+      "op": "write",
+      "slice": 3,
+      "src": {
+        "dir": "west",
+        "id": 2
+      },
+      "time": 23
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 23
+    },
+    {
+      "addr": 65,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 24
+    },
+    {
+      "addr": 3,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 2
+      },
+      "time": 24
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 24
+    },
+    {
+      "addr": 66,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 25
+    },
+    {
+      "addr": 65,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 1
+      },
+      "time": 25
+    },
+    {
+      "addr": 3,
       "op": "write",
       "slice": 5,
       "src": {
         "dir": "east",
         "id": 0
       },
-      "time": 18
+      "time": 26
+    },
+    {
+      "addr": 66,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 1
+      },
+      "time": 26
+    },
+    {
+      "addr": 66,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 26
+    },
+    {
+      "addr": 2,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 27
+    },
+    {
+      "addr": 66,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 27
+    },
+    {
+      "addr": 65,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 27
+    },
+    {
+      "addr": 65,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 28
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 29
     },
     {
       "addr": 0,
@@ -542,7 +987,27 @@
         "dir": "east",
         "id": 0
       },
-      "time": 19
+      "time": 30
+    },
+    {
+      "addr": 1,
+      "op": "write",
+      "slice": 4,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 30
+    },
+    {
+      "addr": 1,
+      "op": "write",
+      "slice": 5,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 31
     }
   ]
 }

@@ -1,20 +1,25 @@
 {
   "config": {
+    "bankSize": 64,
     "kinds": [
       "mxm",
       "sxm",
       "mem",
       "mem",
+      "mem",
+      "mem",
       "vxm",
+      "mem",
+      "mem",
       "mem",
       "mem",
       "sxm",
       "mxm"
     ],
+    "lanes": 8,
     "memDelay": 1,
     "mxmDelay": 2,
-    "mxmWeights": 8,
-    "streams": 8,
+    "streams": 16,
     "sxmDelay": 1,
     "vxmDelay": 1
   },
@@ -32,177 +37,393 @@
       "slice": 3
     },
     {
-      "a": 0,
-      "b": 1,
+      "addr": 0,
       "dst": 2,
+      "op": "read",
+      "slice": 7
+    },
+    {
+      "addr": 0,
+      "dst": 3,
+      "op": "read",
+      "slice": 8
+    },
+    {
+      "a": [
+        0,
+        1
+      ],
+      "b": [
+        2,
+        3
+      ],
+      "dst": [
+        4,
+        5
+      ],
       "fn": "add",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 0,
-      "b": 1,
-      "dst": 3,
+      "a": [
+        0,
+        1
+      ],
+      "b": [
+        2,
+        3
+      ],
+      "dst": [
+        6,
+        7
+      ],
       "fn": "sub",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 2,
-      "b": 3,
-      "dst": 4,
+      "a": [
+        4,
+        5
+      ],
+      "b": [
+        6,
+        7
+      ],
+      "dst": [
+        8,
+        9
+      ],
       "fn": "max",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 4,
+      "src": 8
     },
     {
       "addr": 0,
       "op": "write",
       "slice": 5,
-      "src": 4
-    },
-    {
-      "addr": 1,
-      "dst": 5,
-      "op": "read",
-      "slice": 2
-    },
-    {
-      "addr": 1,
-      "dst": 6,
-      "op": "read",
-      "slice": 3
-    },
-    {
-      "a": 5,
-      "b": 6,
-      "dst": 7,
-      "fn": "add",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "a": 5,
-      "b": 6,
-      "dst": 8,
-      "fn": "sub",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "a": 7,
-      "b": 8,
-      "dst": 9,
-      "fn": "max",
-      "op": "bin",
-      "slice": 4
-    },
-    {
-      "addr": 1,
-      "op": "write",
-      "slice": 5,
       "src": 9
     },
     {
-      "addr": 2,
+      "addr": 1,
       "dst": 10,
       "op": "read",
       "slice": 2
     },
     {
-      "addr": 2,
+      "addr": 1,
       "dst": 11,
       "op": "read",
       "slice": 3
     },
     {
-      "a": 10,
-      "b": 11,
+      "addr": 1,
       "dst": 12,
+      "op": "read",
+      "slice": 7
+    },
+    {
+      "addr": 1,
+      "dst": 13,
+      "op": "read",
+      "slice": 8
+    },
+    {
+      "a": [
+        10,
+        11
+      ],
+      "b": [
+        12,
+        13
+      ],
+      "dst": [
+        14,
+        15
+      ],
       "fn": "add",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 10,
-      "b": 11,
-      "dst": 13,
+      "a": [
+        10,
+        11
+      ],
+      "b": [
+        12,
+        13
+      ],
+      "dst": [
+        16,
+        17
+      ],
       "fn": "sub",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 12,
-      "b": 13,
-      "dst": 14,
+      "a": [
+        14,
+        15
+      ],
+      "b": [
+        16,
+        17
+      ],
+      "dst": [
+        18,
+        19
+      ],
       "fn": "max",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "addr": 1,
+      "op": "write",
+      "slice": 4,
+      "src": 18
+    },
+    {
+      "addr": 1,
+      "op": "write",
+      "slice": 5,
+      "src": 19
+    },
+    {
+      "addr": 2,
+      "dst": 20,
+      "op": "read",
+      "slice": 2
+    },
+    {
+      "addr": 2,
+      "dst": 21,
+      "op": "read",
+      "slice": 3
+    },
+    {
+      "addr": 2,
+      "dst": 22,
+      "op": "read",
+      "slice": 7
+    },
+    {
+      "addr": 2,
+      "dst": 23,
+      "op": "read",
+      "slice": 8
+    },
+    {
+      "a": [
+        20,
+        21
+      ],
+      "b": [
+        22,
+        23
+      ],
+      "dst": [
+        24,
+        25
+      ],
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "a": [
+        20,
+        21
+      ],
+      "b": [
+        22,
+        23
+      ],
+      "dst": [
+        26,
+        27
+      ],
+      "fn": "sub",
+      "op": "bin",
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "a": [
+        24,
+        25
+      ],
+      "b": [
+        26,
+        27
+      ],
+      "dst": [
+        28,
+        29
+      ],
+      "fn": "max",
+      "op": "bin",
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "addr": 2,
+      "op": "write",
+      "slice": 4,
+      "src": 28
     },
     {
       "addr": 2,
       "op": "write",
       "slice": 5,
-      "src": 14
+      "src": 29
     },
     {
       "addr": 3,
-      "dst": 15,
+      "dst": 30,
       "op": "read",
       "slice": 2
     },
     {
       "addr": 3,
-      "dst": 16,
+      "dst": 31,
       "op": "read",
       "slice": 3
     },
     {
-      "a": 15,
-      "b": 16,
-      "dst": 17,
+      "addr": 3,
+      "dst": 32,
+      "op": "read",
+      "slice": 7
+    },
+    {
+      "addr": 3,
+      "dst": 33,
+      "op": "read",
+      "slice": 8
+    },
+    {
+      "a": [
+        30,
+        31
+      ],
+      "b": [
+        32,
+        33
+      ],
+      "dst": [
+        34,
+        35
+      ],
       "fn": "add",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 15,
-      "b": 16,
-      "dst": 18,
+      "a": [
+        30,
+        31
+      ],
+      "b": [
+        32,
+        33
+      ],
+      "dst": [
+        36,
+        37
+      ],
       "fn": "sub",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
     },
     {
-      "a": 17,
-      "b": 18,
-      "dst": 19,
+      "a": [
+        34,
+        35
+      ],
+      "b": [
+        36,
+        37
+      ],
+      "dst": [
+        38,
+        39
+      ],
       "fn": "max",
       "op": "bin",
-      "slice": 4
+      "slice": 6,
+      "ty": "i16"
+    },
+    {
+      "addr": 3,
+      "op": "write",
+      "slice": 4,
+      "src": 38
     },
     {
       "addr": 3,
       "op": "write",
       "slice": 5,
-      "src": 19
+      "src": 39
     }
   ],
   "map": [
     {
-      "base": 0,
-      "size": 4,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 2
+        },
+        {
+          "base": 0,
+          "slice": 3
+        }
+      ],
+      "size": 8
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 3
+      "parts": [
+        {
+          "base": 0,
+          "slice": 7
+        },
+        {
+          "base": 0,
+          "slice": 8
+        }
+      ],
+      "size": 8
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 5
+      "parts": [
+        {
+          "base": 0,
+          "slice": 4
+        },
+        {
+          "base": 0,
+          "slice": 5
+        }
+      ],
+      "size": 8
     }
   ],
   "memSizes": [
@@ -210,8 +431,12 @@
     0,
     4,
     4,
+    4,
+    4,
     0,
     4,
+    4,
+    0,
     0,
     0,
     0

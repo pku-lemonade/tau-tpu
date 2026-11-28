@@ -7,7 +7,7 @@ import tau
 
 
 @tau.kernel
-def residual(x: tau.Buf[1], w1: tau.Buf[4], b1: tau.Buf[1],
+def residual(x: tau.Buf[1], w1: tau.Buf[4], b1: tau.Buf[1, tau.i32],
              w2: tau.Buf[4], y: tau.Buf[1]):
     x0 = tau.load(x, 0)
     p1 = tau.matvec(x0, w1, 0, 4)

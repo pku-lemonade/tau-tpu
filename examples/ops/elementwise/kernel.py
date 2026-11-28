@@ -4,7 +4,7 @@ import tau
 
 
 @tau.kernel
-def elementwise(a: tau.Buf[4], b: tau.Buf[4], out: tau.Buf[4]):
+def elementwise(a: tau.Buf[4, tau.i16], b: tau.Buf[4, tau.i16], out: tau.Buf[4, tau.i16]):
     for i in tau.loop(4):
         x = tau.load(a, i)
         y = tau.load(b, i)

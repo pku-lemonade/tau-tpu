@@ -1,12 +1,13 @@
 {
   "buffers": [1, 1, 2, 1],
   "body": [
-    {"op": "load", "dst": 0, "buf": 0, "base": 0, "stride": 0},
+    {"op": "load", "dst": 0, "ty": "i8", "buf": 0, "base": 0, "stride": 0},
     {"op": "matvec", "dst": 1, "x": 0, "buf": 2, "base": 0, "stride": 0, "n": 2},
-    {"op": "load", "dst": 2, "buf": 1, "base": 0, "stride": 0},
-    {"op": "bin", "fn": "add", "dst": 3, "a": 1, "b": 2},
-    {"op": "un", "fn": "requant", "k": 0, "dst": 4, "a": 3},
-    {"op": "un", "fn": "relu", "dst": 5, "a": 4},
-    {"op": "store", "src": 5, "buf": 3, "base": 0, "stride": 0}
+    {"op": "load", "dst": 2, "ty": "i8", "buf": 1, "base": 0, "stride": 0},
+    {"op": "un", "fn": "widen", "ty": "i8", "to": "i32", "dst": 3, "a": 2},
+    {"op": "bin", "fn": "add", "ty": "i32", "dst": 4, "a": 1, "b": 3},
+    {"op": "un", "fn": "requant", "ty": "i32", "k": 0, "dst": 5, "a": 4},
+    {"op": "un", "fn": "relu", "ty": "i8", "dst": 6, "a": 5},
+    {"op": "store", "src": 6, "ty": "i8", "buf": 3, "base": 0, "stride": 0}
   ]
 }

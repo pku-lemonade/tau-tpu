@@ -1,7 +1,7 @@
 //===- Machine.h - the machine a program is compiled for ------------------===//
 //
 // The description of a machine (docs/Formats.md, section 3: `config`), read
-// from a file such as machines/tau9.json, and how `tau-place` records it on a
+// from a file such as machines/tau13.json, and how `tau-place` records it on a
 // function for the later passes.
 //
 //===----------------------------------------------------------------------===//
@@ -24,9 +24,12 @@ struct Machine {
   /// The kind of slice at each position, west to east: "mem", "vxm", "sxm"
   /// or "mxm".
   std::vector<std::string> kinds;
-  int streams = 8;
-  /// The number of columns a matrix slice can store.
-  int mxmWeights = 8;
+  int streams = 16;
+  /// The number of lanes of a word, and so of installed words of a matrix
+  /// slice.
+  int lanes = 8;
+  /// The number of words in the lower bank of a memory slice.
+  int bankSize = 64;
   int memDelay = 1;
   int vxmDelay = 1;
   int sxmDelay = 1;
@@ -35,8 +38,8 @@ struct Machine {
   /// `tau::delayName` gives them.
   llvm::StringMap<int> delays;
 
-  /// A nine-slice machine: matrix, rearrangement, two memories, vector, two
-  /// memories, rearrangement, matrix.
+  /// A thirteen-slice machine: matrix, rearrangement, four memories, vector,
+  /// four memories, rearrangement, matrix.
   static Machine standard();
   static llvm::Expected<Machine> fromJSON(const llvm::json::Value &value);
   static llvm::Expected<Machine> fromFile(llvm::StringRef path);

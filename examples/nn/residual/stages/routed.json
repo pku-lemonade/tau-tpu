@@ -1,59 +1,104 @@
 {
   "config": {
+    "bankSize": 64,
     "kinds": [
       "mxm",
       "sxm",
       "mem",
       "mem",
+      "mem",
+      "mem",
       "vxm",
+      "mem",
+      "mem",
       "mem",
       "mem",
       "sxm",
       "mxm"
     ],
+    "lanes": 8,
     "memDelay": 1,
     "mxmDelay": 2,
-    "mxmWeights": 8,
-    "streams": 8,
+    "streams": 16,
     "sxmDelay": 1,
     "vxmDelay": 1
   },
-  "cycles": 47,
+  "cycles": 51,
   "map": [
     {
-      "base": 0,
-      "size": 1,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 2
+        }
+      ],
+      "size": 1
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 3
+      "parts": [
+        {
+          "base": 0,
+          "slice": 3
+        },
+        {
+          "base": 0,
+          "slice": 4
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 0,
-      "size": 1,
-      "slice": 5
+      "parts": [
+        {
+          "base": 1,
+          "slice": 2
+        },
+        {
+          "base": 2,
+          "slice": 3
+        },
+        {
+          "base": 2,
+          "slice": 4
+        },
+        {
+          "base": 0,
+          "slice": 5
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 0,
-      "size": 4,
-      "slice": 6
+      "parts": [
+        {
+          "base": 1,
+          "slice": 5
+        }
+      ],
+      "size": 4
     },
     {
-      "base": 1,
-      "size": 1,
-      "slice": 2
+      "parts": [
+        {
+          "base": 0,
+          "slice": 7
+        }
+      ],
+      "size": 1
     }
   ],
   "memSizes": [
     0,
     0,
     2,
-    4,
+    3,
+    3,
+    65,
     0,
     1,
-    4,
+    0,
+    0,
+    0,
     0,
     0
   ],
@@ -62,24 +107,14 @@
       "addr": 0,
       "dst": {
         "dir": "west",
-        "id": 0
+        "id": 1
       },
       "op": "read",
-      "slice": 2,
+      "slice": 4,
       "time": 0
     },
     {
       "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 0
-    },
-    {
-      "addr": 1,
       "dst": {
         "dir": "west",
         "id": 0
@@ -89,7 +124,17 @@
       "time": 1
     },
     {
-      "addr": 2,
+      "addr": 1,
+      "dst": {
+        "dir": "west",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 1
+    },
+    {
+      "addr": 1,
       "dst": {
         "dir": "west",
         "id": 0
@@ -99,149 +144,14 @@
       "time": 2
     },
     {
-      "addr": 3,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 3,
-      "time": 3
-    },
-    {
-      "op": "load",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 4
-    },
-    {
-      "j": 0,
-      "op": "mac",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 5
-    },
-    {
-      "j": 1,
-      "op": "mac",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 6
-    },
-    {
-      "j": 2,
-      "op": "mac",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 7
-    },
-    {
-      "j": 3,
-      "op": "mac",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 8
-    },
-    {
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "op": "emit",
-      "slice": 0,
-      "time": 9
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 5,
-      "time": 13
-    },
-    {
-      "a": {
-        "dir": "east",
-        "id": 0
-      },
-      "b": {
-        "dir": "west",
-        "id": 0
-      },
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "add",
-      "op": "bin",
-      "slice": 4,
-      "time": 16
-    },
-    {
-      "dst": {
-        "dir": "east",
-        "id": 0
-      },
-      "fn": "requant",
-      "k": 2,
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 18
-    },
-    {
-      "addr": 0,
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "op": "read",
-      "slice": 6,
-      "time": 19
-    },
-    {
-      "dst": {
-        "dir": "west",
-        "id": 0
-      },
-      "fn": "relu",
-      "op": "un",
-      "slice": 4,
-      "src": {
-        "dir": "east",
-        "id": 0
-      },
-      "time": 20
-    },
-    {
       "addr": 1,
       "dst": {
         "dir": "west",
         "id": 0
       },
       "op": "read",
-      "slice": 6,
-      "time": 20
+      "slice": 5,
+      "time": 2
     },
     {
       "addr": 2,
@@ -250,8 +160,18 @@
         "id": 0
       },
       "op": "read",
-      "slice": 6,
-      "time": 21
+      "slice": 5,
+      "time": 3
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 4
     },
     {
       "addr": 3,
@@ -260,66 +180,202 @@
         "id": 0
       },
       "op": "read",
-      "slice": 6,
-      "time": 22
+      "slice": 5,
+      "time": 4
     },
     {
-      "op": "load",
-      "slice": 0,
-      "src": {
+      "addr": 4,
+      "dst": {
         "dir": "west",
         "id": 0
       },
-      "time": 26
+      "op": "read",
+      "slice": 5,
+      "time": 5
     },
     {
+      "g": 2,
       "j": 0,
-      "op": "mac",
+      "op": "install",
       "slice": 0,
       "src": {
         "dir": "west",
         "id": 0
       },
-      "time": 27
+      "time": 6
     },
     {
-      "j": 1,
-      "op": "mac",
-      "slice": 0,
-      "src": {
-        "dir": "west",
-        "id": 0
-      },
-      "time": 28
-    },
-    {
+      "g": 2,
       "j": 2,
-      "op": "mac",
+      "op": "install",
       "slice": 0,
       "src": {
         "dir": "west",
         "id": 0
       },
-      "time": 29
+      "time": 7
     },
     {
-      "j": 3,
-      "op": "mac",
+      "dst": {
+        "dir": "east",
+        "id": 4
+      },
+      "n": 4,
+      "op": "product",
       "slice": 0,
       "src": {
         "dir": "west",
         "id": 0
       },
-      "time": 30
+      "time": 8
+    },
+    {
+      "g": 1,
+      "j": 0,
+      "op": "install",
+      "slice": 0,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 9
+    },
+    {
+      "g": 1,
+      "j": 1,
+      "op": "install",
+      "slice": 0,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 10
+    },
+    {
+      "g": 1,
+      "j": 2,
+      "op": "install",
+      "slice": 0,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 11
+    },
+    {
+      "addr": 1,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 2,
+      "time": 11
+    },
+    {
+      "g": 1,
+      "j": 3,
+      "op": "install",
+      "slice": 0,
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 12
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 1
+      },
+      "op": "read",
+      "slice": 3,
+      "time": 12
+    },
+    {
+      "addr": 2,
+      "dst": {
+        "dir": "east",
+        "id": 2
+      },
+      "op": "read",
+      "slice": 4,
+      "time": 13
+    },
+    {
+      "addr": 0,
+      "dst": {
+        "dir": "east",
+        "id": 3
+      },
+      "op": "read",
+      "slice": 5,
+      "time": 14
+    },
+    {
+      "a": {
+        "dir": "east",
+        "id": 4
+      },
+      "b": {
+        "dir": "east",
+        "id": 0
+      },
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "fn": "add",
+      "op": "bin",
+      "slice": 6,
+      "time": 17,
+      "ty": "i32"
     },
     {
       "dst": {
         "dir": "east",
         "id": 0
       },
-      "op": "emit",
+      "fn": "requant",
+      "k": 2,
+      "op": "un",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 19,
+      "ty": "i32"
+    },
+    {
+      "dst": {
+        "dir": "west",
+        "id": 0
+      },
+      "fn": "relu",
+      "op": "un",
+      "slice": 6,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 21,
+      "ty": "i8"
+    },
+    {
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "n": 4,
+      "op": "product",
       "slice": 0,
-      "time": 31
+      "src": {
+        "dir": "west",
+        "id": 0
+      },
+      "time": 29
     },
     {
       "addr": 0,
@@ -329,7 +385,7 @@
       },
       "op": "read",
       "slice": 2,
-      "time": 36
+      "time": 34
     },
     {
       "dst": {
@@ -339,12 +395,13 @@
       "fn": "requant",
       "k": 2,
       "op": "un",
-      "slice": 4,
+      "slice": 6,
       "src": {
         "dir": "east",
         "id": 0
       },
-      "time": 38
+      "time": 38,
+      "ty": "i32"
     },
     {
       "a": {
@@ -361,8 +418,9 @@
       },
       "fn": "add",
       "op": "bin",
-      "slice": 4,
-      "time": 40
+      "slice": 6,
+      "time": 40,
+      "ty": "i8"
     },
     {
       "dst": {
@@ -371,22 +429,43 @@
       },
       "fn": "relu",
       "op": "un",
-      "slice": 4,
+      "slice": 6,
       "src": {
         "dir": "east",
         "id": 0
       },
-      "time": 42
+      "time": 42,
+      "ty": "i8"
     },
     {
-      "addr": 1,
+      "addr": 64,
       "op": "write",
-      "slice": 2,
+      "slice": 5,
       "src": {
         "dir": "west",
         "id": 0
       },
+      "time": 45
+    },
+    {
+      "addr": 64,
+      "dst": {
+        "dir": "east",
+        "id": 0
+      },
+      "op": "read",
+      "slice": 5,
       "time": 46
+    },
+    {
+      "addr": 0,
+      "op": "write",
+      "slice": 7,
+      "src": {
+        "dir": "east",
+        "id": 0
+      },
+      "time": 50
     }
   ]
 }

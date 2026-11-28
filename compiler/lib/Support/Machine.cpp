@@ -11,8 +11,8 @@ using namespace mlir;
 
 tau::Machine tau::Machine::standard() {
   Machine machine;
-  machine.kinds = {"mxm", "sxm", "mem", "mem", "vxm",
-                "mem", "mem", "sxm", "mxm"};
+  machine.kinds = {"mxm", "sxm", "mem", "mem", "mem", "mem", "vxm",
+                   "mem", "mem", "mem", "mem", "sxm", "mxm"};
   return machine;
 }
 
@@ -42,7 +42,7 @@ int tau::Machine::maxDelay() const {
 json::Value tau::Machine::toJSON() const {
   json::Object object{
       {"kinds", json::Array(kinds)}, {"streams", streams},
-      {"mxmWeights", mxmWeights},
+      {"lanes", lanes},              {"bankSize", bankSize},
       {"memDelay", memDelay},        {"vxmDelay", vxmDelay},
       {"sxmDelay", sxmDelay},        {"mxmDelay", mxmDelay},
   };
@@ -50,8 +50,9 @@ json::Value tau::Machine::toJSON() const {
   // delays of its own is written as before.
   if (!delays.empty()) {
     json::Object own;
+    // The key is copied: the object outlives this machine.
     for (const auto &entry : delays)
-      own[entry.getKey()] = entry.getValue();
+      own[entry.getKey().str()] = entry.getValue();
     object["delays"] = std::move(own);
   }
   return object;
@@ -82,6 +83,8 @@ Expected<tau::Machine> tau::Machine::fromJSON(const json::Value &value) {
   };
   if (Error e = field("streams", machine.streams))
     return std::move(e);
+  if (Error e = field("bankSize", machine.bankSize))
+    return std::move(e);
   if (Error e = field("memDelay", machine.memDelay))
     return std::move(e);
   if (Error e = field("vxmDelay", machine.vxmDelay))
@@ -90,9 +93,8 @@ Expected<tau::Machine> tau::Machine::fromJSON(const json::Value &value) {
     return std::move(e);
   if (Error e = field("mxmDelay", machine.mxmDelay))
     return std::move(e);
-  if (object->get("mxmWeights"))
-    if (Error e = field("mxmWeights", machine.mxmWeights))
-      return std::move(e);
+  if (Error e = field("lanes", machine.lanes))
+    return std::move(e);
   if (const json::Object *own = object->getObject("delays"))
     for (const auto &[name, value] : *own) {
       std::optional<int64_t> number = value.getAsInteger();

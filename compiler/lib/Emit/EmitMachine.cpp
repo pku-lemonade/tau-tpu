@@ -38,11 +38,16 @@ Expected<json::Object> header(func::FuncOp func) {
     memSizes.push_back(cast<IntegerAttr>(size).getInt());
   json::Array placements;
   for (Attribute entry : map) {
-    auto triple = cast<ArrayAttr>(entry);
+    // The size, then each part's slice and first address (`tau-place`).
+    auto numbers = cast<ArrayAttr>(entry);
+    json::Array parts;
+    for (size_t i = 1; i + 1 < numbers.size(); i += 2)
+      parts.push_back(
+          json::Object{{"slice", cast<IntegerAttr>(numbers[i]).getInt()},
+                       {"base", cast<IntegerAttr>(numbers[i + 1]).getInt()}});
     placements.push_back(
-        json::Object{{"slice", cast<IntegerAttr>(triple[0]).getInt()},
-                     {"base", cast<IntegerAttr>(triple[1]).getInt()},
-                     {"size", cast<IntegerAttr>(triple[2]).getInt()}});
+        json::Object{{"parts", std::move(parts)},
+                     {"size", cast<IntegerAttr>(numbers[0]).getInt()}});
   }
   return json::Object{{"config", machine->toJSON()},
                       {"memSizes", std::move(memSizes)},
@@ -56,35 +61,63 @@ json::Object common(Operation &op) {
                     {"slice", tau::intAttr(op, "slice")}};
   if (auto fn = op.getAttrOfType<StringAttr>("fn"))
     body["fn"] = fn.getValue();
-  for (StringRef key : {"addr", "k", "j"})
+  for (StringRef key : {"addr", "k", "j", "n"})
     if (std::optional<int64_t> value = tau::optIntAttr(op, key))
       body[key] = *value;
   for (StringRef key : {"table", "values"})
     if (auto array = op.getAttrOfType<DenseI64ArrayAttr>(key))
       body[key] = json::Array(array.asArrayRef());
+  if (std::optional<int64_t> bits = tau::optIntAttr(op, "bits"))
+    body["ty"] = tau::typeName(*bits);
+  if (std::optional<int64_t> to = tau::optIntAttr(op, "to"))
+    body["to"] = tau::typeName(*to);
   return body;
 }
 
-/// Add the operands and the result of an instruction to `body`, each written
-/// by `name`.
+/// Add the operands and the result of an instruction to `body`, each word
+/// written by `name`. A value of several words is written word by word if
+/// `each`, and otherwise as its first word: on the machine its words are on
+/// streams that follow one another. The words of an `install` are written
+/// the same way, with how many there are.
 template <typename NameFn>
-void connect(Operation &op, json::Object &body, NameFn name) {
+void connect(Operation &op, json::Object &body, NameFn name, bool each) {
   StringRef kind = tau::instrName(op);
-  if (kind == "write" || kind == "un" || kind == "load" || kind == "install")
+  auto value = [&](ArrayRef<Value> words) -> json::Value {
+    if (!each)
+      return name(words.front());
+    json::Array names;
+    for (Value word : words)
+      names.push_back(name(word));
+    return std::move(names);
+  };
+  std::vector<std::vector<Value>> values = tau::operandValues(op);
+  if (kind == "write" || kind == "product")
     body["src"] = name(op.getOperand(0));
-  if (kind == "mac" || kind == "seed")
-    body["src"] = name(op.getOperand(1));
+  if (kind == "un")
+    body["src"] = value(values[0]);
+  if (kind == "install") {
+    if (each) {
+      body["srcs"] = value(values[0]);
+    } else {
+      body["g"] = static_cast<int64_t>(values[0].size());
+      body["src"] = name(values[0].front());
+    }
+  }
   if (kind == "bin") {
-    body["a"] = name(op.getOperand(0));
-    body["b"] = name(op.getOperand(1));
+    body["a"] = value(values[0]);
+    body["b"] = value(values[1]);
   }
   if (kind == "sel") {
-    body["m"] = name(op.getOperand(0));
-    body["a"] = name(op.getOperand(1));
-    body["b"] = name(op.getOperand(2));
+    body["m"] = value(values[0]);
+    body["a"] = value(values[1]);
+    body["b"] = value(values[2]);
   }
-  if (Value result = tau::streamResult(op))
-    body["dst"] = name(result);
+  if (kind == "read") {
+    body["dst"] = name(op.getResult(0));
+  } else if (tau::streamResult(op)) {
+    SmallVector<Value> results(op.result_begin(), op.result_end());
+    body["dst"] = value(results);
+  }
 }
 
 /// The slices of a function that `tau-slice` has run on. Empty before.
@@ -116,11 +149,14 @@ Expected<json::Value> tau::emitPlaced(func::FuncOp func) {
   for (Operation &op : func.getBody().front()) {
     if (!isInstr(op))
       continue;
-    if (Value result = streamResult(op))
-      numbers[result] = static_cast<int64_t>(numbers.size());
+    if (streamResult(op))
+      for (Value result : op.getResults())
+        numbers[result] = static_cast<int64_t>(numbers.size());
     json::Object body = common(op);
-    connect(op, body,
-            [&](Value value) -> json::Value { return numbers.lookup(value); });
+    connect(
+        op, body,
+        [&](Value value) -> json::Value { return numbers.lookup(value); },
+        /*each=*/true);
     if (std::optional<int64_t> pin = optIntAttr(op, "pin"))
       body["pin"] = *pin;
     instructions.push_back(std::move(body));
@@ -149,9 +185,14 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
                           {"time", static_cast<int64_t>(entry.getTime())}};
         if (auto fn = entry.getFn())
           body["fn"] = *fn;
-        for (StringRef key : {"addr", "k", "j", "repeats", "gap", "stride"})
+        for (StringRef key :
+             {"addr", "k", "j", "g", "n", "repeats", "gap", "stride"})
           if (std::optional<int64_t> value = optIntAttr(*entry, key))
             body[key] = *value;
+        if (std::optional<int64_t> bits = optIntAttr(*entry, "bits"))
+          body["ty"] = typeName(*bits);
+        if (std::optional<int64_t> to = optIntAttr(*entry, "to"))
+          body["to"] = typeName(*to);
         for (StringRef key : {"table", "values"})
           if (auto array = entry->getAttrOfType<DenseI64ArrayAttr>(key))
             body[key] = json::Array(array.asArrayRef());
@@ -174,14 +215,17 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
   for (Operation &op : func.getBody().front()) {
     if (!isInstr(op))
       continue;
-    Value result = streamResult(op);
-    if (!result)
+    if (!streamResult(op))
       continue;
     auto east = op.getAttrOfType<BoolAttr>("east");
     std::optional<int64_t> stream = optIntAttr(op, "stream");
     if (!east || !stream)
       return createStringError("the function has not been scheduled");
-    streams[result] = Stream{east.getValue(), *stream};
+    // The words of a result are on streams that follow one another.
+    for (Value result : op.getResults())
+      streams[result] = Stream{
+          east.getValue(),
+          *stream + cast<OpResult>(result).getResultNumber()};
   }
 
   std::vector<std::pair<int64_t, json::Object>> timed;
@@ -193,11 +237,14 @@ Expected<json::Value> tau::emitCompiled(func::FuncOp func) {
       return createStringError("the function has not been scheduled");
     json::Object body = common(op);
     body["time"] = *time;
-    connect(op, body, [&](Value value) -> json::Value {
-      Stream on = streams.lookup(value);
-      return json::Object{{"dir", on.east ? "east" : "west"},
-                          {"id", on.id}};
-    });
+    connect(
+        op, body,
+        [&](Value value) -> json::Value {
+          Stream on = streams.lookup(value);
+          return json::Object{{"dir", on.east ? "east" : "west"},
+                              {"id", on.id}};
+        },
+        /*each=*/false);
     timed.push_back({*time, std::move(body)});
   }
   std::stable_sort(timed.begin(), timed.end(),

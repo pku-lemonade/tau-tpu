@@ -4,9 +4,9 @@
 //
 // A slice's repeater can issue one entry several times: `repeats` more times
 // after the first, `gap` idle cycles apart, with the address of a memory
-// instruction or the column of a matrix instruction growing by `stride` each
+// instruction or the first installed word of an `install` growing by `stride` each
 // time (spec/Tau/Blocks/Repeater.lean, `Tau.TimedEntry` in spec/Tau/Isa/Instr.lean). Reading
-// the columns of a matrix on consecutive cycles is one such entry, and so is
+// the rows of a matrix on consecutive cycles is one such entry, and so is
 // what a slice does once per iteration of a loop that is pinned to a fixed
 // spacing.
 //
@@ -40,12 +40,12 @@ using namespace mlir;
 namespace {
 
 /// The field of an entry that a repeat can step: the address of a memory
-/// instruction or the column of a matrix instruction.
+/// instruction or the first installed word of an `install`.
 const char *steppedField(tau::EntryOp entry) {
   StringRef instr = entry.getInstr();
   if (instr == "read" || instr == "write")
     return "addr";
-  if (instr == "mac" || instr == "install" || instr == "macw")
+  if (instr == "install")
     return "j";
   return nullptr;
 }

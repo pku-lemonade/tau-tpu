@@ -18,4 +18,4 @@ The root `AGENTS.md` comes first; these rules add to it.
   does not translate.
 - A kernel operation added to the dialect needs a function there with both
   behaviours, tracing and computing. The computing one follows
-  `spec/Tau/Isa/Word.lean`.
+  `spec/Tau/Isa/Word.lean` and `spec/Tau/Isa/Value.lean`.

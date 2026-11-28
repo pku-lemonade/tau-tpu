@@ -1,9 +1,0 @@
-{
-  "kinds": ["mxm", "sxm", "mem", "mem", "vxm", "mem", "mem", "sxm", "mxm"],
-  "streams": 8,
-  "mxmWeights": 8,
-  "memDelay": 1,
-  "vxmDelay": 1,
-  "sxmDelay": 1,
-  "mxmDelay": 2
-}

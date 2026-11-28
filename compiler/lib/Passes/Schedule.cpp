@@ -10,12 +10,26 @@
 // again. It is run in both directions and the shorter schedule is kept.
 //
 // What is scheduled. A *unit* is a set of instructions a fixed number of
-// cycles apart: the instructions of one matrix product, or of one stored
-// matrix, on consecutive cycles, and any other instruction alone. A read of a
-// buffer word is not a unit. It is issued once for each instruction that
-// uses its word, timed so that the word arrives on the cycle it is used;
-// only a read that is pinned, or whose word is overwritten before it is
-// used, is a unit of its own.
+// cycles apart: the `install`s of one matrix, on consecutive cycles, and any
+// other instruction alone. A read of a buffer word is not a unit. It is
+// issued once for each instruction that uses its word, timed so that the
+// word arrives on the cycle it is used; only a read that is pinned, or whose
+// word is overwritten before it is used, is a unit of its own.
+//
+// Words. An instruction of the vector, rearrangement or matrix slice may
+// give a value of several words (Machine 3.5). Each word has its own users
+// and its own way to them: the words of a value that is stored go to
+// different memory slices. So each word after the first gets a unit of its
+// own that holds no instruction and has the cycle of the unit that makes the
+// word (its *head*). Everything below that speaks of "the word of a unit"
+// holds for such a unit too.
+//
+// The words of a value leave their slice together, on streams that follow
+// one another, so they all go one way. Where a word goes first, to the one
+// instruction that uses it or to the memory slice it waits in, is therefore
+// on the same side of its slice as for the other words of the value. And
+// the words of a value that an instruction takes all come to it from one
+// side.
 //
 // What a unit waits for (its *dependences*):
 //
@@ -23,8 +37,16 @@
 //   * for each word of memory, in the order of the placed program: a read
 //     comes after the write before it, and a write after the reads and the
 //     write before it;
-//   * for the stored columns of a matrix slice, the same: a product that
+//   * for the installed words of a matrix slice, the same: a product that
 //     uses them comes after they are installed and before they are replaced.
+//
+// What a slice can run. One instruction on a cycle, and one result leaving on
+// a cycle (Machine 3.3 and 3.4). A memory slice can run a read and a write on
+// one cycle if they are for different banks. `tau-place` puts the buffers in
+// the lower bank, and this pass puts every scratch word in the upper one. So
+// a word can be put away while a buffer word is read, and taken out again
+// while a buffer word is written; two reads, two writes, or a read and a
+// write of the same bank still take two cycles.
 //
 // The timing rule. A word issued at slice p is at slice q `lag` cycles later
 // and on no other cycle (Machine 3.4). So a word goes *directly* from the
@@ -98,6 +120,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -130,8 +153,10 @@ struct Instr {
   int unit = -1;
   int offset = 0;
   /// For a read or a write: the contents of the word of memory it reads or
-  /// makes (`Version`).
+  /// makes (`Version`), and the bank of that word.
   int version = -1;
+  int bank = -1;
+  bool isWrite = false;
 };
 
 /// What one word of memory holds between two writes to it.
@@ -156,6 +181,9 @@ struct Operand {
   /// Where the word comes from: the unit that makes it, or a word of memory.
   int producer = -1;
   int version = -1;
+  /// Which of the values the instruction takes the word is part of, if it
+  /// is part of one of several words. -1 otherwise.
+  int value = -1;
   /// Every place the instruction names the word.
   std::vector<OpOperand *> uses;
 };
@@ -168,6 +196,13 @@ struct User {
 
 struct Unit {
   std::vector<int> instrs;
+  /// For the unit of one more word of an instruction: the unit that holds
+  /// the instruction. -1 for any other unit.
+  int head = -1;
+  /// The units of the other words of this unit's instruction.
+  std::vector<int> others;
+  /// Which of the instruction's results the word of this unit is.
+  unsigned resultNumber = 0;
   int length = 1;
   /// Its place in the program, for ties.
   size_t order = 0;
@@ -205,9 +240,14 @@ struct Owner {
   enum Kind { Fixed, Write, Read } kind;
   int unit;
   int operand = -1;
+  /// For a read or a write of memory, the bank of its word.
+  int bank = -1;
 };
 
 using Slots = std::map<std::pair<int, Cycle>, Owner>;
+
+/// The bank of every scratch word: the upper one.
+constexpr int scratchBank = 1;
 
 /// A slot of a memory slice.
 struct Hold {
@@ -241,9 +281,11 @@ struct Schedule {
   /// slot held while that is not decided.
   std::vector<std::optional<Hold>> wait, heldWrite;
   std::vector<std::vector<Delivery>> delivery;
-  /// The cycle slots and the leaving slots that are taken (Machine 3.3 and
-  /// 3.4).
-  Slots issue, exit;
+  /// The slots that are taken (Machine 3.3 and 3.4). `issue`: the one
+  /// instruction of a slice on a cycle, or for a memory slice its one read.
+  /// `store`: the one write of a memory slice on a cycle. `exit`: the one
+  /// result that leaves a slice on a cycle.
+  Slots issue, store, exit;
   /// For each `Version`, the cycles on which it is read.
   std::vector<std::vector<Cycle>> reads;
   size_t placed = 0;
@@ -282,6 +324,8 @@ private:
   /// The reads that are issued once for each user, to be removed at the end.
   std::vector<Operation *> perUser;
   bool hasPins = false;
+  /// Set by `write` if the schedule cannot be written.
+  bool failed = false;
 
   Schedule st;
   /// With pins, cycles count from 0 and nothing may be issued before it.
@@ -292,6 +336,15 @@ private:
   // Building the program.
   bool build();
   void edge(int from, int to, Cycle lag);
+
+  /// The unit that holds the instruction that makes the word of unit `u`.
+  int headOf(int u) const { return units[u].head < 0 ? u : units[u].head; }
+  /// The units of the words that the instruction of unit `u` makes.
+  std::vector<int> wordsOf(int u) const {
+    std::vector<int> words{u};
+    words.insert(words.end(), units[u].others.begin(), units[u].others.end());
+    return words;
+  }
 
   // The timing rule.
   int readDelay(int mem) const { return machine.delayOf(mem, "read"); }
@@ -349,9 +402,20 @@ private:
     return false;
   }
 
+  // The side a value leaves its slice on.
+  int sideOf(int w, int slice) const;
+  int sideTaken(int w) const;
+  bool sameSide(int w, int slice) const;
+  int comesFrom(int x, int k) const;
+  bool arrivesTogether(int x, int k, int from) const;
+
   // Reads and writes of memory.
-  bool readFree(int mem, Cycle cycle, const Owner *mine = nullptr);
-  void takeRead(int mem, Cycle cycle, int unit);
+  int bankOf(int64_t addr) const { return addr < machine.bankSize ? 0 : 1; }
+  bool readFree(int mem, Cycle cycle, int bank, const Owner *mine = nullptr);
+  bool writeFree(int mem, Cycle cycle, int bank) const;
+  bool canWait(int p, int mem, Cycle cycle) const;
+  void takeRead(int mem, Cycle cycle, int unit, int bank);
+  void takeWrite(int mem, Cycle cycle, int unit);
   bool holdsWrite(int p, int mem, Cycle cycle) const;
   void releaseRead(int x, int k);
   void releaseWrite(int p);
@@ -461,6 +525,8 @@ bool Scheduler::build() {
     StringRef name = tau::instrName(op);
     if (name == "read" || name == "write") {
       std::pair<int, int64_t> word{in.slice, tau::intAttr(op, "addr")};
+      in.bank = bankOf(word.second);
+      in.isWrite = name == "write";
       auto found = current.find(word);
       if (found == current.end()) {
         versions.push_back({word.first, word.second});
@@ -480,16 +546,15 @@ bool Scheduler::build() {
     instrs.push_back(in);
   }
 
-  // The units. The instructions of one matrix product, or of one stored
-  // matrix, are joined by the state they pass on and go on consecutive
-  // cycles. A read is a unit only if it is pinned or its word is overwritten
+  // The units. The `install`s of one matrix are joined by the link each
+  // passes to the next and go on consecutive cycles. A read is a unit only if it is pinned or its word is overwritten
   // before a user takes it.
   for (size_t i = 0; i < instrs.size(); ++i) {
     Instr &in = instrs[i];
     Operation *op = in.op;
     int state = -1;
     for (Value operand : op->getOperands())
-      if (isa<tau::AccType>(operand.getType()))
+      if (isa<tau::PlaneType>(operand.getType()))
         state = index.lookup(operand.getDefiningOp());
     if (state >= 0) {
       in.unit = instrs[state].unit;
@@ -538,18 +603,54 @@ bool Scheduler::build() {
     }
   }
 
+  // A unit for each further word of an instruction that gives several.
+  for (size_t u = 0, n = units.size(); u < n; ++u) {
+    if (units[u].result < 0)
+      continue;
+    Operation *op = instrs[units[u].result].op;
+    for (unsigned k = 1; k < op->getNumResults(); ++k) {
+      Unit word;
+      word.head = static_cast<int>(u);
+      word.result = units[u].result;
+      word.resultNumber = k;
+      word.order = units[u].order;
+      units[u].others.push_back(static_cast<int>(units.size()));
+      units.push_back(std::move(word));
+    }
+  }
+  // The unit of the word `value`, or -1 for a read that is issued once for
+  // each user.
+  auto wordUnit = [&](Value value) {
+    int unit = instrs[index.lookup(value.getDefiningOp())].unit;
+    unsigned k = cast<OpResult>(value).getResultNumber();
+    return unit < 0 || k == 0 ? unit : units[unit].others[k - 1];
+  };
+
   // The words each unit uses. An instruction that names one word twice, or
   // two reads of the same contents, uses it once.
   for (size_t u = 0; u < units.size(); ++u)
     for (int i : units[u].instrs) {
       const Instr &in = instrs[i];
+      // The value each operand is part of, by operand number.
+      std::vector<int> valueOf(in.op->getNumOperands(), -1);
+      {
+        unsigned number = 0;
+        int value = 0;
+        for (const std::vector<Value> &words : tau::operandValues(*in.op)) {
+          for (size_t k = 0; k < words.size(); ++k)
+            valueOf[number + k] = words.size() > 1 ? value : -1;
+          number += words.size();
+          ++value;
+        }
+      }
       for (OpOperand &use : in.op->getOpOperands()) {
         if (!isa<tau::WordType>(use.get().getType()))
           continue;
         const Instr &source = instrs[index.lookup(use.get().getDefiningOp())];
         Operand operand{in.offset, in.slice};
+        operand.value = valueOf[use.getOperandNumber()];
         if (source.unit >= 0)
-          operand.producer = source.unit;
+          operand.producer = wordUnit(use.get());
         else
           operand.version = source.version;
         auto same = llvm::find_if(units[u].operands, [&](const Operand &o) {
@@ -577,7 +678,7 @@ bool Scheduler::build() {
     for (const Operand &operand : units[u].operands) {
       int me = static_cast<int>(u);
       if (operand.producer >= 0) {
-        edge(operand.producer, me,
+        edge(headOf(operand.producer), me,
              lands(operand.producer, 0, operand.slice) - operand.offset);
         continue;
       }
@@ -591,6 +692,8 @@ bool Scheduler::build() {
     }
   // Reads that are units, and the writes of each word in order.
   for (size_t u = 0; u < units.size(); ++u) {
+    if (units[u].head >= 0)
+      continue;
     const Instr &in = instrs[units[u].instrs[0]];
     if (in.version < 0)
       continue;
@@ -605,16 +708,18 @@ bool Scheduler::build() {
         edge(static_cast<int>(u), versions[version.next].store, 1);
     }
   }
-  // The stored columns of each matrix slice: installing them is a write and
-  // a product that uses them is a read.
+  // The installed words of each matrix slice: installing them is a write and
+  // a product is a read.
   std::map<int, int> installed;
   std::map<int, std::vector<int>> since;
   for (size_t u = 0; u < units.size(); ++u) {
+    if (units[u].head >= 0)
+      continue;
     int slice = instrs[units[u].instrs[0]].slice;
     bool installs = false, usesStored = false;
     for (int i : units[u].instrs) {
       installs |= tau::instrName(*instrs[i].op) == "install";
-      usesStored |= tau::instrName(*instrs[i].op) == "macw";
+      usesStored |= tau::instrName(*instrs[i].op) == "product";
     }
     int me = static_cast<int>(u);
     if (usesStored) {
@@ -640,14 +745,15 @@ bool Scheduler::build() {
     if (store.stores < 0)
       continue;
     store.together = true;
-    std::vector<int> todo{store.stores};
+    int maker = headOf(store.stores);
+    std::vector<int> todo{maker};
     std::set<int> seen;
     while (!todo.empty() && store.together) {
       int next = todo.back();
       todo.pop_back();
       for (auto [succ, lag] : units[next].succs) {
         if (succ == static_cast<int>(u))
-          store.together &= next == store.stores;
+          store.together &= next == maker;
         else if (static_cast<size_t>(succ) < u && seen.insert(succ).second)
           todo.push_back(succ);
       }
@@ -683,9 +789,87 @@ bool Scheduler::build() {
 // Reads and writes of memory
 //===----------------------------------------------------------------------===//
 
-/// Whether the slice `mem` can issue a read on `cycle`: it issues nothing
-/// else then, and no other result leaves it together with the word.
-bool Scheduler::readFree(int mem, Cycle cycle, const Owner *mine) {
+/// The side of the slice that makes word `w` that `slice` is on: -1 for
+/// west, 1 for east, 0 for that slice itself.
+int Scheduler::sideOf(int w, int slice) const {
+  int from = instrs[units[w].result].slice;
+  return slice < from ? -1 : slice > from ? 1 : 0;
+}
+
+/// The side that the words of the value of `w` go to first, as far as that
+/// is settled: the side of a memory slice one of them waits in or holds a
+/// write on, or of an instruction that takes one of them directly. 0 if
+/// nothing is settled yet.
+int Scheduler::sideTaken(int w) const {
+  for (int word : wordsOf(headOf(w))) {
+    if (st.wait[word])
+      return sideOf(word, st.wait[word]->mem);
+    if (st.heldWrite[word])
+      return sideOf(word, st.heldWrite[word]->mem);
+    for (User user : units[word].users)
+      if (st.time[user.unit] &&
+          st.delivery[user.unit][user.operand].how == Delivery::Direct)
+        if (int side =
+                sideOf(word, units[user.unit].operands[user.operand].slice))
+          return side;
+  }
+  return 0;
+}
+
+/// Whether word `w` may go first to `slice`: the other words of its value
+/// do not go the other way.
+bool Scheduler::sameSide(int w, int slice) const {
+  int side = sideOf(w, slice), taken = sideTaken(w);
+  return side == 0 || taken == 0 || side == taken;
+}
+
+/// The slice that operand `k` of unit `x` gets its word from, as far as that
+/// is settled: the slice that makes it, or the memory slice it is read from.
+/// -1 if nothing is settled yet.
+int Scheduler::comesFrom(int x, int k) const {
+  const Operand &operand = units[x].operands[k];
+  const Delivery &way = st.delivery[x][k];
+  switch (way.how) {
+  case Delivery::Direct:
+    return instrs[units[operand.producer].result].slice;
+  case Delivery::Scratch:
+    return st.wait[operand.producer]->mem;
+  case Delivery::Load:
+    return versions[operand.version].slice;
+  case Delivery::Via:
+    return way.mem;
+  case Delivery::None:
+    return way.held ? way.held->mem : -1;
+  }
+  return -1;
+}
+
+/// Whether the word for operand `k` of unit `x` may come from the slice
+/// `from`: the other words of the same value do not come from the other
+/// side of the instruction.
+bool Scheduler::arrivesTogether(int x, int k, int from) const {
+  const Operand &operand = units[x].operands[k];
+  auto side = [&](int slice) {
+    return slice < operand.slice ? -1 : slice > operand.slice ? 1 : 0;
+  };
+  if (operand.value < 0 || side(from) == 0)
+    return true;
+  for (size_t j = 0; j < units[x].operands.size(); ++j) {
+    const Operand &other = units[x].operands[j];
+    if (static_cast<int>(j) == k || other.value != operand.value ||
+        other.offset != operand.offset)
+      continue;
+    int at = comesFrom(x, static_cast<int>(j));
+    if (at >= 0 && side(at) != 0 && side(at) != side(from))
+      return false;
+  }
+  return true;
+}
+
+/// Whether the slice `mem` can issue a read of a word of `bank` on `cycle`:
+/// it issues no other read then, it writes no word of that bank then, and no
+/// other result leaves it together with the word.
+bool Scheduler::readFree(int mem, Cycle cycle, int bank, const Owner *mine) {
   auto free = [&](const Slots &slots, Cycle c) {
     const Owner *who = owner(slots, mem, c);
     return !who || (mine && who->kind == mine->kind &&
@@ -693,12 +877,34 @@ bool Scheduler::readFree(int mem, Cycle cycle, const Owner *mine) {
   };
   if (walled && cycle < 0)
     return false;
-  return free(st.issue, cycle) && free(st.exit, cycle + readDelay(mem));
+  const Owner *write = owner(st.store, mem, cycle);
+  return free(st.issue, cycle) && free(st.exit, cycle + readDelay(mem)) &&
+         (!write || write->bank != bank);
 }
 
-void Scheduler::takeRead(int mem, Cycle cycle, int unit) {
-  take(st.issue, mem, cycle, {Owner::Fixed, unit});
-  take(st.exit, mem, cycle + readDelay(mem), {Owner::Fixed, unit});
+/// Whether the slice `mem` can write a word of `bank` on `cycle`: it writes
+/// no other word then, and reads no word of that bank then.
+bool Scheduler::writeFree(int mem, Cycle cycle, int bank) const {
+  const Owner *read = owner(st.issue, mem, cycle);
+  return !owner(st.store, mem, cycle) && (!read || read->bank != bank);
+}
+
+/// Whether the word of unit `p` can be written to a scratch word of `mem` on
+/// `cycle`: the write is held for this word already, or it is free and on
+/// the side the value goes.
+bool Scheduler::canWait(int p, int mem, Cycle cycle) const {
+  return holdsWrite(p, mem, cycle) ||
+         (sameSide(p, mem) && writeFree(mem, cycle, scratchBank));
+}
+
+void Scheduler::takeRead(int mem, Cycle cycle, int unit, int bank) {
+  take(st.issue, mem, cycle, {Owner::Fixed, unit, -1, bank});
+  take(st.exit, mem, cycle + readDelay(mem), {Owner::Fixed, unit, -1, bank});
+}
+
+/// Take the write of the word of `unit` to a scratch word of `mem`.
+void Scheduler::takeWrite(int mem, Cycle cycle, int unit) {
+  take(st.store, mem, cycle, {Owner::Fixed, unit, -1, scratchBank});
 }
 
 bool Scheduler::holdsWrite(int p, int mem, Cycle cycle) const {
@@ -719,7 +925,7 @@ void Scheduler::releaseWrite(int p) {
   std::optional<Hold> &held = st.heldWrite[p];
   if (!held)
     return;
-  drop(st.issue, held->mem, held->cycle);
+  drop(st.store, held->mem, held->cycle);
   set(held, std::optional<Hold>());
 }
 
@@ -730,10 +936,11 @@ void Scheduler::holdRead(int x, int k) {
   const Operand &operand = units[x].operands[k];
   for (int mem : near[operand.slice]) {
     Cycle cycle = uses(x, k) - readLag(mem, operand.slice);
-    if (!readFree(mem, cycle))
+    if (!arrivesTogether(x, k, mem) || !readFree(mem, cycle, scratchBank))
       continue;
-    take(st.issue, mem, cycle, {Owner::Read, x, k});
-    take(st.exit, mem, cycle + readDelay(mem), {Owner::Read, x, k});
+    take(st.issue, mem, cycle, {Owner::Read, x, k, scratchBank});
+    take(st.exit, mem, cycle + readDelay(mem),
+         {Owner::Read, x, k, scratchBank});
     set(st.delivery[x][k].held, std::optional<Hold>(Hold{mem, cycle}));
     return;
   }
@@ -744,9 +951,9 @@ void Scheduler::holdRead(int x, int k) {
 bool Scheduler::holdWrite(int p) {
   for (int mem : near[instrs[units[p].result].slice]) {
     Cycle cycle = lands(p, mem);
-    if (owner(st.issue, mem, cycle))
+    if (!sameSide(p, mem) || !writeFree(mem, cycle, scratchBank))
       continue;
-    take(st.issue, mem, cycle, {Owner::Write, p});
+    take(st.store, mem, cycle, {Owner::Write, p, -1, scratchBank});
     set(st.heldWrite[p], std::optional<Hold>(Hold{mem, cycle}));
     return true;
   }
@@ -796,7 +1003,8 @@ std::optional<Cycle> Scheduler::scratchRead(int x, int k, int mem,
                                             Cycle written) {
   Cycle cycle = uses(x, k) - readLag(mem, units[x].operands[k].slice);
   Owner mine{Owner::Read, x, k};
-  if (cycle <= written || !readFree(mem, cycle, &mine))
+  if (cycle <= written || !arrivesTogether(x, k, mem) ||
+      !readFree(mem, cycle, scratchBank, &mine))
     return std::nullopt;
   return cycle;
 }
@@ -808,27 +1016,29 @@ std::optional<Cycle> Scheduler::scratchRead(int x, int k, int mem,
 /// that slice cannot issue together.
 bool Scheduler::viaSecond(int x, int k, int from, Cycle after, int version) {
   const Operand &operand = units[x].operands[k];
+  // The bank of the word where it is: a buffer word, or a scratch word.
+  int bank = version >= 0 ? bankOf(versions[version].addr) : scratchBank;
   for (int mem : near[operand.slice]) {
-    if (mem == from)
+    if (mem == from || !arrivesTogether(x, k, mem))
       continue;
     Cycle read = uses(x, k) - readLag(mem, operand.slice);
-    if (!readFree(mem, read))
+    if (!readFree(mem, read, scratchBank))
       continue;
     // The latest write that still leaves a cycle before the read.
     for (Cycle write = read - 1; write > read - 64; --write) {
       Cycle first = write - readLag(from, mem);
       if (first <= after || (walled && first < 0))
         break;
-      if (owner(st.issue, mem, write) || !readFree(from, first))
+      if (!writeFree(mem, write, scratchBank) || !readFree(from, first, bank))
         continue;
       Why kept = why;
       if (version >= 0 && !inOrder(version, first, false)) {
         why = kept;
         continue;
       }
-      takeRead(from, first, x);
-      take(st.issue, mem, write, {Owner::Fixed, x});
-      takeRead(mem, read, x);
+      takeRead(from, first, x, bank);
+      takeWrite(mem, write, x);
+      takeRead(mem, read, x, scratchBank);
       if (version >= 0) {
         st.reads[version].push_back(first);
         undo.push_back([this, version] { st.reads[version].pop_back(); });
@@ -852,7 +1062,11 @@ bool Scheduler::readWord(int x, int k) {
   const Operand &operand = units[x].operands[k];
   const Version &version = versions[operand.version];
   Cycle cycle = uses(x, k) - readLag(version.slice, operand.slice);
-  if (!readFree(version.slice, cycle)) {
+  int bank = bankOf(version.addr);
+  if (!arrivesTogether(x, k, version.slice))
+    return viaSecond(x, k, version.slice, std::numeric_limits<Cycle>::min(),
+                     operand.version);
+  if (!readFree(version.slice, cycle, bank)) {
     // Taken by another word for the same instruction: go round.
     const Owner *who = owner(st.issue, version.slice, cycle);
     if (who && who->kind == Owner::Fixed && who->unit == x)
@@ -860,11 +1074,13 @@ bool Scheduler::readWord(int x, int k) {
                        operand.version);
     if (walled && cycle < 0)
       return fail(Why::TooEarly, version.slice, cycle);
+    if (!who)
+      who = owner(st.store, version.slice, cycle);
     return fail(Why::Busy, version.slice, cycle, who ? who->unit : -1);
   }
   if (!inOrder(operand.version, cycle, false))
     return false;
-  takeRead(version.slice, cycle, x);
+  takeRead(version.slice, cycle, x, bank);
   st.reads[operand.version].push_back(cycle);
   undo.push_back([this, v = operand.version] { st.reads[v].pop_back(); });
   Delivery way = st.delivery[x][k];
@@ -882,7 +1098,7 @@ bool Scheduler::routeOne(int p, int x, int k) {
   auto fromScratch = [&](Cycle read) {
     Hold where = *st.wait[p];
     releaseRead(x, k);
-    takeRead(where.mem, read, x);
+    takeRead(where.mem, read, x, scratchBank);
     Delivery way = st.delivery[x][k];
     way.how = Delivery::Scratch;
     way.read = read;
@@ -904,7 +1120,9 @@ bool Scheduler::routeOne(int p, int x, int k) {
     return fail(Why::NoWay, operand.slice, uses(x, k), p);
   }
 
-  if (units[p].users.size() == 1 && uses(x, k) == lands(p, operand.slice)) {
+  if (units[p].users.size() == 1 && uses(x, k) == lands(p, operand.slice) &&
+      sameSide(p, operand.slice) &&
+      arrivesTogether(x, k, instrs[units[p].result].slice)) {
     releaseWrite(p);
     releaseRead(x, k);
     Delivery way = st.delivery[x][k];
@@ -927,13 +1145,13 @@ bool Scheduler::routeOne(int p, int x, int k) {
     if (!tried.insert(mem).second)
       continue;
     Cycle written = lands(p, mem);
-    if (owner(st.issue, mem, written) && !holdsWrite(p, mem, written))
+    if (!canWait(p, mem, written))
       continue;
     std::optional<Cycle> read = scratchRead(x, k, mem, written);
     if (!read)
       continue;
     releaseWrite(p);
-    take(st.issue, mem, written, {Owner::Fixed, p});
+    takeWrite(mem, written, p);
     set(st.wait[p], std::optional<Hold>(Hold{mem, written}));
     return fromScratch(*read);
   }
@@ -944,7 +1162,7 @@ bool Scheduler::routeOne(int p, int x, int k) {
     if (!tried.insert(mem).second)
       continue;
     Cycle written = lands(p, mem);
-    if (owner(st.issue, mem, written) && !holdsWrite(p, mem, written))
+    if (!canWait(p, mem, written))
       continue;
     Cycle read = uses(x, k) - readLag(mem, operand.slice);
     const Owner *who = owner(st.issue, mem, read);
@@ -953,7 +1171,7 @@ bool Scheduler::routeOne(int p, int x, int k) {
     size_t mark = undo.size();
     releaseWrite(p);
     releaseRead(x, k);
-    take(st.issue, mem, written, {Owner::Fixed, p});
+    takeWrite(mem, written, p);
     set(st.wait[p], std::optional<Hold>(Hold{mem, written}));
     if (viaSecond(x, k, mem, written, -1))
       return true;
@@ -968,7 +1186,10 @@ bool Scheduler::routeProducer(int p, const std::vector<User> &placed) {
   if (units[p].users.size() == 1) {
     User user = placed[0];
     if (uses(user.unit, user.operand) ==
-        lands(p, units[user.unit].operands[user.operand].slice)) {
+            lands(p, units[user.unit].operands[user.operand].slice) &&
+        sameSide(p, units[user.unit].operands[user.operand].slice) &&
+        arrivesTogether(user.unit, user.operand,
+                        instrs[units[p].result].slice)) {
       releaseRead(user.unit, user.operand);
       Delivery way = st.delivery[user.unit][user.operand];
       way.how = Delivery::Direct;
@@ -988,7 +1209,7 @@ bool Scheduler::routeProducer(int p, const std::vector<User> &placed) {
     if (!tried.insert(mem).second)
       continue;
     Cycle written = lands(p, mem);
-    if (owner(st.issue, mem, written))
+    if (!sameSide(p, mem) || !writeFree(mem, written, scratchBank))
       continue;
     // One read for each user, on different cycles.
     std::vector<Cycle> reads;
@@ -1001,12 +1222,12 @@ bool Scheduler::routeProducer(int p, const std::vector<User> &placed) {
     }
     if (reads.size() != placed.size())
       continue;
-    take(st.issue, mem, written, {Owner::Fixed, p});
+    takeWrite(mem, written, p);
     set(st.wait[p], std::optional<Hold>(Hold{mem, written}));
     for (size_t i = 0; i < placed.size(); ++i) {
       User user = placed[i];
       releaseRead(user.unit, user.operand);
-      takeRead(mem, reads[i], user.unit);
+      takeRead(mem, reads[i], user.unit, scratchBank);
       Delivery way = st.delivery[user.unit][user.operand];
       way.how = Delivery::Scratch;
       way.read = reads[i];
@@ -1023,10 +1244,10 @@ bool Scheduler::routeProducer(int p, const std::vector<User> &placed) {
     if (!tried.insert(mem).second)
       continue;
     Cycle written = lands(p, mem);
-    if (owner(st.issue, mem, written))
+    if (!sameSide(p, mem) || !writeFree(mem, written, scratchBank))
       continue;
     size_t mark = undo.size();
-    take(st.issue, mem, written, {Owner::Fixed, p});
+    takeWrite(mem, written, p);
     set(st.wait[p], std::optional<Hold>(Hold{mem, written}));
     bool found = true;
     for (User user : placed) {
@@ -1034,7 +1255,7 @@ bool Scheduler::routeProducer(int p, const std::vector<User> &placed) {
           scratchRead(user.unit, user.operand, mem, written);
       releaseRead(user.unit, user.operand);
       if (read) {
-        takeRead(mem, *read, user.unit);
+        takeRead(mem, *read, user.unit, scratchBank);
         Delivery way = st.delivery[user.unit][user.operand];
         way.how = Delivery::Scratch;
         way.read = *read;
@@ -1066,34 +1287,47 @@ bool Scheduler::place(int u, Cycle time) {
   // A slot held for a word gives way to the instruction the word was held
   // for: the one user that will take the word directly, and the store that
   // is the write.
-  if (unit.result >= 0 && unit.users.size() == 1) {
-    User user = unit.users[0];
+  for (int w : wordsOf(u)) {
+    const Unit &word = units[w];
+    if (word.result < 0 || word.users.size() != 1)
+      continue;
+    User user = word.users[0];
     if (st.time[user.unit] &&
         uses(user.unit, user.operand) ==
-            lands(u, time, units[user.unit].operands[user.operand].slice))
+            lands(w, time, units[user.unit].operands[user.operand].slice))
       releaseRead(user.unit, user.operand);
   }
   if (unit.isStore && unit.stores >= 0 && st.time[unit.stores] &&
       holdsWrite(unit.stores, instrs[unit.instrs[0]].slice, time))
     releaseWrite(unit.stores);
 
-  // Its own slots: one instruction at a slice on a cycle (Machine 3.3), and
-  // one result leaving a slice on a cycle (Machine 3.4).
+  // Its own slots: one instruction at a slice on a cycle, or at a memory
+  // slice a read and a write of different banks (Machine 3.3), and one
+  // result leaving a slice on a cycle (Machine 3.4).
   for (int i : unit.instrs) {
     const Instr &in = instrs[i];
     Cycle cycle = time + in.offset;
     if (walled && cycle < 0)
       return fail(Why::TooEarly, in.slice, cycle);
-    if (const Owner *who = owner(st.issue, in.slice, cycle))
+    Slots &mine = in.isWrite ? st.store : st.issue;
+    const Owner *who = owner(mine, in.slice, cycle);
+    if (!who && in.bank >= 0) {
+      const Slots &other = in.isWrite ? st.issue : st.store;
+      const Owner *across = owner(other, in.slice, cycle);
+      if (across && across->bank == in.bank)
+        who = across;
+    }
+    if (who)
       return fail(Why::Busy, in.slice, cycle, who->unit);
-    take(st.issue, in.slice, cycle, {Owner::Fixed, u});
+    take(mine, in.slice, cycle, {Owner::Fixed, u, -1, in.bank});
     if (!in.hasResult)
       continue;
     if (const Owner *who = owner(st.exit, in.slice, cycle + in.delay))
       return fail(Why::Leaving, in.slice, cycle + in.delay, who->unit);
-    take(st.exit, in.slice, cycle + in.delay, {Owner::Fixed, u});
+    take(st.exit, in.slice, cycle + in.delay, {Owner::Fixed, u, -1, in.bank});
   }
-  set(st.time[u], std::optional<Cycle>(time));
+  for (int w : wordsOf(u))
+    set(st.time[w], std::optional<Cycle>(time));
 
   // Every dependence on a unit that has a cycle already.
   const Instr &head = instrs[unit.instrs[0]];
@@ -1133,18 +1367,21 @@ bool Scheduler::place(int u, Cycle time) {
       holdRead(u, k);
   }
 
-  // The word it makes.
-  if (unit.result >= 0) {
+  // The words it makes.
+  for (int w : wordsOf(u)) {
+    const Unit &word = units[w];
+    if (word.result < 0)
+      continue;
     std::vector<User> placed;
-    for (User user : unit.users)
+    for (User user : word.users)
       if (st.time[user.unit])
         placed.push_back(user);
-    if (!placed.empty() && !routeProducer(u, placed))
+    if (!placed.empty() && !routeProducer(w, placed))
       return false;
-    if (!st.wait[u] && placed.size() < unit.users.size() && !holdWrite(u))
+    if (!st.wait[w] && placed.size() < word.users.size() && !holdWrite(w))
       return false;
   }
-  set(st.placed, st.placed + 1);
+  set(st.placed, st.placed + 1 + unit.others.size());
   return true;
 }
 
@@ -1164,20 +1401,21 @@ bool Scheduler::tryWithStores(int u, Cycle time) {
     rollback(mark);
     return false;
   }
-  for (User user : units[u].users) {
-    const Unit &store = units[user.unit];
-    if (!store.together || store.stores != u || store.pin ||
-        st.time[user.unit])
-      continue;
-    Cycle from = lands(u, instrs[store.instrs[0]].slice);
-    bool done = false;
-    for (Cycle cycle = from; cycle < from + 64 && !done; ++cycle)
-      done = tryPlace(user.unit, cycle);
-    if (!done) {
-      rollback(mark);
-      return false;
+  for (int w : wordsOf(u))
+    for (User user : units[w].users) {
+      const Unit &store = units[user.unit];
+      if (!store.together || store.stores != w || store.pin ||
+          st.time[user.unit])
+        continue;
+      Cycle from = lands(w, instrs[store.instrs[0]].slice);
+      bool done = false;
+      for (Cycle cycle = from; cycle < from + 64 && !done; ++cycle)
+        done = tryPlace(user.unit, cycle);
+      if (!done) {
+        rollback(mark);
+        return false;
+      }
     }
-  }
   return true;
 }
 
@@ -1197,23 +1435,27 @@ bool Scheduler::arrivesNow(int u, Cycle time) const {
   return false;
 }
 
-/// Backward: whether the word of unit `u`, if `u` were given `time`,
-/// arrives exactly on the cycle its one user uses it.
+/// Backward: whether a word of unit `u`, if `u` were given `time`, arrives
+/// exactly on the cycle its one user uses it.
 bool Scheduler::wantedNow(int u, Cycle time) const {
-  const Unit &unit = units[u];
-  if (unit.result < 0 || unit.users.size() != 1)
-    return false;
-  User user = unit.users[0];
-  return st.time[user.unit] &&
-         lands(u, time, units[user.unit].operands[user.operand].slice) ==
-             uses(user.unit, user.operand);
+  for (int w : wordsOf(u)) {
+    const Unit &word = units[w];
+    if (word.result < 0 || word.users.size() != 1)
+      continue;
+    User user = word.users[0];
+    if (st.time[user.unit] &&
+        lands(w, time, units[user.unit].operands[user.operand].slice) ==
+            uses(user.unit, user.operand))
+      return true;
+  }
+  return false;
 }
 
 /// Backward: whether the store `s` goes with the unit that makes its word,
 /// which is one of the `chosen`.
 bool Scheduler::storeGoesWith(int s, const std::vector<bool> &chosen) const {
   const Unit &store = units[s];
-  return store.together && !store.pin && chosen[store.stores];
+  return store.together && !store.pin && chosen[headOf(store.stores)];
 }
 
 /// For each unit without a cycle, the latest cycle it can have: every unit
@@ -1266,7 +1508,8 @@ bool Scheduler::forward(Cycle from) {
     std::vector<Cycle> bound = latest();
     std::vector<int> ready;
     for (size_t u = 0; u < units.size(); ++u) {
-      if (st.time[u])
+      // The unit of a further word gets its cycle with its head.
+      if (st.time[u] || units[u].head >= 0)
         continue;
       bool waits = false;
       for (auto [pred, lag] : units[u].preds)
@@ -1323,7 +1566,7 @@ bool Scheduler::backward(const std::vector<bool> &chosen, Cycle from,
         if (st.time[succ])
           continue;
         if (storeGoesWith(succ, chosen))
-          add(waiting[u], units[succ].stores);
+          add(waiting[u], headOf(units[succ].stores));
         else if (chosen[succ])
           add(waiting[u], succ);
         add(waiting[u], waiting[succ]);
@@ -1392,8 +1635,8 @@ bool Scheduler::pins() {
   for (size_t u = units.size(); u-- > 0;)
     if (units[u].pin || before[u])
       for (const Operand &operand : units[u].operands)
-        if (operand.producer >= 0 && !units[operand.producer].pin)
-          before[operand.producer] = true;
+        if (operand.producer >= 0 && !units[headOf(operand.producer)].pin)
+          before[headOf(operand.producer)] = true;
   // Then everything between one of those and a pinned unit: it waits for a
   // unit the walk places, and a pinned unit waits for it. Left to the
   // forward walk it would come after a unit that was placed as late as the
@@ -1458,7 +1701,7 @@ std::string Scheduler::describe(const Why &w) const {
   raw_string_ostream out(text);
   switch (w.kind) {
   case Why::Busy:
-    out << "slice " << w.slice << " would have two instructions on cycle "
+    out << "slice " << w.slice << " cannot run one more instruction on cycle "
         << w.cycle;
     break;
   case Why::Leaving:
@@ -1524,7 +1767,7 @@ bool Scheduler::run() {
     reset();
     std::vector<bool> chosen(units.size());
     for (size_t u = 0; u < units.size(); ++u)
-      chosen[u] = !units[u].together;
+      chosen[u] = !units[u].together && units[u].head < 0;
     bool back = backward(chosen, 0, false);
     if (!back) {
       if (!found) {
@@ -1543,7 +1786,7 @@ bool Scheduler::run() {
     undo.clear();
   }
   write();
-  return true;
+  return !failed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1581,7 +1824,7 @@ void Scheduler::write() {
   };
 
   // Scratch words: one for each word that waits, numbered in each memory
-  // slice in the order they are written, after the buffers.
+  // slice in the order they are written, from the start of the upper bank.
   std::vector<int64_t> sizes;
   for (Attribute size : func->getAttrOfType<ArrayAttr>("tau.mem_sizes"))
     sizes.push_back(cast<IntegerAttr>(size).getInt());
@@ -1606,8 +1849,10 @@ void Scheduler::write() {
                    [](const Scratch &a, const Scratch &b) {
                      return a.written < b.written;
                    });
-  for (const Scratch &word : scratch)
+  for (const Scratch &word : scratch) {
+    sizes[word.mem] = std::max<int64_t>(sizes[word.mem], machine.bankSize);
     *word.addr = sizes[word.mem]++;
+  }
 
   for (size_t u = 0; u < units.size(); ++u) {
     const Unit &unit = units[u];
@@ -1615,8 +1860,8 @@ void Scheduler::write() {
       issue(instrs[i].op, *st.time[u] + instrs[i].offset);
     if (st.wait[u])
       writeWord(instrs[unit.result].op->getLoc(),
-                instrs[unit.result].op->getResult(0), st.wait[u]->mem,
-                waitAddr[u], st.wait[u]->cycle);
+                instrs[unit.result].op->getResult(unit.resultNumber),
+                st.wait[u]->mem, waitAddr[u], st.wait[u]->cycle);
   }
   for (size_t u = 0; u < units.size(); ++u)
     for (size_t k = 0; k < units[u].operands.size(); ++k) {
@@ -1663,21 +1908,47 @@ void Scheduler::write() {
     op->moveBefore(block.getTerminator());
     cycles = std::max(cycles, cycle + 1);
     // A result nobody reads is still inside its slice; let it leave.
-    Value result = tau::streamResult(*op);
-    if (result && result.use_empty())
+    if (tau::streamResult(*op) && op->use_empty())
       cycles = std::max(cycles, cycle + machine.maxDelay() + 2);
   }
 
   // A stream of its own for every word, on a machine with enough streams.
+  // The words of a result are on streams that follow one another, from a
+  // number that is a multiple of how many they are, and so are words that an
+  // instruction takes side by side (Machine 3.5).
   int64_t fresh[2] = {0, 0};
+  auto claim = [&](bool east, int64_t width, int64_t align) {
+    int64_t base = (fresh[east] + align - 1) / align * align;
+    fresh[east] = base + width;
+    return base;
+  };
+  auto give = [&](Operation *op, int64_t stream) {
+    op->setAttr("east", builder.getBoolAttr(tau::goesEast(*op).value_or(true)));
+    tau::setIntAttr(*op, "stream", stream);
+  };
+  llvm::DenseSet<Operation *> given;
   for (auto &[cycle, op] : timed) {
-    Value result = tau::streamResult(*op);
-    if (!result)
-      continue;
-    bool east = tau::goesEast(*op).value_or(true);
-    op->setAttr("east", builder.getBoolAttr(east));
-    tau::setIntAttr(*op, "stream", fresh[east]++);
+    Expected<std::vector<tau::SideBySide>> runs = tau::sideBySide(*op);
+    if (!runs) {
+      op->emitError(toString(runs.takeError()));
+      failed = true;
+      return;
+    }
+    for (const tau::SideBySide &run : *runs) {
+      bool east = tau::goesEast(*run.makers.front()).value_or(true);
+      int64_t base =
+          claim(east, static_cast<int64_t>(run.makers.size()), run.align);
+      for (size_t k = 0; k < run.makers.size(); ++k) {
+        give(run.makers[k], base + static_cast<int64_t>(k));
+        given.insert(run.makers[k]);
+      }
+    }
   }
+  for (auto &[cycle, op] : timed)
+    if (tau::streamResult(*op) && !given.count(op)) {
+      int64_t width = op->getNumResults();
+      give(op, claim(tau::goesEast(*op).value_or(true), width, width));
+    }
   func->setAttr("tau.streams", builder.getI64IntegerAttr(machine.streams));
   tau::Machine widened = machine;
   widened.streams = static_cast<int>(

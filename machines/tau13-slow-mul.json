@@ -1,0 +1,12 @@
+{
+  "kinds": ["mxm", "sxm", "mem", "mem", "mem", "mem", "vxm",
+            "mem", "mem", "mem", "mem", "sxm", "mxm"],
+  "streams": 16,
+  "lanes": 8,
+  "bankSize": 64,
+  "memDelay": 1,
+  "vxmDelay": 1,
+  "sxmDelay": 1,
+  "mxmDelay": 2,
+  "delays": {"mul": 3}
+}

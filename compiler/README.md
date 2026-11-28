@@ -31,11 +31,11 @@ change nothing.
 | Pass | Step | Method |
 |---|---|---|
 | `tau-inline` | inline | copies each called kernel in, and adds the call's origin to its pins |
-| `tau-simplify` | simplify | three rewrites: `relu` of `relu`, and `max` or `min` of a word with itself; never removes a pinned operation |
+| `tau-simplify` | simplify | three rewrites: `relu` of `relu`, and `max` or `min` of a value with itself; never removes a pinned operation |
 | `tau-unroll` | unroll | one copy of the body per iteration, with the iteration filled into positions and pins |
-| `tau-place` | place | binding: buffers over the memories in turn; each operation on the nearest slice of its kind; a matrix that is multiplied again is stored in its matrix slice |
-| `tau-schedule` | schedule | list scheduling, run forward and backward, the shorter schedule kept; a word that does not arrive exactly when it is used waits in a scratch word; then every word gets a stream of its own, on a machine widened to have enough |
-| `tau-route` | route | on the machine's own streams, two words share a stream only if they are never in the same moving slot |
+| `tau-place` | place | binding: buffers over the memories in turn, in the lower bank, a buffer of values of several words dealt out over as many memories next to one another, a matrix dealt out over several memories if that brings its words out sooner; each operation on the nearest slice of its kind; a matrix is installed in its matrix slice before the first product with it, and not again while it stays there; every value taken apart into its words |
+| `tau-schedule` | schedule | list scheduling, run forward and backward, the shorter schedule kept; a word that does not arrive exactly when it is used waits in a scratch word of the upper bank; then every word gets a stream of its own, on a machine widened to have enough |
+| `tau-route` | route | on the machine's own streams, two words share a stream only if they are never in the same moving slot; the words of a value an instruction takes or gives, and the words of one `install`, get streams that follow one another |
 | `tau-slice` | slice | replaces each operand by the stream its word is on, and sorts the entries by slice |
 | `tau-fold` | fold | in each slice, the longest runs of like entries at equal steps of cycle and address |
 | `tau-encode` | encode | each slice's entries as numbers (`tau.image`), following `Program.encode` in `spec/Tau/Isa/Encode.lean` |
@@ -59,7 +59,10 @@ none decides anything for a later one.
 `tau-place` decides where. Each operation of the kernel becomes its
 instructions, in the kernel's order, and every word goes straight from the
 instruction that makes it to the ones that use it. Nothing waits and there
-is no scratch space yet.
+is no scratch space yet. A value of two or four words (Machine 1) becomes
+its words here: a load is a read for each word, a store a write for each,
+and a buffer of such values has each word of a value in a memory slice of
+its own (Compiler 3), so that a whole value comes out on one cycle.
 
 `tau-schedule` decides when. It is a *list scheduler*: it takes the
 instructions one at a time, by priority, gives each a cycle on which
@@ -68,13 +71,21 @@ slice is at another a fixed number of cycles later and on no other cycle
 (Machine 3.4), so a word goes directly only if its two ends are exactly that
 far apart; otherwise the pass writes it to a scratch word and reads it back
 in time. That costs two instructions, so the first rule of the priority is
-to place an instruction on the cycle a word arrives. The walk is done twice,
+to place an instruction on the cycle a word arrives. Scratch words are in
+the upper bank of a memory slice and buffers in the lower (Machine 3.11), so
+a slice can put a word away on the cycle it reads a buffer word, and take
+one out on the cycle it writes a buffer word. The walk is done twice,
 forward from the first cycle and backward from the last, and the shorter
 schedule is kept: a forward walk is weak where two words meet, a backward
-one where a word parts, and neither is shorter on every program.
+one where a word parts, and neither is shorter on every program. The words
+of a value are scheduled each on its own, with two things kept: they leave
+the slice that makes them toward one side, and they reach an instruction
+that takes them from one side, on one cycle.
 
 `tau-route` decides on which stream. `tau-schedule` leaves every word on a
 stream of its own, so its cycles can be checked before any stream is shared.
+The words of a value go on streams that follow one another, from a number
+the value may start on (Machine 3.5).
 
 `tau-check --decides` holds each of the three to this division (Compiler 8).
 
@@ -118,13 +129,13 @@ compiler/build/bin/tau-opt examples/nn/linear/kernel.mlir --tau-simplify --tau-u
   | compiler/build/bin/tau-opt --tau-slice --tau-fold --tau-encode
 ```
 
-`tau-place` takes the machine as an option: `--tau-place='machine=machines/tau9.json'`.
+`tau-place` takes the machine as an option: `--tau-place='machine=machines/tau13.json'`.
 
 `tauc` runs all nine passes and writes what each produced:
 
 ```bash
 compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out
-compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --machine machines/tau9.json --print-mlir
+compiler/build/bin/tauc examples/nn/linear/kernel.mlir -o out --machine machines/tau13.json --print-mlir
 ```
 
 The program is the last function of the file; the functions before it are
@@ -194,3 +205,10 @@ why its output is accepted.
   with several users waits in a scratch word and each user reads it from
   there, even where two of them could have taken it from the stream.
 - Every waiting word gets a scratch word of its own; none is used twice.
+- A buffer of values of two or four words needs that many memory slices next
+  to one another with room in each; `tau-place` refuses the program if the
+  machine has none. Such a buffer is never kept in one slice and read over
+  several cycles.
+- Nothing changes a type on its own. The operands of an operation have one
+  type, and a `widen` or a `requant` is there only where the program has it.
+  Arithmetic wraps (Machine 1); nothing saturates but `requant`.

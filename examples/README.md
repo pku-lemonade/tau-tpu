@@ -94,7 +94,7 @@ the Lean tools.
 | `kernel.py` | the program in Python, bound to the name `kernel` (`compiler/python/tau/__init__.py`) |
 | `kernel.mlir` | the program in the `tau` dialect; an example has this, `kernel.py`, or both, and both must give the same `source.json` |
 | `buffers.json` | the contents of the buffers to run it on (Formats 6) |
-| `machine` | optional: one line, the machine file to compile for, such as `machines/tau17.json`; without it `tauc` uses the nine-slice machine |
+| `machine` | optional: one line, the machine file to compile for, such as `machines/tau17.json`; without it `tauc` uses the thirteen-slice machine, `machines/tau13.json` |
 | `stages/` | optional: a copy of every file `tauc` writes for the example, for readers without the compiler; `UPDATE_STAGES=1 scripts/check-examples.sh` refreshes it |
 
 `linear-by-hand/` is different: a kernel file and a compiled file written by
@@ -118,30 +118,28 @@ shortest schedule the compiler finds for the program, so they cost nothing.
 | Example | Input | What it exercises |
 |---|---|---|
 | `paced` | Python | a loop pinned to one iteration every cycle, the fastest pace there is, which folds into three repeating entries |
-| `paced-axpy` | Python | a loop of three operations paced by one pin: two cycles longer than the compiler's own schedule, and a third the entries |
+| `paced-axpy` | Python | a loop of three operations paced by one pin: two cycles longer than the compiler's own schedule, and a quarter the entries |
 | `two-layer` | Python | one kernel called twice, the second call from the first cycle on which its input is ready, with a scratch buffer between |
 | `pinned-chain` | Python | three pins that agree, so the word goes directly, and three that do not, so it waits in memory |
 | `pinned-end` | Python | one pin at the end of a chain, on the earliest cycle it can have; what comes before it is scheduled backward from it, so nothing waits |
 | `linear-by-hand` | JSON | the linear layer scheduled by hand |
-| `nn/linear` | Python & MLIR | one quantized linear layer; a redundant `relu` for the simplifier |
+| `nn/linear` | Python & MLIR | one quantized linear layer: input and weights of 8 bits, product and bias of 32; a redundant `relu` for the simplifier |
 | `nn/residual` | Python & MLIR | a residual block; one value used twice |
-| `nn/affine` | MLIR | the linear layer with the bias added inside the matrix slice |
-| `nn/affine-own-bias` | MLIR | an affine layer whose bias is the vector it multiplies: one word used by two instructions of a product |
 | `nn/affine-batch` | MLIR | two affine layers in a loop, each with its own matrix |
-| `nn/batch-linear` | MLIR | a matrix multiplied four times; its columns are stored in the matrix slice once |
-| `nn/two-matrices` | MLIR | two matrices that take turns in one matrix slice's stored columns |
+| `nn/batch-linear` | MLIR | a matrix multiplied four times; its rows are installed in the matrix slice once |
+| `nn/two-matrices` | MLIR | two matrices that take turns as one matrix slice's installed words; the first product is requantized to feed the second |
 | `nn/mlp` | MLIR | two linear layers in a row |
 | `nn/mlp-wide` | MLIR | the same kernel on the 17-slice machine (`machines/tau17.json`) |
-| `nn/gemv8` | MLIR | an 8 x 8 matrix times a vector |
+| `nn/gemv8` | MLIR | an 8 x 8 matrix times a vector; the matrix is dealt out over two memories and installed two rows a cycle |
 | `nn/conv1d` | MLIR | a three-tap convolution along the lanes, using lane shifts |
 | `nn/conv-taps` | Python | a Python loop over constant taps inside a `tau.loop` |
 | `nn/maxpool` | MLIR | pooling over neighbouring lanes, using lane rotation |
-| `ops/elementwise` | Python & MLIR | a loop of add, subtract and max over four words |
+| `ops/elementwise` | Python & MLIR | a loop of add, subtract and max over four values of 16 bits |
 | `ops/axpy` | MLIR | scaled add, updating a buffer in place |
-| `ops/axpy-slow-mul` | MLIR | the same kernel on a machine whose multiply takes three cycles (`machines/tau9-slow-mul.json`) |
-| `ops/clip` | MLIR | clamping between two bounds |
+| `ops/axpy-slow-mul` | MLIR | the same kernel on a machine whose multiply takes three cycles (`machines/tau13-slow-mul.json`) |
+| `ops/clip` | MLIR | clamping values of 32 bits between two bounds |
 | `ops/leaky-relu` | MLIR | a constant word, a lane compare and a lane-wise select |
-| `ops/bitops` | MLIR | absolute value, negation, constant add and multiply, shifts, and, or, xor |
+| `ops/bitops` | MLIR | absolute value, negation, constant add and multiply, shifts, and, or, xor, on values of 16 bits |
 | `ops/lanes` | MLIR | reverse, broadcast and permute |
 | `ops/shuffle` | MLIR | the rearrangement slice, and a value that waits in memory |
 | `ops/east-side` | MLIR | buffers east of the vector slice; uses the east matrix and rearrangement slices |
